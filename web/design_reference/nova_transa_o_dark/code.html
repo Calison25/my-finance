@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Observatory - New Transaction</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;500;600&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-error": "#690005",
+                      "outline": "#8b919e",
+                      "secondary-fixed-dim": "#b0c7f5",
+                      "tertiary-fixed-dim": "#ffb692",
+                      "on-surface-variant": "#c1c6d5",
+                      "primary-container": "#0066cc",
+                      "background": "#0e141a",
+                      "surface": "#0e141a",
+                      "on-tertiary-fixed": "#341100",
+                      "on-background": "#dde3ec",
+                      "on-tertiary-container": "#ffe3d6",
+                      "primary-fixed-dim": "#aac7ff",
+                      "secondary-container": "#334970",
+                      "on-secondary-fixed": "#001b3e",
+                      "surface-dim": "#0e141a",
+                      "secondary": "#b0c7f5",
+                      "surface-container-highest": "#2f353c",
+                      "surface-container-high": "#252b31",
+                      "tertiary-container": "#af4900",
+                      "surface-container": "#1a2027",
+                      "surface-variant": "#2f353c",
+                      "on-primary-container": "#dfe8ff",
+                      "on-primary": "#002f65",
+                      "surface-container-low": "#161c22",
+                      "primary-fixed": "#d7e3ff",
+                      "on-secondary-fixed-variant": "#30476d",
+                      "secondary-fixed": "#d7e3ff",
+                      "on-primary-fixed": "#001b3e",
+                      "on-primary-fixed-variant": "#00458e",
+                      "surface-bright": "#343a41",
+                      "on-tertiary": "#562000",
+                      "inverse-primary": "#005cba",
+                      "on-surface": "#dde3ec",
+                      "tertiary": "#ffb692",
+                      "on-error-container": "#ffdad6",
+                      "on-secondary": "#183055",
+                      "inverse-on-surface": "#2b3138",
+                      "error": "#ffb4ab",
+                      "error-container": "#93000a",
+                      "tertiary-fixed": "#ffdbcb",
+                      "on-secondary-container": "#a2b9e6",
+                      "inverse-surface": "#dde3ec",
+                      "surface-tint": "#aac7ff",
+                      "on-tertiary-fixed-variant": "#793000",
+                      "surface-container-lowest": "#090f15",
+                      "outline-variant": "#414753",
+                      "primary": "#aac7ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "fontFamily": {
+                      "headline": ["Manrope"],
+                      "body": ["Inter"],
+                      "label": ["Inter"]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(47, 53, 60, 0.2);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="bg-[#0e141a] dark:bg-[#0e141a] docked full-width top-0 flex justify-between items-center w-full px-6 py-4 max-w-none z-50 sticky">
+<div class="flex items-center gap-4">
+<button class="text-[#c1c6d5] active:scale-95 transition-transform">
+<span class="material-symbols-outlined">close</span>
+</button>
+<h1 class="font-manrope font-bold text-on-surface dark:text-[#dde3ec] text-xl tracking-tight text-[#aac7ff] dark:text-[#aac7ff]">New Transaction</h1>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#aac7ff]">notifications</span>
+<div class="w-8 h-8 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant/15">
+<img class="w-full h-full object-cover" data-alt="professional male portrait with soft rim lighting against a dark navy studio background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAG1rGyqJxn8T8C5M98nE9lgq1rHL1H5MxFPBybNfPRxSyFSiHE32Iofsnvf2-Jl9t1uD5tMoLTkZXhJyPRgq4tfQbXvx4NmHzU5x_ENQ4NlNa-xsafGCMe2L2IMe-WjmqRVZdfBszBhuNnxcbz6cf0CRnJFX1BFXQfY6Wr4xQbXX0olhQQQh4sVbZYOD8feTCG8-cYYRBSKsCjrMVDYxq5hYmE6K_3lTZAxFlqZOC7dVtrebeaDi5aItpCIzNhP0oy8tbGCzC86rc"/>
+</div>
+</div>
+</header>
+<main class="max-w-2xl mx-auto px-6 mt-8 space-y-12">
+<!-- Amount Input Section -->
+<section class="text-center space-y-4">
+<label class="font-headline text-on-surface-variant font-medium tracking-widest text-xs uppercase">Enter Amount</label>
+<div class="flex items-center justify-center gap-2 group">
+<span class="text-primary-fixed-dim text-4xl font-headline font-extrabold">$</span>
+<input class="bg-transparent border-none focus:ring-0 text-6xl md:text-8xl font-headline font-extrabold text-on-surface placeholder-on-surface/20 w-full text-center selection:bg-primary-container/30" placeholder="0.00" type="text" value="0.00"/>
+</div>
+</section>
+<!-- Form Canvas -->
+<div class="space-y-8">
+<!-- Category Selector -->
+<section class="space-y-4">
+<div class="flex justify-between items-center px-2">
+<h3 class="font-headline font-bold text-lg text-on-surface">Category</h3>
+<button class="text-primary text-xs font-label font-semibold tracking-wider uppercase">View All</button>
+</div>
+<div class="grid grid-cols-4 gap-3">
+<button class="flex flex-col items-center justify-center gap-3 p-4 rounded-xl bg-surface-container-highest border border-primary/20 shadow-[0_0_15px_rgba(0,102,204,0.1)] active:scale-95 transition-all">
+<div class="w-12 h-12 flex items-center justify-center rounded-full bg-primary-container text-on-primary-container">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">shopping_bag</span>
+</div>
+<span class="font-label text-xs font-medium text-primary">Shopping</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-3 p-4 rounded-xl bg-surface-container-high hover:bg-surface-container-highest transition-colors active:scale-95">
+<div class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-variant text-on-surface-variant">
+<span class="material-symbols-outlined">restaurant</span>
+</div>
+<span class="font-label text-xs font-medium text-on-surface-variant">Food</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-3 p-4 rounded-xl bg-surface-container-high hover:bg-surface-container-highest transition-colors active:scale-95">
+<div class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-variant text-on-surface-variant">
+<span class="material-symbols-outlined">directions_car</span>
+</div>
+<span class="font-label text-xs font-medium text-on-surface-variant">Transport</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-3 p-4 rounded-xl bg-surface-container-high hover:bg-surface-container-highest transition-colors active:scale-95">
+<div class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-variant text-on-surface-variant">
+<span class="material-symbols-outlined">bolt</span>
+</div>
+<span class="font-label text-xs font-medium text-on-surface-variant">Bills</span>
+</button>
+</div>
+</section>
+<!-- Details Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Date Picker -->
+<div class="p-5 rounded-xl bg-surface-container-low space-y-3 border border-outline-variant/10">
+<label class="font-label text-xs font-bold text-on-surface-variant uppercase tracking-tighter">Transaction Date</label>
+<div class="flex items-center gap-3 bg-surface-container-highest p-3 rounded-lg">
+<span class="material-symbols-outlined text-primary">calendar_today</span>
+<span class="font-body text-sm font-medium">October 24, 2023</span>
+</div>
+</div>
+<!-- Account Selector -->
+<div class="p-5 rounded-xl bg-surface-container-low space-y-3 border border-outline-variant/10">
+<label class="font-label text-xs font-bold text-on-surface-variant uppercase tracking-tighter">Source Account</label>
+<div class="flex items-center justify-between bg-surface-container-highest p-3 rounded-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-tertiary">account_balance_wallet</span>
+<span class="font-body text-sm font-medium">Main Vault</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Notes Input -->
+<section class="p-5 rounded-xl bg-surface-container-low border border-outline-variant/10">
+<label class="font-label text-xs font-bold text-on-surface-variant uppercase tracking-tighter mb-3 block">Transaction Note</label>
+<textarea class="w-full bg-surface-container-highest border-none rounded-lg focus:ring-1 focus:ring-primary/30 text-sm font-body p-4 text-on-surface placeholder-on-surface-variant/40" placeholder="Describe this transaction..." rows="3"></textarea>
+</section>
+<!-- Save Button -->
+<button class="w-full py-5 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-headline font-extrabold text-lg shadow-[0_8px_32px_rgba(0,102,204,0.3)] active:scale-[0.98] transition-all relative overflow-hidden group">
+<div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex items-center justify-center gap-3">
+<span class="material-symbols-outlined">done_all</span>
+<span>Save Transaction</span>
+</div>
+</button>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-2 bg-[#161c22]/80 backdrop-blur-xl dark:bg-[#161c22]/80 border-t border-[#414753]/15 shadow-[0_-8px_32px_rgba(0,0,0,0.3)]">
+<div class="flex flex-col items-center justify-center text-[#c1c6d5] p-3 opacity-60 hover:bg-[#252b31] hover:opacity-100 active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">home</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#c1c6d5] p-3 opacity-60 hover:bg-[#252b31] hover:opacity-100 active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">history</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-[#2f353c] text-[#aac7ff] rounded-xl p-3 shadow-[0_0_15px_rgba(0,102,204,0.2)] active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#c1c6d5] p-3 opacity-60 hover:bg-[#252b31] hover:opacity-100 active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">pie_chart</span>
+</div>
+</nav>
+</body></html>

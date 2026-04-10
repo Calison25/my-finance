@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Transaction History - The Ledger</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-primary": "#95cfe7",
+                    "surface-container-high": "#e6e8ea",
+                    "on-error": "#ffffff",
+                    "on-primary-container": "#83bdd4",
+                    "on-secondary-container": "#0f6f62",
+                    "secondary": "#046b5e",
+                    "secondary-fixed-dim": "#84d5c5",
+                    "tertiary-fixed-dim": "#88d982",
+                    "background": "#f7f9fb",
+                    "surface-container-low": "#f2f4f6",
+                    "on-tertiary": "#ffffff",
+                    "on-tertiary-container": "#77c772",
+                    "secondary-fixed": "#a0f2e1",
+                    "on-primary-fixed-variant": "#014d61",
+                    "surface-container-lowest": "#ffffff",
+                    "on-background": "#191c1e",
+                    "primary-fixed": "#b9eaff",
+                    "outline": "#70787c",
+                    "surface-bright": "#f7f9fb",
+                    "surface-variant": "#e0e3e5",
+                    "surface-container": "#eceef0",
+                    "on-tertiary-fixed-variant": "#005312",
+                    "primary-container": "#004d61",
+                    "inverse-surface": "#2d3133",
+                    "secondary-container": "#9defde",
+                    "on-tertiary-fixed": "#002204",
+                    "on-primary": "#ffffff",
+                    "tertiary": "#003909",
+                    "error": "#ba1a1a",
+                    "on-surface": "#191c1e",
+                    "tertiary-fixed": "#a3f69c",
+                    "primary": "#003544",
+                    "inverse-on-surface": "#eff1f3",
+                    "outline-variant": "#c0c8cc",
+                    "surface-dim": "#d8dadc",
+                    "on-surface-variant": "#40484c",
+                    "on-error-container": "#93000a",
+                    "primary-fixed-dim": "#95cfe7",
+                    "surface": "#f7f9fb",
+                    "surface-tint": "#28657a",
+                    "surface-container-highest": "#e0e3e5",
+                    "on-secondary-fixed": "#00201b",
+                    "on-secondary-fixed-variant": "#005046",
+                    "on-secondary": "#ffffff",
+                    "tertiary-container": "#005312",
+                    "error-container": "#ffdad6",
+                    "on-primary-fixed": "#001f29"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .tonal-shift-bg {
+            background: linear-gradient(180deg, rgba(247, 249, 251, 0) 0%, rgba(242, 244, 246, 1) 100%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface font-body text-on-background min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="w-full top-0 sticky z-40 bg-slate-50 dark:bg-slate-900">
+<div class="flex justify-between items-center px-6 py-4 w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-4">
+<img alt="User Profile" class="w-10 h-10 rounded-full object-cover ring-2 ring-outline-variant/10" data-alt="Professional headshot of a person with friendly expression, soft natural indoor lighting, minimalist background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcajzci9HJ40C_qRGoQWeQ_c_K8G0L8nRYMpBsT95ut6WcvhdNVEjFNOPuhGaYrvk9BrXlSL74rX5HJdiXp7WbD_RZ5RJFl9RsswQXVqV8wff1BAb4CZidArDbQNi6Z40xnGm8-GNCkp85YG3EB-vFSZtNYPjHGZZKfBuBq9dtOTrC_8DAwa1jpOYih5xYlkKCkcH9wnzeXlQMzSTfZKYQvMyfoI4NVBh0GQvjlDNl-mhN9hw4rkS9K9ZyFBso7Qf1ADyTD4gpTLQ"/>
+<h1 class="font-headline font-bold text-xl tracking-tight text-cyan-900 dark:text-cyan-100">The Ledger</h1>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined text-slate-500 dark:text-slate-400" data-icon="notifications">notifications</span>
+</button>
+</div>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-6 mt-8">
+<!-- Search and Filter Section -->
+<section class="mb-10">
+<h2 class="font-headline text-3xl font-extrabold tracking-tight mb-6 text-primary">Transaction History</h2>
+<div class="flex flex-col md:flex-row gap-4 items-center">
+<div class="relative w-full md:flex-1">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" data-icon="search">search</span>
+<input class="w-full pl-12 pr-4 py-3.5 bg-surface-container-low border-none rounded-xl focus:ring-2 focus:ring-primary/20 text-on-surface placeholder:text-on-surface-variant/60 font-medium" placeholder="Search transactions..." type="text"/>
+</div>
+<div class="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+<button class="flex items-center gap-2 px-5 py-3 rounded-xl font-semibold whitespace-nowrap hover:bg-surface-container-high transition-colors bg-[#0066CC] text-white">
+<span class="material-symbols-outlined text-[20px]" data-icon="category">category</span>
+                        Category
+                    </button>
+<button class="flex items-center gap-2 px-5 py-3 rounded-xl font-semibold whitespace-nowrap hover:bg-surface-container-high transition-colors bg-[#0066CC] text-white">
+<span class="material-symbols-outlined text-[20px]" data-icon="calendar_today">calendar_today</span>
+                        Date
+                    </button>
+<button class="flex items-center gap-2 px-5 py-3 rounded-xl font-semibold whitespace-nowrap hover:bg-surface-container-high transition-colors bg-[#0066CC] text-white">
+<span class="material-symbols-outlined text-[20px]" data-icon="filter_list">filter_list</span>
+                        Amount
+                    </button>
+</div>
+</div>
+</section>
+<!-- Transactions Groups -->
+<div class="space-y-12">
+<!-- Group: Today -->
+<section>
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline text-sm font-bold uppercase tracking-[0.2em] text-on-surface-variant">Today</h3>
+<span class="h-[1px] flex-1 bg-outline-variant/10 ml-4"></span>
+</div>
+<div class="space-y-1">
+<!-- Item 1 -->
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl hover:bg-surface-container-low transition-all cursor-pointer">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 flex items-center justify-center rounded-xl bg-primary-container text-on-primary-container">
+<span class="material-symbols-outlined" data-icon="restaurant">restaurant</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface tracking-tight">The Artisan Bakery</p>
+<p class="text-sm text-on-surface-variant">Dining &amp; Drinks</p>
+</div>
+</div>
+<p class="font-headline font-bold text-error">-$24.50</p>
+</div>
+<!-- Item 2 -->
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl hover:bg-surface-container-low transition-all cursor-pointer">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 flex items-center justify-center rounded-xl bg-secondary-container text-on-secondary-container">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface tracking-tight">Dividend Payment</p>
+<p class="text-sm text-on-surface-variant">Investment Income</p>
+</div>
+</div>
+<p class="font-headline font-bold text-tertiary">+$1,450.00</p>
+</div>
+</div>
+</section>
+<!-- Group: Yesterday -->
+<section>
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline text-sm font-bold uppercase tracking-[0.2em] text-on-surface-variant">Yesterday</h3>
+<span class="h-[1px] flex-1 bg-outline-variant/10 ml-4"></span>
+</div>
+<div class="space-y-1">
+<!-- Item 3 -->
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl hover:bg-surface-container-low transition-all cursor-pointer">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-high text-primary">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface tracking-tight">Whole Foods Market</p>
+<p class="text-sm text-on-surface-variant">Groceries</p>
+</div>
+</div>
+<p class="font-headline font-bold text-error">-$112.84</p>
+</div>
+<!-- Item 4 -->
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl hover:bg-surface-container-low transition-all cursor-pointer">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-high text-primary">
+<span class="material-symbols-outlined" data-icon="commute">commute</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface tracking-tight">Uber Technologies</p>
+<p class="text-sm text-on-surface-variant">Transport</p>
+</div>
+</div>
+<p class="font-headline font-bold text-error">-$32.00</p>
+</div>
+</div>
+</section>
+<!-- Group: Last Week -->
+<section>
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline text-sm font-bold uppercase tracking-[0.2em] text-on-surface-variant">Last Week</h3>
+<span class="h-[1px] flex-1 bg-outline-variant/10 ml-4"></span>
+</div>
+<div class="space-y-1">
+<!-- Item 5 -->
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl hover:bg-surface-container-low transition-all cursor-pointer">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-high text-primary">
+<span class="material-symbols-outlined" data-icon="subscriptions">subscriptions</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface tracking-tight">Netflix Subscription</p>
+<p class="text-sm text-on-surface-variant">Entertainment</p>
+</div>
+</div>
+<p class="font-headline font-bold text-error">-$19.99</p>
+</div>
+<!-- Item 6 -->
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl hover:bg-surface-container-low transition-all cursor-pointer">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 flex items-center justify-center rounded-xl bg-secondary-container text-on-secondary-container">
+<span class="material-symbols-outlined" data-icon="work">work</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface tracking-tight">Salary Deposit</p>
+<p class="text-sm text-on-surface-variant">Income</p>
+</div>
+</div>
+<p class="font-headline font-bold text-tertiary">+$8,200.00</p>
+</div>
+<!-- Item 7 -->
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl hover:bg-surface-container-low transition-all cursor-pointer">
+<div class="flex items-center gap-5">
+<div class="w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-high text-primary">
+<span class="material-symbols-outlined" data-icon="health_and_safety">health_and_safety</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface tracking-tight">Health Insurance Premium</p>
+<p class="text-sm text-on-surface-variant">Insurance</p>
+</div>
+</div>
+<p class="font-headline font-bold text-error">-$450.00</p>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl z-50 rounded-t-2xl shadow-[0px_-12px_32px_rgba(25,28,30,0.06)]">
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 px-5 py-2.5 hover:text-cyan-700 dark:hover:text-cyan-200 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="home">home</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center dark:bg-cyan-100 text-white dark:text-cyan-950 rounded-xl px-5 py-2.5 transition-all active:scale-90 duration-200 bg-[#0066CC]" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="receipt_long" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide">History</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 px-5 py-2.5 hover:text-cyan-700 dark:hover:text-cyan-200 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="add_circle">add_circle</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide">Add</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 px-5 py-2.5 hover:text-cyan-700 dark:hover:text-cyan-200 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="pie_chart">pie_chart</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide">Budget</span>
+</a>
+</nav>
+</body></html>

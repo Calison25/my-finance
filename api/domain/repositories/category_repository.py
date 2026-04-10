@@ -1,0 +1,12 @@
+from typing import Protocol
+from uuid import UUID
+
+from api.domain.entities.category import Category
+
+
+class CategoryRepository(Protocol):
+    async def list_all(self, user_id: UUID | None = None) -> list[Category]: ...
+
+    async def create(self, category: Category) -> Category: ...
+
+    async def delete(self, category_id: UUID) -> None: ...

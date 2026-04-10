@@ -1,0 +1,190 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* ===== Light Theme (Azure Ledger) ===== */
+  --color-surface: #f7f9fb;
+  --color-surface-dim: #d8dde3;
+  --color-surface-bright: #f7f9fb;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f4f6;
+  --color-surface-container: #eceef0;
+  --color-surface-container-high: #e6e8ea;
+  --color-surface-container-highest: #e0e3e5;
+  --color-surface-variant: #dfe3e8;
+
+  --color-on-surface: #191c1e;
+  --color-on-surface-variant: #40484c;
+
+  --color-primary: #003544;
+  --color-primary-container: #004d61;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #c4e7ff;
+  --color-primary-fixed-dim: #8aceff;
+
+  --color-secondary: #4a6579;
+  --color-secondary-container: #cde5f5;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #051f30;
+
+  --color-tertiary: #7d4e24;
+  --color-tertiary-container: #ffdbcb;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #2e1500;
+
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #410002;
+
+  --color-outline: #6f797e;
+  --color-outline-variant: #c0c8cc;
+
+  --color-inverse-surface: #2e3133;
+  --color-inverse-on-surface: #eff1f3;
+  --color-inverse-primary: #8aceff;
+
+  --color-surface-tint: #003544;
+
+  /* Backward compat */
+  --color-background: #f7f9fb;
+  --color-foreground: #191c1e;
+
+  /* Radius */
+  --radius: 0.75rem;
+
+  /* Fonts */
+  --font-headline: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ===== Dark Theme (Azure Ledger Nocturne) ===== */
+.dark {
+  --color-surface: #0e141a;
+  --color-surface-dim: #0e141a;
+  --color-surface-bright: #343a41;
+  --color-surface-container-lowest: #090f15;
+  --color-surface-container-low: #161c22;
+  --color-surface-container: #1a2027;
+  --color-surface-container-high: #252b31;
+  --color-surface-container-highest: #2f353c;
+  --color-surface-variant: #2f353c;
+
+  --color-on-surface: #dde3ec;
+  --color-on-surface-variant: #c1c6d5;
+
+  --color-primary: #aac7ff;
+  --color-primary-container: #0066cc;
+  --color-on-primary: #002f65;
+  --color-on-primary-container: #dfe8ff;
+  --color-primary-fixed-dim: #aac7ff;
+
+  --color-secondary: #b0c7f5;
+  --color-secondary-container: #334970;
+  --color-on-secondary: #183055;
+  --color-on-secondary-container: #a2b9e6;
+
+  --color-tertiary: #ffb692;
+  --color-tertiary-container: #af4900;
+  --color-on-tertiary: #562000;
+  --color-on-tertiary-container: #ffe3d6;
+
+  --color-error: #ffb4ab;
+  --color-error-container: #93000a;
+  --color-on-error: #690005;
+  --color-on-error-container: #ffdad6;
+
+  --color-outline: #8b919e;
+  --color-outline-variant: #414753;
+
+  --color-inverse-surface: #dde3ec;
+  --color-inverse-on-surface: #2b3138;
+  --color-inverse-primary: #005cba;
+
+  --color-surface-tint: #aac7ff;
+
+  --color-background: #0e141a;
+  --color-foreground: #dde3ec;
+}
+
+/* ===== Base Styles ===== */
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  border-color: var(--color-outline-variant);
+}
+
+/* ===== Material Symbols config ===== */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ===== Design System Utilities ===== */
+.glass-card {
+  background: rgba(52, 58, 65, 0.2);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.ghost-border {
+  border: 1px solid rgba(65, 71, 83, 0.15);
+}
+
+.atmos-shadow {
+  box-shadow: 0 24px 40px rgba(48, 71, 109, 0.08);
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-container-highest);
+  border-radius: 10px;
+}
+
+/* ===== Dialog ===== */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog-content {
+  background: var(--color-surface-container-low);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  z-index: 51;
+}
+
+.dialog-content:is(.dark *) {
+  border: 1px solid rgba(65, 71, 83, 0.15);
+}
+
+/* ===== Selection ===== */
+::selection {
+  background: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+}

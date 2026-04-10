@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Azure Ledger - Secure Login</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-container": "#83bdd4",
+                        "surface-container": "#eceef0",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed-variant": "#005046",
+                        "on-secondary-fixed": "#00201b",
+                        "tertiary-container": "#005312",
+                        "surface-variant": "#e0e3e5",
+                        "on-tertiary-fixed-variant": "#005312",
+                        "on-primary-fixed-variant": "#014d61",
+                        "primary-fixed-dim": "#95cfe7",
+                        "on-background": "#191c1e",
+                        "surface-tint": "#28657a",
+                        "surface-container-high": "#e6e8ea",
+                        "surface-container-low": "#f2f4f6",
+                        "on-surface-variant": "#40484c",
+                        "on-secondary-container": "#0f6f62",
+                        "primary": "#003544",
+                        "tertiary-fixed": "#a3f69c",
+                        "tertiary": "#003909",
+                        "error": "#ba1a1a",
+                        "secondary-fixed-dim": "#84d5c5",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#d8dadc",
+                        "outline-variant": "#c0c8cc",
+                        "outline": "#70787c",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-surface": "#191c1e",
+                        "error-container": "#ffdad6",
+                        "background": "#f7f9fb",
+                        "primary-container": "#004d61",
+                        "on-tertiary-container": "#77c772",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed-dim": "#88d982",
+                        "surface-container-lowest": "#ffffff",
+                        "surface": "#f7f9fb",
+                        "surface-bright": "#f7f9fb",
+                        "secondary": "#046b5e",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-tertiary-fixed": "#002204",
+                        "on-primary-fixed": "#001f29",
+                        "inverse-primary": "#95cfe7",
+                        "secondary-fixed": "#a0f2e1",
+                        "primary-fixed": "#b9eaff",
+                        "secondary-container": "#9defde",
+                        "inverse-surface": "#2d3133"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, .headline { font-family: 'Manrope', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary-container selection:text-white min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<!-- As per "Shell Visibility & Relevance": Navigation shell suppressed for transactional screens, 
+         but TopAppBar title is maintained for brand presence as per task. -->
+<header class="bg-[#f7f9fb] dark:bg-slate-950 flex items-center justify-between px-6 h-16 w-full docked full-width top-0">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#003544] dark:text-cyan-500" style="font-size: 24px;">account_balance</span>
+<span class="text-xl font-bold tracking-tight text-[#003544] dark:text-cyan-500">Azure Ledger</span>
+</div>
+<div class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[#e6e8ea] transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-slate-500">help_outline</span>
+</div>
+</header>
+<main class="flex-grow flex items-center justify-center px-4 py-12 relative overflow-hidden">
+<!-- Abstract Background Decorative Elements -->
+<div class="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] bg-primary-container/5 rounded-full blur-[100px] pointer-events-none"></div>
+<div class="absolute bottom-[-10%] left-[-5%] w-[300px] h-[300px] bg-secondary/5 rounded-full blur-[80px] pointer-events-none"></div>
+<div class="w-full max-w-[440px] z-10">
+<!-- Hero Section -->
+<div class="text-center mb-10">
+<h1 class="text-4xl font-extrabold text-primary tracking-tight mb-3">Secure Login</h1>
+<p class="text-on-surface-variant leading-relaxed px-4">
+                    Access your institutional-grade financial dashboard with multi-factor architectural security.
+                </p>
+</div>
+<!-- Login Card -->
+<div class="bg-surface-container-lowest rounded-xl p-8 shadow-[0px_12px_32px_rgba(25,28,30,0.06)] ring-1 ring-outline-variant/10">
+<form action="#" class="space-y-6" method="POST">
+<!-- Email Field -->
+<div class="space-y-2">
+<label class="block text-sm font-medium text-on-surface-variant ml-1" for="email">Email Address</label>
+<div class="relative group">
+<input class="w-full bg-surface-container-low border-none rounded-lg py-3.5 px-4 text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest transition-all duration-200" id="email" name="email" placeholder="name@company.com" type="email"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="space-y-2">
+<div class="flex items-center justify-between ml-1">
+<label class="block text-sm font-medium text-on-surface-variant" for="password">Password</label>
+<a class="text-xs font-semibold text-secondary hover:text-primary transition-colors" href="#">Forgot Password?</a>
+</div>
+<div class="relative group">
+<input class="w-full bg-surface-container-low border-none rounded-lg py-3.5 px-4 text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest transition-all duration-200" id="password" name="password" placeholder="••••••••••••" type="password"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors" type="button">
+<span class="material-symbols-outlined">visibility</span>
+</button>
+</div>
+</div>
+<!-- Sign In Button -->
+<button class="w-full text-white font-semibold py-4 rounded-lg shadow-sm hover:brightness-110 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2" style="background-color: #0066CC;" type="submit">
+                        Sign In
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</form>
+<!-- Divider -->
+<div class="relative my-8">
+<div class="absolute inset-0 flex items-center">
+<div class="w-full border-t border-outline-variant/30"></div>
+</div>
+<div class="relative flex justify-center text-xs uppercase tracking-widest font-bold text-outline bg-surface-container-lowest px-4">
+                        Or continue with
+                    </div>
+</div>
+<!-- Social Logins -->
+<div class="grid grid-cols-2 gap-4">
+<button class="flex items-center justify-center gap-2 bg-surface-container-low py-3 rounded-lg hover:bg-surface-container-high transition-colors active:scale-[0.98] duration-150">
+<img alt="" class="w-5 h-5 opacity-80" data-alt="Official Google G logo in flat minimalist design style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQSnT6UJJ1w0JHhPkrI2wmBHOTXrfa7MFDVn_Hxp4vdfI29QfVHj78yhOlQ6TwSt_bgCD0160IaLvIlKBIL8aQ71ZFKVXg4zMocgPmMOlxHaOLxLZvIJW9MO-aHdfPyfpLdCSH8nL1pM_WFMIApftQNjSS_vzRCnTaP4Q6-RPzFQU75p8TRWkOzpiRNc3kHjEGPHX6UvJ25CpfB0jiIWCsxlOT8Han2kR-sL7zfNVSk_j_CPhnKWXs1e7s8GVhCgz4G5vOPDplC-A"/>
+<span class="text-sm font-semibold text-on-surface">Google</span>
+</button>
+<button class="flex items-center justify-center gap-2 bg-surface-container-low py-3 rounded-lg hover:bg-surface-container-high transition-colors active:scale-[0.98] duration-150">
+<img alt="" class="w-5 h-5 opacity-80" data-alt="Official Apple logo in flat minimalist design style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6ZD6Y1PwZ0cGZvLR62iPlxh0G1ZoB5AEfXFAnN_8w94bTjQCQEy8uUR4QSXWCOY0-hj_avN25dv1TKzoWMzbchcgK_VuN9gyBP6YwDQhIPxeVSzLpxaZ12drmDJwt8tfWNUWeNPjLidcAGljQ0F0c9_BFiqvj47S78s4DB4YGWpl3x-b2KbkkLyFFJbqKfTShOZuf0wHgQ8tXb2WalXZXT8r4omZwpGTaljEwraSm1e1jnW1DPwefODPyxyIXbomxFXa8-jvGFMk"/>
+<span class="text-sm font-semibold text-on-surface">Apple</span>
+</button>
+</div>
+</div>
+<!-- Footer -->
+<div class="mt-8 text-center">
+<p class="text-on-surface-variant text-sm">
+                    Don't have an account? 
+                    <a class="text-primary font-bold hover:underline decoration-2 underline-offset-4 ml-1" href="#">Sign Up</a>
+</p>
+</div>
+</div>
+</main>
+<!-- Footer Security Badge -->
+<footer class="py-8 px-6 flex flex-col items-center gap-4">
+<div class="flex items-center gap-4 opacity-40">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">verified_user</span>
+<span class="text-[10px] font-bold tracking-widest uppercase">AES-256 Encrypted</span>
+</div>
+<div class="w-1 h-1 bg-outline rounded-full"></div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">shield</span>
+<span class="text-[10px] font-bold tracking-widest uppercase">FDIC Insured</span>
+</div>
+</div>
+<!-- Bottom Link (Non-navigational version of the Shell elements) -->
+<div class="flex gap-6">
+<a class="text-[11px] font-semibold text-slate-400 hover:text-primary transition-colors tracking-wide" href="#">Privacy Policy</a>
+<a class="text-[11px] font-semibold text-slate-400 hover:text-primary transition-colors tracking-wide" href="#">Security Terms</a>
+<a class="text-[11px] font-semibold text-slate-400 hover:text-primary transition-colors tracking-wide" href="#">Support</a>
+</div>
+</footer>
+</body></html>

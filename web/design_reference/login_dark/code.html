@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Azure Ledger - Secure Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#690005",
+                        "outline": "#8b919e",
+                        "secondary-fixed-dim": "#b0c7f5",
+                        "tertiary-fixed-dim": "#ffb692",
+                        "on-surface-variant": "#c1c6d5",
+                        "primary-container": "#0066cc",
+                        "background": "#0e141a",
+                        "surface": "#0e141a",
+                        "on-tertiary-fixed": "#341100",
+                        "on-background": "#dde3ec",
+                        "on-tertiary-container": "#ffe3d6",
+                        "primary-fixed-dim": "#aac7ff",
+                        "secondary-container": "#334970",
+                        "on-secondary-fixed": "#001b3e",
+                        "surface-dim": "#0e141a",
+                        "secondary": "#b0c7f5",
+                        "surface-container-highest": "#2f353c",
+                        "surface-container-high": "#252b31",
+                        "tertiary-container": "#af4900",
+                        "surface-container": "#1a2027",
+                        "surface-variant": "#2f353c",
+                        "on-primary-container": "#dfe8ff",
+                        "on-primary": "#002f65",
+                        "surface-container-low": "#161c22",
+                        "primary-fixed": "#d7e3ff",
+                        "on-secondary-fixed-variant": "#30476d",
+                        "secondary-fixed": "#d7e3ff",
+                        "on-primary-fixed": "#001b3e",
+                        "on-primary-fixed-variant": "#00458e",
+                        "surface-bright": "#343a41",
+                        "on-tertiary": "#562000",
+                        "inverse-primary": "#005cba",
+                        "on-surface": "#dde3ec",
+                        "tertiary": "#ffb692",
+                        "on-error-container": "#ffdad6",
+                        "on-secondary": "#183055",
+                        "inverse-on-surface": "#2b3138",
+                        "error": "#ffb4ab",
+                        "error-container": "#93000a",
+                        "tertiary-fixed": "#ffdbcb",
+                        "on-secondary-container": "#a2b9e6",
+                        "inverse-surface": "#dde3ec",
+                        "surface-tint": "#aac7ff",
+                        "on-tertiary-fixed-variant": "#793000",
+                        "surface-container-lowest": "#090f15",
+                        "outline-variant": "#414753",
+                        "primary": "#aac7ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(47, 53, 60, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body min-h-screen flex items-center justify-center p-4 selection:bg-primary-container selection:text-on-primary-container">
+<!-- Background Atmospheric Elements -->
+<div class="fixed inset-0 overflow-hidden pointer-events-none">
+<div class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] rounded-full bg-primary/10 blur-[120px]"></div>
+<div class="absolute bottom-[5%] right-[5%] w-[30%] h-[30%] rounded-full bg-tertiary/5 blur-[100px]"></div>
+</div>
+<main class="relative w-full max-w-5xl grid grid-cols-1 md:grid-cols-12 gap-0 overflow-hidden rounded-xl bg-surface-container-low shadow-[0_24px_48px_rgba(0,0,0,0.5)]">
+<!-- Left Side: Visual/Branding (Asymmetric) -->
+<section class="hidden md:flex md:col-span-5 relative flex-col justify-between p-12 bg-surface-container-high overflow-hidden">
+<div class="z-10">
+<div class="flex items-center gap-3 mb-12">
+<div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-[0_0_20px_rgba(170,199,255,0.3)]">
+<span class="material-symbols-outlined text-on-primary text-2xl" data-weight="fill" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<span class="font-headline font-extrabold text-2xl tracking-tighter text-primary">Azure Ledger</span>
+</div>
+<h1 class="font-headline text-4xl font-extrabold leading-tight mb-6 text-on-surface">
+                    Experience the <br/> <span class="text-primary-fixed-dim">Financial Observatory</span>
+</h1>
+<p class="text-on-surface-variant leading-relaxed text-lg max-w-xs">
+                    Access your assets through a crystalline lens of absolute clarity and precision.
+                </p>
+</div>
+<div class="relative z-10 mt-auto">
+<div class="glass-panel p-6 rounded-xl border border-outline-variant/15">
+<p class="italic text-on-surface-variant font-medium">"The most intuitive wealth management interface I have ever encountered."</p>
+<div class="mt-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-bright flex items-center justify-center overflow-hidden">
+<img alt="User" data-alt="close-up portrait of a professional male executive in a dark suit with soft cinematic lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3h5lLuMeS2UghhmlzAl12fmlmeGG8lCXfph4GCJcYgHEUsj96WHuzrPcMfCxx76DEr6Av_sD5e84jp5Qg-iFC_kVTzXKLo88MhkKfoXsBCvcX6kO_V8hjEfeYKKT9p-EzNvt9XJ79A8ekHw-ofIss86xouEDEI6kxCu_4PQUZF_GWY0KzvGRSuPpZsrPyC_EPVK6CVxCg4pUQw2r_GmAemMu42Od6xr_tQWCL2f18D6pDmkKlxpRRYW6D4ifsAefgooUgduR6dTg"/>
+</div>
+<div class="text-sm">
+<p class="font-bold text-on-surface">Adrian Thorne</p>
+<p class="text-on-surface-variant opacity-75">Principal Analyst</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Decorative Glow behind content -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-20">
+<div class="absolute inset-0 bg-gradient-to-tr from-primary-container/40 to-transparent"></div>
+</div>
+</section>
+<!-- Right Side: Login Form -->
+<section class="col-span-1 md:col-span-7 p-8 md:p-16 flex flex-col justify-center bg-surface">
+<!-- Mobile Brand Header -->
+<div class="flex md:hidden items-center gap-2 mb-10">
+<span class="material-symbols-outlined text-primary text-3xl">account_balance</span>
+<span class="font-headline font-bold text-xl tracking-tight text-primary">Azure Ledger</span>
+</div>
+<div class="max-w-md w-full mx-auto">
+<header class="mb-10">
+<h2 class="font-headline text-3xl font-bold text-on-surface mb-2">Secure Login</h2>
+<p class="text-on-surface-variant">Enter your credentials to access your vault.</p>
+</header>
+<form class="space-y-6">
+<!-- Email Field -->
+<div class="space-y-2">
+<label class="block font-label text-xs font-bold uppercase tracking-widest text-on-surface-variant/80" for="email">Email Address</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-on-surface-variant text-xl group-focus-within:text-primary transition-colors">mail</span>
+</div>
+<input class="block w-full pl-12 pr-4 py-4 bg-surface-container-highest border-none rounded-xl text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50 transition-all duration-300" id="email" name="email" placeholder="name@company.com" type="email"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="space-y-2">
+<div class="flex justify-between items-center">
+<label class="block font-label text-xs font-bold uppercase tracking-widest text-on-surface-variant/80" for="password">Password</label>
+<a class="text-xs font-semibold text-primary hover:text-primary-fixed-dim transition-colors" href="#">Forgot Password?</a>
+</div>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-on-surface-variant text-xl group-focus-within:text-primary transition-colors">lock</span>
+</div>
+<input class="block w-full pl-12 pr-12 py-4 bg-surface-container-highest border-none rounded-xl text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50 transition-all duration-300" id="password" name="password" placeholder="••••••••" type="password"/>
+<button class="absolute inset-y-0 right-0 pr-4 flex items-center" type="button">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-on-surface transition-colors">visibility</span>
+</button>
+</div>
+</div>
+<!-- Remember Me -->
+<div class="flex items-center">
+<input class="w-5 h-5 rounded border-none bg-surface-container-highest text-primary focus:ring-primary/30 focus:ring-offset-0" id="remember" type="checkbox"/>
+<label class="ml-3 text-sm text-on-surface-variant" for="remember">Stay authenticated for 30 days</label>
+</div>
+<!-- Sign In Button -->
+<button class="w-full py-4 px-6 rounded-xl font-headline font-bold text-on-primary bg-gradient-to-br from-primary to-primary-container shadow-[0_10px_20px_rgba(0,102,204,0.3)] hover:shadow-[0_15px_30px_rgba(0,102,204,0.4)] hover:-translate-y-0.5 transition-all duration-300 active:scale-95" type="submit">
+                        Sign In
+                    </button>
+</form>
+<!-- Social Login Divider -->
+<div class="relative my-10">
+<div class="absolute inset-0 flex items-center">
+<div class="w-full border-t border-outline-variant/15"></div>
+</div>
+<div class="relative flex justify-center text-xs uppercase tracking-[0.2em]">
+<span class="px-4 bg-surface text-on-surface-variant font-bold">Or continue with</span>
+</div>
+</div>
+<!-- Social Login Buttons -->
+<div class="grid grid-cols-2 gap-4">
+<button class="flex items-center justify-center gap-3 py-3.5 px-4 rounded-xl border border-outline-variant/15 bg-surface hover:bg-surface-container-low transition-colors duration-300 group">
+<svg class="w-5 h-5" viewbox="0 0 24 24">
+<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="currentColor"></path>
+<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="currentColor"></path>
+<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="currentColor"></path>
+<path d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="currentColor"></path>
+</svg>
+<span class="text-sm font-semibold text-on-surface">Google</span>
+</button>
+<button class="flex items-center justify-center gap-3 py-3.5 px-4 rounded-xl border border-outline-variant/15 bg-surface hover:bg-surface-container-low transition-colors duration-300 group">
+<svg class="w-5 h-5" viewbox="0 0 24 24">
+<path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z" fill="currentColor"></path>
+</svg>
+<span class="text-sm font-semibold text-on-surface">GitHub</span>
+</button>
+</div>
+<footer class="mt-12 text-center">
+<p class="text-sm text-on-surface-variant">
+                        Don't have an account? 
+                        <a class="font-bold text-primary ml-1 hover:underline underline-offset-4 decoration-primary/30" href="#">Join the Registry</a>
+</p>
+</footer>
+</div>
+</section>
+</main>
+<!-- Support Link Footer -->
+<div class="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-6 opacity-40 hover:opacity-100 transition-opacity duration-300">
+<a class="text-xs font-label font-bold uppercase tracking-[0.2em] text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy</a>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<a class="text-xs font-label font-bold uppercase tracking-[0.2em] text-on-surface-variant hover:text-primary transition-colors" href="#">Security</a>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<a class="text-xs font-label font-bold uppercase tracking-[0.2em] text-on-surface-variant hover:text-primary transition-colors" href="#">Contact</a>
+</div>
+</body></html>

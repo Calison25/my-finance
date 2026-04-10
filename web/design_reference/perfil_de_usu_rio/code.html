@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-fixed-variant": "#004d61",
+                    "on-secondary": "#ffffff",
+                    "on-primary-container": "#0066CC",
+                    "error": "#ba1a1a",
+                    "on-primary-fixed": "#001f29",
+                    "on-tertiary": "#ffffff",
+                    "inverse-on-surface": "#eff1f3",
+                    "surface-container-high": "#e6e8ea",
+                    "secondary-fixed-dim": "#84d5c5",
+                    "tertiary": "#003909",
+                    "surface-container-low": "#f2f4f6",
+                    "primary-fixed-dim": "#95cfe7",
+                    "on-background": "#191c1e",
+                    "surface-variant": "#e0e3e5",
+                    "surface": "#f7f9fb",
+                    "inverse-primary": "#95cfe7",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed": "#00201b",
+                    "surface-dim": "#d8dadc",
+                    "surface-bright": "#f7f9fb",
+                    "secondary-container": "#9defde",
+                    "tertiary-fixed": "#e0f2ff",
+                    "outline-variant": "#c0c8cc",
+                    "inverse-surface": "#2d3133",
+                    "on-tertiary-container": "#0066CC",
+                    "surface-tint": "#0066CC",
+                    "secondary": "#046b5e",
+                    "outline": "#70787c",
+                    "on-tertiary-fixed-variant": "#0066CC",
+                    "on-tertiary-fixed": "#002204",
+                    "surface-container-lowest": "#ffffff",
+                    "on-error": "#ffffff",
+                    "primary-fixed": "#b9eaff",
+                    "on-secondary-fixed-variant": "#005046",
+                    "secondary-fixed": "#a0f2e1",
+                    "tertiary-fixed-dim": "#88d982",
+                    "tertiary-container": "#005312",
+                    "on-error-container": "#93000a",
+                    "surface-container": "#eceef0",
+                    "primary-container": "#0066CC",
+                    "primary": "#0066CC",
+                    "on-primary": "#ffffff",
+                    "surface-container-highest": "#e0e3e5",
+                    "background": "#f7f9fb",
+                    "on-surface-variant": "#40484c",
+                    "on-surface": "#191c1e",
+                    "on-secondary-container": "#0f6f62"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(247, 249, 251, 0.8);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface font-body text-on-surface min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-[#f7f9fb] dark:bg-slate-950/80 backdrop-blur-md flex items-center justify-between px-6 py-4 w-full">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-[#003544] hover:bg-[#f2f4f6] p-2 rounded-full transition-colors active:scale-95 duration-200">arrow_back</button>
+<h1 class="font-['Manrope'] font-bold text-xl tracking-tight text-[#003544]">Profile</h1>
+</div>
+<button class="material-symbols-outlined text-[#003544] hover:bg-[#f2f4f6] p-2 rounded-full transition-colors active:scale-95 duration-200">settings</button>
+</header>
+<main class="pt-24 px-6 max-w-2xl mx-auto space-y-8">
+<!-- Profile Header Section -->
+<section class="flex flex-col items-center text-center space-y-4">
+<div class="relative">
+<div class="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-primary to-secondary">
+<img alt="Arthur Morgan Profile" class="w-full h-full rounded-full object-cover border-4 border-surface" data-alt="Close-up portrait of a professional man in a dark suit with a calm, confident expression, soft natural office lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYjSB9UuHTKTdwYdqPS2prGrlU3KHLxk5xUbLMo233NLt4bkgKvhT1S86cJqmmbz9zGMVw-BhXiBSYwfPldPt14RqyTN70i_-1vsbWaL9YmZVFHImcUQMuZ6_52chGyS2YBWGhojS3mXt8dyqYgpjOijEB1mInrnN_0VP5HAHRpRFl3VP0SoEhVV97c9TRpfeSwKCfnaX01OK2Jx2AN61S4wi1I3Ug5rtDyWBsfsvH6wCsXlp1hqvLlVn7d6ycZCQAO81Xx17Uyoc"/>
+</div>
+<div class="absolute bottom-1 right-1 bg-secondary text-on-secondary w-8 h-8 rounded-full flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<div>
+<h2 class="font-headline font-extrabold text-3xl tracking-tight text-primary">Arthur Morgan</h2>
+<div class="inline-flex items-center px-3 py-1 mt-2 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-medium text-xs tracking-wider uppercase">
+                    Premium Member
+                </div>
+</div>
+</section>
+<!-- Account Info Grid (Bento Style) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="bg-surface-container-lowest p-6 rounded-xl space-y-1">
+<span class="text-on-surface-variant text-xs font-semibold uppercase tracking-widest">Primary Email</span>
+<p class="text-primary font-semibold">arthur.m@ledger.com</p>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl space-y-1">
+<span class="text-on-surface-variant text-xs font-semibold uppercase tracking-widest">Mobile Number</span>
+<p class="text-primary font-semibold">+1 (555) 012-3456</p>
+</div>
+</div>
+<!-- Settings Menu -->
+<div class="space-y-6">
+<h3 class="font-headline font-bold text-lg text-primary px-2">Account Settings</h3>
+<div class="bg-surface-container-lowest rounded-2xl overflow-hidden">
+<!-- Security -->
+<button class="w-full flex items-center justify-between p-5 hover:bg-surface-container-low transition-colors group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">security</span>
+</div>
+<div class="text-left">
+<p class="font-semibold text-on-surface">Security</p>
+<p class="text-xs text-on-surface-variant">2FA, Password management</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+<!-- Notifications -->
+<button class="w-full flex items-center justify-between p-5 hover:bg-surface-container-low transition-colors group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">notifications_active</span>
+</div>
+<div class="text-left">
+<p class="font-semibold text-on-surface">Notifications</p>
+<p class="text-xs text-on-surface-variant">Manage alerts and daily reports</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+<!-- Linked Accounts -->
+<button class="w-full flex items-center justify-between p-5 hover:bg-surface-container-low transition-colors group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">account_balance</span>
+</div>
+<div class="text-left">
+<p class="font-semibold text-on-surface">Linked Accounts</p>
+<p class="text-xs text-on-surface-variant">4 active bank connections</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+<!-- App Preferences -->
+<button class="w-full flex items-center justify-between p-5 hover:bg-surface-container-low transition-colors group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">tune</span>
+</div>
+<div class="text-left">
+<p class="font-semibold text-on-surface">App Preferences</p>
+<p class="text-xs text-on-surface-variant">Theme, Language, Currency</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+</div>
+</div>
+<!-- Help Section -->
+<div class="space-y-4">
+<h3 class="font-headline font-bold text-lg text-primary px-2">Support</h3>
+<div class="grid grid-cols-2 gap-4">
+<button class="bg-surface-container-lowest p-4 rounded-xl flex items-center gap-3 hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-secondary">help_center</span>
+<span class="font-medium text-sm">Help Center</span>
+</button>
+<button class="bg-surface-container-lowest p-4 rounded-xl flex items-center gap-3 hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-secondary">chat_bubble</span>
+<span class="font-medium text-sm">Live Support</span>
+</button>
+</div>
+</div>
+<!-- Sign Out -->
+<div class="pt-8 pb-4">
+<button class="w-full py-4 px-6 rounded-xl bg-[#E6F0FA] text-[#0066CC] font-bold flex items-center justify-center gap-2 hover:bg-[#D1E5F7] active:scale-[0.98] transition-all border border-[#0066CC]/20">
+<span class="material-symbols-outlined">logout</span>
+                Sign Out
+            </button>
+<p class="text-center text-xs text-outline mt-6 font-medium tracking-widest uppercase">Version 2.4.1 (Build 890)</p>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-t-2xl shadow-[0px_-12px_32px_rgba(25,28,30,0.06)] z-50">
+<!-- Wealth -->
+<button class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 hover:text-[#004d61] active:scale-90 transition-transform">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide uppercase mt-1">Wealth</span>
+</button>
+<!-- Analytics -->
+<button class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 hover:text-[#004d61] active:scale-90 transition-transform">
+<span class="material-symbols-outlined">query_stats</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide uppercase mt-1">Analytics</span>
+</button>
+<!-- Markets -->
+<button class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 hover:text-[#004d61] active:scale-90 transition-transform">
+<span class="material-symbols-outlined">show_chart</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide uppercase mt-1">Markets</span>
+</button>
+<!-- Account (Active) -->
+<button class="flex flex-col items-center justify-center text-[#0066CC] dark:text-cyan-400 font-bold bg-[#E6F0FA] dark:bg-slate-800 rounded-xl px-4 py-1 active:scale-90 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide uppercase mt-1">Account</span>
+</button>
+</nav>
+</body></html>

@@ -1,0 +1,16 @@
+from typing import Protocol
+from uuid import UUID
+
+from api.domain.entities.card import Card
+
+
+class CardRepository(Protocol):
+    async def list_by_user(self, user_id: UUID) -> list[Card]: ...
+
+    async def get_by_id(self, card_id: UUID) -> Card | None: ...
+
+    async def create(self, card: Card) -> Card: ...
+
+    async def update(self, card: Card) -> Card: ...
+
+    async def delete(self, card_id: UUID) -> None: ...

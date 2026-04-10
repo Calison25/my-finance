@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Transaction History | Observatory</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#690005",
+                        "outline": "#8b919e",
+                        "secondary-fixed-dim": "#b0c7f5",
+                        "tertiary-fixed-dim": "#ffb692",
+                        "on-surface-variant": "#c1c6d5",
+                        "primary-container": "#0066cc",
+                        "background": "#0e141a",
+                        "surface": "#0e141a",
+                        "on-tertiary-fixed": "#341100",
+                        "on-background": "#dde3ec",
+                        "on-tertiary-container": "#ffe3d6",
+                        "primary-fixed-dim": "#aac7ff",
+                        "secondary-container": "#334970",
+                        "on-secondary-fixed": "#001b3e",
+                        "surface-dim": "#0e141a",
+                        "secondary": "#b0c7f5",
+                        "surface-container-highest": "#2f353c",
+                        "surface-container-high": "#252b31",
+                        "tertiary-container": "#af4900",
+                        "surface-container": "#1a2027",
+                        "surface-variant": "#2f353c",
+                        "on-primary-container": "#dfe8ff",
+                        "on-primary": "#002f65",
+                        "surface-container-low": "#161c22",
+                        "primary-fixed": "#d7e3ff",
+                        "on-secondary-fixed-variant": "#30476d",
+                        "secondary-fixed": "#d7e3ff",
+                        "on-primary-fixed": "#001b3e",
+                        "on-primary-fixed-variant": "#00458e",
+                        "surface-bright": "#343a41",
+                        "on-tertiary": "#562000",
+                        "inverse-primary": "#005cba",
+                        "on-surface": "#dde3ec",
+                        "tertiary": "#ffb692",
+                        "on-error-container": "#ffdad6",
+                        "on-secondary": "#183055",
+                        "inverse-on-surface": "#2b3138",
+                        "error": "#ffb4ab",
+                        "error-container": "#93000a",
+                        "tertiary-fixed": "#ffdbcb",
+                        "on-secondary-container": "#a2b9e6",
+                        "inverse-surface": "#dde3ec",
+                        "surface-tint": "#aac7ff",
+                        "on-tertiary-fixed-variant": "#793000",
+                        "surface-container-lowest": "#090f15",
+                        "outline-variant": "#414753",
+                        "primary": "#aac7ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(52, 58, 65, 0.2);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/30 min-h-screen pb-24">
+<!-- TopAppBar Shell -->
+<header class="bg-[#0e141a] dark:bg-[#0e141a] docked full-width top-0 z-50">
+<div class="flex justify-between items-center w-full px-6 py-4 max-w-none">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-container-high ring-2 ring-primary/20">
+<img alt="User Profile Photo" class="w-full h-full object-cover" data-alt="close up professional portrait of a man with clean studio lighting and dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-vHJsAhdtn7JV07JeG78jmHEK7g5JtyelW58w3Y1aRAaYW8_1u8EgQCkhB4vfFrFldAvDHADyttFdRwCd64Pf2QpgObySQEiR9YdtjaGOVTQZP6_jAc4wOhDFmE4L1Qe6DRJbLwXCOiWoE1Uw7PNeBNF5EKHfBoHIrnNai_aJ3rkarDgp-Julky_8q9IA7Due51X-mE1A5NErhZBimyQ-CkbZSGTY3YCbIKOOJMAx45Vwi0fYse5sD2Thq749VtqR6ySJjyA-tYE"/>
+</div>
+<h1 class="font-manrope font-bold text-on-surface dark:text-[#dde3ec] text-xl font-bold tracking-tight text-[#aac7ff] dark:text-[#aac7ff]">Observatory</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-[#aac7ff] hover:bg-[#252b31] transition-colors duration-300 p-2 rounded-full active:scale-95 transition-transform">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</div>
+</header>
+<main class="px-6 py-4 max-w-5xl mx-auto">
+<!-- Search & Filters -->
+<section class="mb-8 mt-2">
+<div class="relative group">
+<div class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input class="w-full bg-surface-container-high border-none rounded-xl py-4 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-highest transition-all duration-300" placeholder="Search transactions, merchants, or tags..." type="text"/>
+</div>
+<!-- Quick Category Chips -->
+<div class="flex gap-2 mt-4 overflow-x-auto pb-2 no-scrollbar">
+<button class="px-5 py-2 rounded-full bg-primary-container text-on-primary-container font-medium text-sm whitespace-nowrap">All Activity</button>
+<button class="px-5 py-2 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high transition-colors text-sm whitespace-nowrap">Spending</button>
+<button class="px-5 py-2 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high transition-colors text-sm whitespace-nowrap">Income</button>
+<button class="px-5 py-2 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high transition-colors text-sm whitespace-nowrap">Investments</button>
+</div>
+</section>
+<!-- Insights Bento Grid -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+<div class="md:col-span-2 glass-card p-6 rounded-2xl relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'FILL' 1;">analytics</span>
+</div>
+<div class="relative z-10">
+<p class="text-on-surface-variant text-sm font-medium tracking-wide">MONTHLY OUTLOOK</p>
+<h2 class="text-4xl font-headline font-extrabold mt-1 text-on-surface">$12,480.00</h2>
+<div class="mt-4 flex items-center gap-2">
+<span class="flex items-center text-tertiary text-sm font-semibold bg-tertiary-container/20 px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-sm mr-1">trending_up</span>
+                            +14.2%
+                        </span>
+<span class="text-on-surface-variant text-xs italic opacity-70">vs last month</span>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-low p-6 rounded-2xl flex flex-col justify-between border border-outline-variant/15">
+<div>
+<p class="text-on-surface-variant text-sm font-medium">RECURRING</p>
+<p class="text-xl font-bold mt-1">24 active</p>
+</div>
+<div class="mt-4 flex -space-x-2">
+<div class="w-8 h-8 rounded-full bg-surface-bright flex items-center justify-center text-xs border border-surface">S</div>
+<div class="w-8 h-8 rounded-full bg-surface-bright flex items-center justify-center text-xs border border-surface">N</div>
+<div class="w-8 h-8 rounded-full bg-surface-bright flex items-center justify-center text-xs border border-surface">A</div>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center text-xs border border-surface">+3</div>
+</div>
+</div>
+</section>
+<!-- Transaction List -->
+<section class="space-y-8">
+<!-- Date Group: Today -->
+<div>
+<div class="flex items-center justify-between mb-4 sticky top-20 bg-surface/80 backdrop-blur-md py-2 z-20">
+<h3 class="font-headline font-bold text-on-surface-variant text-sm tracking-[0.2em] uppercase">Today</h3>
+<span class="text-xs text-on-surface-variant/50 font-medium">Oct 24, 2023</span>
+</div>
+<div class="space-y-1">
+<!-- Transaction Item -->
+<div class="group flex items-center justify-between p-4 rounded-2xl hover:bg-surface-container-low transition-all duration-300 cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">shopping_cart</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface">Whole Foods Market</p>
+<p class="text-xs text-on-surface-variant">Groceries • 10:42 AM</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-headline font-bold text-error">-$142.30</p>
+<div class="flex justify-end gap-1 mt-1">
+<span class="w-2 h-2 rounded-full bg-outline-variant/30"></span>
+</div>
+</div>
+</div>
+<!-- Transaction Item -->
+<div class="group flex items-center justify-between p-4 rounded-2xl hover:bg-surface-container-low transition-all duration-300 cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-tertiary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">payments</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface">Cloud Solutions Inc.</p>
+<p class="text-xs text-on-surface-variant">Salary • 09:00 AM</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-headline font-bold text-tertiary">+$4,200.00</p>
+<div class="flex justify-end gap-1 mt-1">
+<span class="w-2 h-2 rounded-full bg-tertiary/40"></span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Date Group: Yesterday -->
+<div>
+<div class="flex items-center justify-between mb-4 sticky top-20 bg-surface/80 backdrop-blur-md py-2 z-20">
+<h3 class="font-headline font-bold text-on-surface-variant text-sm tracking-[0.2em] uppercase">Yesterday</h3>
+<span class="text-xs text-on-surface-variant/50 font-medium">Oct 23, 2023</span>
+</div>
+<div class="space-y-1">
+<!-- Transaction Item -->
+<div class="group flex items-center justify-between p-4 rounded-2xl hover:bg-surface-container-low transition-all duration-300 cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">restaurant</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface">The Alchemist Bar</p>
+<p class="text-xs text-on-surface-variant">Dining • 11:15 PM</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-headline font-bold text-error">-$68.00</p>
+<div class="flex justify-end gap-1 mt-1">
+<span class="w-2 h-2 rounded-full bg-outline-variant/30"></span>
+</div>
+</div>
+</div>
+<!-- Transaction Item -->
+<div class="group flex items-center justify-between p-4 rounded-2xl hover:bg-surface-container-low transition-all duration-300 cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">directions_car</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface">Uber Technologies</p>
+<p class="text-xs text-on-surface-variant">Transport • 06:30 PM</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-headline font-bold text-error">-$24.50</p>
+<div class="flex justify-end gap-1 mt-1">
+<span class="w-2 h-2 rounded-full bg-outline-variant/30"></span>
+</div>
+</div>
+</div>
+<!-- Transaction Item -->
+<div class="group flex items-center justify-between p-4 rounded-2xl hover:bg-surface-container-low transition-all duration-300 cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">bolt</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface">Grid Power Corp</p>
+<p class="text-xs text-on-surface-variant">Utilities • 02:45 PM</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-headline font-bold text-error">-$112.00</p>
+<div class="flex justify-end gap-1 mt-1">
+<span class="w-2 h-2 rounded-full bg-outline-variant/30"></span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar Shell -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-2 bg-[#161c22]/80 backdrop-blur-xl dark:bg-[#161c22]/80 shadow-[0_-8px_32px_rgba(0,0,0,0.3)] border-t border-[#414753]/15">
+<a class="flex flex-col items-center justify-center text-[#c1c6d5] p-3 opacity-60 hover:bg-[#252b31] hover:opacity-100 active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-[#2f353c] text-[#aac7ff] rounded-xl p-3 shadow-[0_0_15px_rgba(0,102,204,0.2)] active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">history</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#c1c6d5] p-3 opacity-60 hover:bg-[#252b31] hover:opacity-100 active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">add_circle</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#c1c6d5] p-3 opacity-60 hover:bg-[#252b31] hover:opacity-100 active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">pie_chart</span>
+</a>
+</nav>
+</body></html>
