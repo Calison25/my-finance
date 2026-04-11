@@ -1,14 +1,18 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
 import type { CardType } from "@/types"
 
 export function Cards() {
-  const { cards, banks, addCard, deleteCard, getCardBalance, getCardExpenses } = useFinanceStore()
+  const navigate = useNavigate()
+  const { cards: allCards, banks, addCard, deleteCard, getCardBalance, getCardExpenses } = useFinanceStore()
+  const cards = allCards.filter((c) => c.type === "CREDIT_CARD")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState({
     bank_id: "",
+    custom_bank_name: "",
     name: "",
     type: "CREDIT_CARD" as CardType,
     last_digits: "",
@@ -16,18 +20,21 @@ export function Cards() {
     billing_day: "",
   })
 
+  const isOtherBank = form.bank_id === "__other__"
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.bank_id || !form.name) return
+    if ((!form.bank_id || isOtherBank && !form.custom_bank_name) || !form.name) return
     addCard({
-      bank_id: form.bank_id,
+      bank_id: isOtherBank ? undefined : form.bank_id,
+      custom_bank_name: isOtherBank ? form.custom_bank_name : undefined,
       name: form.name,
       type: form.type,
       last_digits: form.last_digits || undefined,
       credit_limit: form.credit_limit ? Number(form.credit_limit) : undefined,
       billing_day: form.billing_day ? Number(form.billing_day) : undefined,
     })
-    setForm({ bank_id: "", name: "", type: "CREDIT_CARD", last_digits: "", credit_limit: "", billing_day: "" })
+    setForm({ bank_id: "", custom_bank_name: "", name: "", type: "CREDIT_CARD", last_digits: "", credit_limit: "", billing_day: "" })
     setDialogOpen(false)
   }
 
@@ -49,6 +56,30 @@ export function Cards() {
           Novo Cartao
         </button>
       </div>
+
+      {/* Total Card */}
+      {cards.length > 0 && (
+        <div className="glass-card ghost-border rounded-xl p-8 relative overflow-hidden group">
+          <div className="absolute -top-12 -right-12 w-32 h-32 bg-error/10 rounded-full blur-3xl group-hover:bg-error/20 transition-all duration-700" />
+          <p className="text-on-surface-variant font-label text-sm mb-1">Fatura Total dos Cartoes</p>
+          <p className="font-headline font-bold text-4xl text-error">{fmt(cards.reduce((acc, c) => acc + getCardExpenses(c.id), 0))}</p>
+          <div className="flex items-center gap-6 mt-4">
+            <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm">
+              <Icon name="credit_card" className="text-base" />
+              <span>{cards.length} cartao(es) cadastrado(s)</span>
+            </div>
+            {(() => {
+              const totalLimit = cards.reduce((acc, c) => acc + (c.credit_limit ?? 0), 0)
+              return totalLimit > 0 ? (
+                <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm">
+                  <Icon name="account_balance_wallet" className="text-base" />
+                  <span>Limite total: {fmt(totalLimit)}</span>
+                </div>
+              ) : null
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Empty State */}
       {cards.length === 0 ? (
@@ -76,10 +107,11 @@ export function Cards() {
             return (
               <div
                 key={card.id}
-                className="group relative bg-surface-container-high rounded-xl p-6 ghost-border hover:bg-surface-container-highest transition-all duration-300 min-h-[200px] flex flex-col justify-between"
+                onClick={() => navigate(`/transactions?card_id=${card.id}`)}
+                className="group relative bg-surface-container-high rounded-xl p-6 ghost-border hover:bg-surface-container-highest transition-all duration-300 min-h-[200px] flex flex-col justify-between cursor-pointer"
               >
                 <button
-                  onClick={() => deleteCard(card.id)}
+                  onClick={(e) => { e.stopPropagation(); deleteCard(card.id) }}
                   className="absolute top-4 right-4 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error-container/20 text-on-surface-variant hover:text-error"
                 >
                   <Icon name="delete" className="text-lg" />
@@ -143,7 +175,7 @@ export function Cards() {
             <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Banco</label>
             <select
               value={form.bank_id}
-              onChange={(e) => setForm({ ...form, bank_id: e.target.value })}
+              onChange={(e) => setForm({ ...form, bank_id: e.target.value, custom_bank_name: "" })}
               className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
               required
             >
@@ -151,7 +183,17 @@ export function Cards() {
               {banks.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
+              <option value="__other__">Outro</option>
             </select>
+            {isOtherBank && (
+              <input
+                value={form.custom_bank_name}
+                onChange={(e) => setForm({ ...form, custom_bank_name: e.target.value })}
+                placeholder="Nome do banco"
+                className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50 mt-2"
+                required
+              />
+            )}
           </div>
 
           <div className="space-y-2">

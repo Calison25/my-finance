@@ -61,7 +61,7 @@ export function Dashboard() {
               </h2>
               <div className="flex flex-wrap gap-4">
                 {monthlyIncome > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-tertiary-container/20 border border-tertiary-container/30 text-tertiary">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-income-container/20 border border-income-container/30 text-income">
                     <Icon name="trending_up" className="text-sm" />
                     <span className="text-sm font-semibold">
                       +{fmt(monthlyIncome)} este mes
@@ -205,7 +205,7 @@ export function Dashboard() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className={`text-sm font-bold ${tx.type === "INCOME" ? "text-primary" : "text-error"}`}>
+                      <p className={`text-sm font-bold ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
                         {tx.type === "INCOME" ? "+" : "-"}{fmt(tx.amount)}
                       </p>
                     </div>

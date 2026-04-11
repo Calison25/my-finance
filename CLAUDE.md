@@ -7,7 +7,7 @@
 - **Framework Frontend**: React 19 + Vite
 - **UI**: shadcn/ui + Tailwind CSS 4
 - **Banco de dados**: PostgreSQL via Supabase
-- **DB Client**: supabase-py
+- **DB Client**: asyncpg (conexão direta PostgreSQL)
 - **Validacao**: Pydantic v2
 - **State Management**: Zustand
 - **Data Fetching**: TanStack Query
@@ -81,4 +81,4 @@ vercel dev
 - Gastos futuros (is_scheduled) ja abatem do saldo disponivel
 - Sempre usar Pydantic v2 para validacao e serializacao no backend
 - Repository pattern com Protocol (typing) para interfaces
-- Sem ORM - usar supabase-py client direto
+- Sem ORM - usar asyncpg direto (pool async)

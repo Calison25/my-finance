@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
+import { useSearchParams } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
@@ -18,47 +19,139 @@ const CATEGORY_ICONS: Record<string, string> = {
 }
 
 export function Transactions() {
-  const { transactions, cards, categories, banks, addTransaction, deleteTransaction, realizeTransaction } = useFinanceStore()
+  const { transactions, cards, categories, banks, addTransaction, updateTransaction, deleteTransaction, realizeTransaction, getCardBalance, getCardExpenses } = useFinanceStore()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [filterCardId, setFilterCardId] = useState("")
+  const [editingTx, setEditingTx] = useState<string | null>(null)
+  const [editCascade, setEditCascade] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filterCardId = searchParams.get("card_id") ?? ""
+  const setFilterCardId = (id: string) => {
+    if (id) {
+      setSearchParams({ card_id: id })
+    } else {
+      setSearchParams({})
+    }
+  }
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+  })
+  const [expandedSection, setExpandedSection] = useState<"recurring" | "scheduled" | null>(null)
   const [form, setForm] = useState({
     card_id: "",
     description: "",
     amount: "",
     type: "EXPENSE" as TransactionType,
     category_id: "",
+    custom_category_name: "",
     date: new Date().toISOString().slice(0, 10),
     is_scheduled: false,
     scheduled_date: "",
     notes: "",
+    is_installment: false,
+    installments: "",
+    is_recurring: false,
   })
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    if (dropdownOpen) document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [dropdownOpen])
+
+  const isOtherCategory = form.category_id === "__other__"
+
+  function isInstallment(tx: { description: string }) {
+    return /\(\d+\/\d+\)$/.test(tx.description)
+  }
+
+  function getBaseDescription(desc: string) {
+    return desc.replace(/\s\(\d+\/\d+\)$/, "")
+  }
+
+  function openEdit(tx: typeof transactions[0]) {
+    setEditingTx(tx.id)
+    setEditCascade(false)
+    setForm({
+      card_id: tx.card_id,
+      description: getBaseDescription(tx.description),
+      amount: String(tx.amount),
+      type: tx.type,
+      category_id: tx.category_id ?? "",
+      custom_category_name: "",
+      date: tx.date,
+      is_scheduled: tx.is_scheduled,
+      scheduled_date: tx.scheduled_date ?? "",
+      notes: tx.notes ?? "",
+      is_installment: false,
+      installments: "",
+      is_recurring: tx.is_recurring,
+    })
+    setDialogOpen(true)
+  }
+
+  function closeDialog() {
+    setDialogOpen(false)
+    setDropdownOpen(false)
+    setEditingTx(null)
+    setEditCascade(false)
+  }
+
+  const defaultForm = {
+    card_id: "",
+    description: "",
+    amount: "",
+    type: "EXPENSE" as TransactionType,
+    category_id: "",
+    custom_category_name: "",
+    date: new Date().toISOString().slice(0, 10),
+    is_scheduled: false,
+    scheduled_date: "",
+    notes: "",
+    is_installment: false,
+    installments: "",
+    is_recurring: false,
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.card_id || !form.description || !form.amount) return
-    addTransaction({
-      card_id: form.card_id,
-      description: form.description,
-      amount: Number(form.amount),
-      type: form.type,
-      category_id: form.category_id || undefined,
-      date: form.date,
-      is_scheduled: form.is_scheduled,
-      scheduled_date: form.is_scheduled ? form.scheduled_date : undefined,
-      notes: form.notes || undefined,
-    })
-    setForm({
-      card_id: "",
-      description: "",
-      amount: "",
-      type: "EXPENSE",
-      category_id: "",
-      date: new Date().toISOString().slice(0, 10),
-      is_scheduled: false,
-      scheduled_date: "",
-      notes: "",
-    })
-    setDialogOpen(false)
+    if (isOtherCategory && !form.custom_category_name) return
+
+    if (editingTx) {
+      updateTransaction(editingTx, {
+        description: form.description,
+        amount: Number(form.amount),
+        type: form.type,
+        category_id: isOtherCategory ? null : (form.category_id || null),
+        notes: form.notes || null,
+        is_recurring: form.is_recurring,
+      }, editCascade)
+    } else {
+      addTransaction({
+        card_id: form.card_id,
+        description: form.description,
+        amount: Number(form.amount),
+        type: form.type,
+        category_id: isOtherCategory ? undefined : (form.category_id || undefined),
+        custom_category_name: isOtherCategory ? form.custom_category_name : undefined,
+        date: form.date,
+        is_scheduled: form.is_scheduled,
+        scheduled_date: form.is_scheduled ? form.scheduled_date : undefined,
+        notes: form.notes || undefined,
+        installments: form.is_installment && form.installments ? Number(form.installments) : undefined,
+        is_recurring: form.is_recurring || undefined,
+      })
+    }
+
+    setForm(defaultForm)
+    closeDialog()
   }
 
   function getCardName(cardId: string) {
@@ -76,9 +169,9 @@ export function Transactions() {
     return { icon: iconName, name: cat.name }
   }
 
-  const filtered = filterCardId
-    ? transactions.filter((t) => t.card_id === filterCardId)
-    : transactions
+  const filtered = transactions
+    .filter((t) => !filterCardId || t.card_id === filterCardId)
+    .filter((t) => t.date.startsWith(selectedMonth))
 
   const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date))
 
@@ -94,16 +187,46 @@ export function Transactions() {
     return acc + (tx.type === "INCOME" ? tx.amount : -tx.amount)
   }, 0)
 
+  const recurringTxs = sorted.filter((t) => t.is_recurring)
+  const scheduledTxs = sorted.filter((t) => t.is_scheduled && !t.is_realized)
+  const filterCard = filterCardId ? cards.find((c) => c.id === filterCardId) : null
+  const isCreditCardFilter = filterCard?.type === "CREDIT_CARD"
+
+  const monthLabel = new Date(selectedMonth + "-15").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+
+  function changeMonth(delta: number) {
+    const [y, m] = selectedMonth.split("-").map(Number)
+    const d = new Date(y, m - 1 + delta, 1)
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+  }
+
   return (
     <div className="space-y-8">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-extrabold font-headline tracking-tight">Transacoes</h2>
-          <p className="text-on-surface-variant text-sm mt-1">Gerencie seus gastos e receitas</p>
+          <h2 className="text-3xl font-extrabold font-headline tracking-tight">
+            {filterCard ? getCardName(filterCard.id) : "Transacoes"}
+          </h2>
+          {filterCard ? (
+            <p className="text-on-surface-variant text-sm mt-1 flex items-center gap-2">
+              <span>{isCreditCardFilter ? "Fatura:" : "Saldo:"}</span>
+              <span className={`font-bold ${isCreditCardFilter ? "text-error" : getCardBalance(filterCard.id) >= 0 ? "text-primary" : "text-error"}`}>
+                {fmt(isCreditCardFilter ? getCardExpenses(filterCard.id) : getCardBalance(filterCard.id))}
+              </span>
+              {isCreditCardFilter && filterCard.credit_limit && (
+                <>
+                  <span className="text-on-surface-variant/50">|</span>
+                  <span>Limite: {fmt(filterCard.credit_limit)}</span>
+                </>
+              )}
+            </p>
+          ) : (
+            <p className="text-on-surface-variant text-sm mt-1">Gerencie seus gastos e receitas</p>
+          )}
         </div>
         <button
-          onClick={() => setDialogOpen(true)}
+          onClick={() => { setEditingTx(null); setForm(defaultForm); setDialogOpen(true) }}
           className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all atmos-shadow"
         >
           <Icon name="add_circle" className="text-lg" />
@@ -142,12 +265,16 @@ export function Transactions() {
                 <button
                   key={c.id}
                   onClick={() => setFilterCardId(c.id)}
-                  className={`px-5 py-2 rounded-full text-sm whitespace-nowrap transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm whitespace-nowrap transition-colors ${
                     filterCardId === c.id
                       ? "bg-primary-container text-on-primary-container"
                       : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
                   }`}
                 >
+                  <Icon
+                    name={c.type === "CREDIT_CARD" ? "credit_card" : "account_balance"}
+                    className="text-base"
+                  />
                   {bank?.name} - {c.name}
                 </button>
               )
@@ -156,37 +283,129 @@ export function Transactions() {
         )}
       </section>
 
+      {/* Month Picker */}
+      <div className="flex items-center justify-between">
+        <button onClick={() => changeMonth(-1)} className="p-2 rounded-xl hover:bg-surface-container-high transition-colors">
+          <Icon name="chevron_left" className="text-on-surface-variant" />
+        </button>
+        <h3 className="font-headline font-bold text-lg text-on-surface capitalize">{monthLabel}</h3>
+        <button onClick={() => changeMonth(1)} className="p-2 rounded-xl hover:bg-surface-container-high transition-colors">
+          <Icon name="chevron_right" className="text-on-surface-variant" />
+        </button>
+      </div>
+
       {/* Insights */}
       {sorted.length > 0 && (
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2 glass-card p-6 rounded-2xl relative overflow-hidden group ghost-border">
-            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
-              <Icon name="analytics" className="text-8xl" filled />
-            </div>
-            <div className="relative z-10">
-              <p className="text-on-surface-variant text-sm font-medium tracking-wide uppercase">Resumo</p>
-              <h2 className="text-4xl font-headline font-extrabold mt-1 text-on-surface">{fmt(Math.abs(totalMonth))}</h2>
-              <div className="mt-4 flex items-center gap-2">
-                <span className={`flex items-center text-sm font-semibold px-2 py-0.5 rounded ${totalMonth >= 0 ? "text-tertiary bg-tertiary-container/20" : "text-error bg-error-container/20"}`}>
-                  <Icon name={totalMonth >= 0 ? "trending_up" : "trending_down"} className="text-sm mr-1" />
-                  {totalMonth >= 0 ? "Positivo" : "Negativo"}
-                </span>
-                <span className="text-on-surface-variant text-xs italic opacity-70">{sorted.length} transacao(es)</span>
+        <section className="space-y-3">
+          {/* Summary */}
+          {!isCreditCardFilter && (
+            <div className="glass-card p-5 rounded-2xl relative overflow-hidden ghost-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-on-surface-variant text-xs font-medium tracking-wide uppercase">Saldo do mes</p>
+                  <h2 className="text-2xl font-headline font-extrabold mt-0.5 text-on-surface">{fmt(Math.abs(totalMonth))}</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`flex items-center text-xs font-semibold px-2 py-0.5 rounded ${totalMonth >= 0 ? "text-income bg-income-container/20" : "text-error bg-error-container/20"}`}>
+                    <Icon name={totalMonth >= 0 ? "trending_up" : "trending_down"} className="text-xs mr-1" />
+                    {totalMonth >= 0 ? "Positivo" : "Negativo"}
+                  </span>
+                  <span className="text-on-surface-variant text-[10px] opacity-70">{sorted.length} tx</span>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="bg-surface-container-low p-6 rounded-2xl ghost-border flex flex-col justify-between">
-            <div>
-              <p className="text-on-surface-variant text-sm font-medium uppercase">Recorrentes</p>
-              <p className="text-xl font-bold mt-1">
-                {transactions.filter(t => t.is_scheduled && !t.is_realized).length} pendente(s)
-              </p>
+          )}
+          {isCreditCardFilter && (
+            <div className="glass-card p-5 rounded-2xl relative overflow-hidden ghost-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-on-surface-variant text-xs font-medium tracking-wide uppercase">Fatura do mes</p>
+                  <h2 className="text-2xl font-headline font-extrabold mt-0.5 text-error">{fmt(sorted.filter(t => t.type === "EXPENSE").reduce((a, t) => a + t.amount, 0))}</h2>
+                </div>
+                <span className="text-on-surface-variant text-[10px] opacity-70">{sorted.length} transacao(es)</span>
+              </div>
             </div>
-            <div className="mt-4 flex items-center gap-2 text-tertiary text-sm">
-              <Icon name="event_repeat" className="text-base" />
-              <span>Agendados</span>
-            </div>
+          )}
+
+          {/* Recurring + Scheduled */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setExpandedSection(expandedSection === "recurring" ? null : "recurring")}
+              className={`p-4 rounded-2xl ghost-border text-left transition-colors ${expandedSection === "recurring" ? "bg-primary-container/10" : "bg-surface-container-low"}`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Icon name="repeat" className="text-base text-primary" />
+                  <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">Recorrentes</span>
+                </div>
+                <span className="text-lg font-bold text-on-surface">{recurringTxs.length}</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setExpandedSection(expandedSection === "scheduled" ? null : "scheduled")}
+              className={`p-4 rounded-2xl ghost-border text-left transition-colors ${expandedSection === "scheduled" ? "bg-tertiary-container/10" : "bg-surface-container-low"}`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Icon name="schedule" className="text-base text-tertiary" />
+                  <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">Agendados</span>
+                </div>
+                <span className="text-lg font-bold text-on-surface">{scheduledTxs.length}</span>
+              </div>
+            </button>
           </div>
+
+          {/* Expanded: Recurring list */}
+          {expandedSection === "recurring" && recurringTxs.length > 0 && (
+            <div className="bg-surface-container-low rounded-2xl ghost-border overflow-hidden">
+              {recurringTxs.map((tx) => {
+                const cat = getCategoryInfo(tx.category_id)
+                return (
+                  <div key={tx.id} className="flex items-center justify-between px-4 py-2.5 border-b border-outline-variant/10 last:border-0">
+                    <div className="flex items-center gap-2.5">
+                      <Icon name={cat.icon} className="text-sm text-primary" />
+                      <span className="text-sm text-on-surface">{tx.description}</span>
+                    </div>
+                    <span className={`text-sm font-bold ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
+                      {tx.type === "INCOME" ? "+" : "-"}{fmt(tx.amount)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Expanded: Scheduled list */}
+          {expandedSection === "scheduled" && scheduledTxs.length > 0 && (
+            <div className="bg-surface-container-low rounded-2xl ghost-border overflow-hidden">
+              {scheduledTxs.map((tx) => {
+                const cat = getCategoryInfo(tx.category_id)
+                return (
+                  <div key={tx.id} className="flex items-center justify-between px-4 py-2.5 border-b border-outline-variant/10 last:border-0">
+                    <div className="flex items-center gap-2.5">
+                      <Icon name={cat.icon} className="text-sm text-tertiary" />
+                      <div>
+                        <span className="text-sm text-on-surface">{tx.description}</span>
+                        {tx.scheduled_date && <span className="text-[10px] text-on-surface-variant ml-2">{tx.scheduled_date}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-bold ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
+                        {tx.type === "INCOME" ? "+" : "-"}{fmt(tx.amount)}
+                      </span>
+                      <button
+                        onClick={() => realizeTransaction(tx.id)}
+                        title="Marcar como realizado"
+                        className="rounded-full p-1 hover:bg-income-container/20 text-income transition-colors"
+                      >
+                        <Icon name="check_circle" className="text-base" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </section>
       )}
 
@@ -202,62 +421,70 @@ export function Transactions() {
           </p>
         </div>
       ) : (
-        <section className="space-y-8">
+        <section className="space-y-6">
           {Object.entries(grouped).map(([date, txs]) => (
             <div key={date}>
-              <div className="flex items-center justify-between mb-4 sticky top-16 bg-surface/80 backdrop-blur-md py-2 z-20">
-                <h3 className="font-headline font-bold text-on-surface-variant text-sm tracking-[0.2em] uppercase">
+              <div className="flex items-center justify-between mb-2 sticky top-16 bg-surface/80 backdrop-blur-md py-1.5 z-20">
+                <h3 className="font-headline font-bold text-on-surface-variant text-xs tracking-[0.15em] uppercase">
                   {new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}
                 </h3>
-                <span className="text-xs text-on-surface-variant/50 font-medium">{date}</span>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {txs.map((tx) => {
                   const cat = getCategoryInfo(tx.category_id)
                   return (
                     <div
                       key={tx.id}
-                      className="group flex items-center justify-between p-4 rounded-2xl hover:bg-surface-container-low transition-all duration-300"
+                      className="group flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-surface-container-low transition-all duration-200"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-lg bg-surface-container-high flex items-center justify-center shrink-0">
                           <Icon
                             name={cat.icon}
-                            className={tx.type === "INCOME" ? "text-tertiary" : "text-primary"}
+                            className={`text-lg ${tx.type === "INCOME" ? "text-income" : "text-primary"}`}
                           />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold text-on-surface">{tx.description}</p>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-semibold text-on-surface truncate">{tx.description}</p>
                             {tx.is_scheduled && !tx.is_realized && (
-                              <span className="text-[10px] bg-tertiary-container/20 text-tertiary rounded-full px-2 py-0.5 font-medium">
+                              <span className="text-[9px] bg-tertiary-container/20 text-tertiary rounded-full px-1.5 py-px font-medium shrink-0">
                                 Futuro
                               </span>
                             )}
+                            {tx.is_recurring && (
+                              <Icon name="repeat" className="text-xs text-primary shrink-0" />
+                            )}
                           </div>
-                          <p className="text-xs text-on-surface-variant">
+                          <p className="text-[11px] text-on-surface-variant truncate">
                             {cat.name} · {getCardName(tx.card_id)}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <p className={`font-headline font-bold ${tx.type === "INCOME" ? "text-tertiary" : "text-error"}`}>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <p className={`text-sm font-headline font-bold ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
                           {tx.type === "INCOME" ? "+" : "-"}{fmt(tx.amount)}
                         </p>
                         {tx.is_scheduled && !tx.is_realized && (
                           <button
                             onClick={() => realizeTransaction(tx.id)}
                             title="Marcar como realizado"
-                            className="rounded-full p-1.5 hover:bg-tertiary-container/20 text-tertiary transition-colors"
+                            className="rounded-full p-1 hover:bg-income-container/20 text-income transition-colors"
                           >
-                            <Icon name="check_circle" className="text-lg" />
+                            <Icon name="check_circle" className="text-base" />
                           </button>
                         )}
                         <button
-                          onClick={() => deleteTransaction(tx.id)}
-                          className="rounded-full p-1.5 opacity-0 group-hover:opacity-100 hover:bg-error-container/20 text-on-surface-variant hover:text-error transition-all"
+                          onClick={() => openEdit(tx)}
+                          className="rounded-full p-1 opacity-0 group-hover:opacity-100 hover:bg-primary-container/20 text-on-surface-variant hover:text-primary transition-all"
                         >
-                          <Icon name="delete" className="text-lg" />
+                          <Icon name="edit" className="text-base" />
+                        </button>
+                        <button
+                          onClick={() => deleteTransaction(tx.id)}
+                          className="rounded-full p-1 opacity-0 group-hover:opacity-100 hover:bg-error-container/20 text-on-surface-variant hover:text-error transition-all"
+                        >
+                          <Icon name="delete" className="text-base" />
                         </button>
                       </div>
                     </div>
@@ -270,157 +497,349 @@ export function Transactions() {
       )}
 
       {/* Dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title="Nova Transacao">
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Type Toggle */}
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo</label>
-            <div className="grid grid-cols-2 gap-2">
+      <Dialog open={dialogOpen} onClose={closeDialog} title={editingTx ? "Editar Transacao" : "Nova Transacao"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Hero: Type + Amount */}
+          <div className="text-center space-y-3">
+            <div className="inline-flex bg-surface-container-highest rounded-full p-1 gap-1">
               {(["EXPENSE", "INCOME"] as TransactionType[]).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setForm({ ...form, type: t })}
-                  className={`rounded-xl px-3 py-3 text-sm font-medium transition-all ${
+                  className={`rounded-full px-5 py-1.5 text-xs font-bold uppercase tracking-wider transition-all ${
                     form.type === t
                       ? t === "EXPENSE"
-                        ? "bg-error-container/20 text-error border border-error/20"
-                        : "bg-tertiary-container/20 text-tertiary border border-tertiary/20"
-                      : "bg-surface-container-highest text-on-surface-variant hover:bg-surface-bright"
+                        ? "bg-error-container/30 text-error"
+                        : "bg-income-container/30 text-income"
+                      : "text-on-surface-variant hover:text-on-surface"
                   }`}
                 >
                   {t === "EXPENSE" ? "Despesa" : "Receita"}
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Card/Account Select */}
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Cartao / Conta</label>
-            <select
-              value={form.card_id}
-              onChange={(e) => setForm({ ...form, card_id: e.target.value })}
-              className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
-              required
-            >
-              <option value="">Selecione</option>
-              {cards.map((c) => {
-                const bank = banks.find((b) => b.id === c.bank_id)
-                return (
-                  <option key={c.id} value={c.id}>
-                    {bank?.name} - {c.name}
-                  </option>
-                )
-              })}
-            </select>
+            <div className="flex items-baseline justify-center gap-1 w-fit mx-auto">
+              <span className={`text-3xl font-headline font-extrabold ${form.type === "EXPENSE" ? "text-error/60" : "text-income/60"}`}>R$</span>
+              <input
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                placeholder="0,00"
+                type="number"
+                step="0.01"
+                min="0.01"
+                className="bg-transparent border-none text-left text-4xl font-headline font-extrabold text-on-surface placeholder:text-on-surface/20 focus:ring-0 focus:outline-none p-0"
+                style={{ width: `${Math.max(3.5, (form.amount?.length || 0) + 1.5)}ch` }}
+                required
+              />
+            </div>
           </div>
 
           {/* Description */}
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Descricao</label>
-            <input
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Ex: Supermercado"
-              className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-              required
-            />
+          <input
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            placeholder="Descricao (ex: Supermercado)"
+            className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+            required
+          />
+
+          {/* Category chips */}
+          <div className="space-y-1.5">
+            <label className="font-label text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-1">Categoria</label>
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, category_id: "", custom_category_name: "" })}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  !form.category_id
+                    ? "bg-primary-container/20 text-primary border border-primary/20"
+                    : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                }`}
+              >
+                Nenhuma
+              </button>
+              {categories.map((c) => {
+                const iconName = CATEGORY_ICONS[c.name] ?? "receipt_long"
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setForm({ ...form, category_id: c.id, custom_category_name: "" })}
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      form.category_id === c.id
+                        ? "bg-primary-container/20 text-primary border border-primary/20"
+                        : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                    }`}
+                  >
+                    <Icon name={iconName} className="text-sm" />
+                    {c.name}
+                  </button>
+                )
+              })}
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, category_id: "__other__", custom_category_name: "" })}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  isOtherCategory
+                    ? "bg-primary-container/20 text-primary border border-primary/20"
+                    : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                }`}
+              >
+                <Icon name="add" className="text-sm" />
+                Outra
+              </button>
+            </div>
+            {isOtherCategory && (
+              <input
+                value={form.custom_category_name}
+                onChange={(e) => setForm({ ...form, custom_category_name: e.target.value })}
+                placeholder="Nome da categoria"
+                className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+                required
+                autoFocus
+              />
+            )}
           </div>
 
-          {/* Amount */}
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Valor (R$)</label>
-            <input
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-              placeholder="100.00"
-              type="number"
-              step="0.01"
-              min="0.01"
-              className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-              required
-            />
-          </div>
+          {/* Bento: Account + Date (create only) */}
+          {!editingTx && <div className="grid grid-cols-2 gap-3">
+            {/* Account Selector */}
+            <div className="relative">
+              <label className="font-label text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-1 mb-1 block">Conta</label>
+              <input type="hidden" name="card_id" value={form.card_id} required />
+              <button
+                type="button"
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="w-full flex items-center justify-between bg-surface-container-highest rounded-xl px-3 py-2.5 text-sm text-on-surface"
+              >
+                {form.card_id ? (
+                  (() => {
+                    const selected = cards.find((c) => c.id === form.card_id)
+                    const bank = banks.find((b) => b.id === selected?.bank_id)
+                    return (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Icon
+                          name={selected?.type === "CREDIT_CARD" ? "credit_card" : "account_balance"}
+                          className="text-base shrink-0"
+                          style={{ color: bank?.color || undefined }}
+                        />
+                        <span className="text-xs font-medium truncate">{bank?.name} {selected?.last_digits ? `*${selected.last_digits}` : ""}</span>
+                      </div>
+                    )
+                  })()
+                ) : (
+                  <span className="text-xs text-on-surface-variant/40">Selecione</span>
+                )}
+                <Icon name="expand_more" className="text-on-surface-variant text-base shrink-0" />
+              </button>
 
-          {/* Category */}
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Categoria (opcional)</label>
-            <select
-              value={form.category_id}
-              onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-              className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
-            >
-              <option value="">Sem categoria</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
+              {dropdownOpen && (
+                <div ref={dropdownRef} className="absolute z-50 w-[calc(200%+0.75rem)] left-0 mt-1 bg-surface-container-high rounded-xl border border-outline-variant/15 shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                  {cards.filter((c) => c.type === "CHECKING_ACCOUNT").length > 0 && (
+                    <>
+                      <div className="px-3 py-1.5 bg-surface-container text-[10px] font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
+                        <Icon name="account_balance" className="text-xs text-primary" />
+                        Contas Correntes
+                      </div>
+                      {cards.filter((c) => c.type === "CHECKING_ACCOUNT").map((c) => {
+                        const bank = banks.find((b) => b.id === c.bank_id)
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => { setForm({ ...form, card_id: c.id }); setDropdownOpen(false) }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-container-highest transition-colors ${form.card_id === c.id ? "bg-primary/10" : ""}`}
+                          >
+                            <div
+                              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                              style={{ backgroundColor: bank?.color ? `${bank.color}20` : undefined }}
+                            >
+                              <Icon name="account_balance" className="text-base" style={{ color: bank?.color || undefined }} />
+                            </div>
+                            <div className="flex flex-col items-start min-w-0">
+                              <span className="text-sm font-medium text-on-surface truncate w-full">{bank?.name} - {c.name}</span>
+                              <span className="text-[10px] text-on-surface-variant">
+                                Conta Corrente{c.last_digits ? ` • *${c.last_digits}` : ""}
+                              </span>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </>
+                  )}
+                  {cards.filter((c) => c.type === "CREDIT_CARD").length > 0 && (
+                    <>
+                      <div className="px-3 py-1.5 bg-surface-container text-[10px] font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
+                        <Icon name="credit_card" className="text-xs text-tertiary" />
+                        Cartoes de Credito
+                      </div>
+                      {cards.filter((c) => c.type === "CREDIT_CARD").map((c) => {
+                        const bank = banks.find((b) => b.id === c.bank_id)
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => { setForm({ ...form, card_id: c.id }); setDropdownOpen(false) }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-container-highest transition-colors ${form.card_id === c.id ? "bg-primary/10" : ""}`}
+                          >
+                            <div
+                              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                              style={{ backgroundColor: bank?.color ? `${bank.color}20` : undefined }}
+                            >
+                              <Icon name="credit_card" className="text-base" style={{ color: bank?.color || undefined }} />
+                            </div>
+                            <div className="flex flex-col items-start min-w-0">
+                              <span className="text-sm font-medium text-on-surface truncate w-full">{bank?.name} - {c.name}</span>
+                              <span className="text-[10px] text-on-surface-variant">
+                                Cartao de Credito{c.last_digits ? ` • *${c.last_digits}` : ""}
+                              </span>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
-          {/* Date */}
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Data</label>
-            <input
-              value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })}
-              type="date"
-              className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
-              required
-            />
-          </div>
+            {/* Date */}
+            <div>
+              <label className="font-label text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-1 mb-1 block">Data</label>
+              <input
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                type="date"
+                className="w-full bg-surface-container-highest border-none rounded-xl px-3 py-2.5 text-xs text-on-surface focus:ring-1 focus:ring-primary/50"
+                required
+              />
+            </div>
+          </div>}
 
-          {/* Scheduled Toggle */}
-          <div className="flex items-center gap-3 p-4 bg-surface-container-high/50 rounded-xl">
-            <input
-              type="checkbox"
-              id="is_scheduled"
-              checked={form.is_scheduled}
-              onChange={(e) => setForm({ ...form, is_scheduled: e.target.checked })}
-              className="w-5 h-5 rounded border-none bg-surface-container-highest text-primary focus:ring-primary/30 focus:ring-offset-0"
-            />
-            <label htmlFor="is_scheduled" className="text-sm font-medium text-on-surface">
-              Gasto futuro (agendado)
-            </label>
-          </div>
+          {/* Toggle chips: Parcelado | Agendado | Recorrente */}
+          {!editingTx && <div className="flex gap-2">
+            {([
+              { key: "is_installment" as const, icon: "payments", label: "Parcelado", disabledBy: "is_recurring" as const },
+              { key: "is_scheduled" as const, icon: "schedule", label: "Agendado", disabledBy: null },
+              { key: "is_recurring" as const, icon: "repeat", label: "Recorrente", disabledBy: "is_installment" as const },
+            ]).map(({ key, icon, label, disabledBy }) => {
+              const isDisabled = disabledBy ? form[disabledBy] : false
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => {
+                    const toggled = !form[key]
+                    const updates: Record<string, unknown> = { [key]: toggled }
+                    if (key === "is_installment" && !toggled) updates.installments = ""
+                    if (key === "is_installment" && toggled) { updates.is_recurring = false }
+                    if (key === "is_recurring" && toggled) { updates.is_installment = false; updates.installments = "" }
+                    setForm({ ...form, ...updates })
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                    isDisabled
+                      ? "opacity-50 cursor-not-allowed bg-surface-container-high text-on-surface-variant"
+                      : form[key]
+                        ? "bg-primary-container/20 text-primary border border-primary/20"
+                        : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                  }`}
+                >
+                  <Icon name={icon} className="text-sm" />
+                  {label}
+                </button>
+              )
+            })}
+          </div>}
 
-          {form.is_scheduled && (
-            <div className="space-y-2">
-              <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Data prevista</label>
+          {/* Conditional: Installments */}
+          {!editingTx && form.is_installment && (
+            <div className="flex items-center gap-3 bg-surface-container-high/50 rounded-xl px-4 py-2.5">
+              <label className="text-xs text-on-surface-variant whitespace-nowrap">Parcelas:</label>
+              <input
+                value={form.installments}
+                onChange={(e) => setForm({ ...form, installments: e.target.value })}
+                placeholder="Ex: 10"
+                type="number"
+                min="2"
+                max="48"
+                className="flex-1 bg-transparent border-none text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-0 p-0"
+                required
+              />
+              {form.amount && form.installments && Number(form.installments) >= 2 && (
+                <span className="text-xs text-on-surface-variant whitespace-nowrap">
+                  {Number(form.installments)}x {(Number(form.amount) / Number(form.installments)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Conditional: Scheduled date */}
+          {!editingTx && form.is_scheduled && (
+            <div className="flex items-center gap-3 bg-surface-container-high/50 rounded-xl px-4 py-2.5">
+              <Icon name="event" className="text-sm text-on-surface-variant" />
+              <label className="text-xs text-on-surface-variant whitespace-nowrap">Data prevista:</label>
               <input
                 value={form.scheduled_date}
                 onChange={(e) => setForm({ ...form, scheduled_date: e.target.value })}
                 type="date"
-                className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+                className="flex-1 bg-transparent border-none text-sm text-on-surface focus:ring-0 p-0"
               />
             </div>
           )}
 
+          {/* Recurring info */}
+          {!editingTx && form.is_recurring && (
+            <div className="flex items-center gap-2 bg-primary-container/10 rounded-xl px-4 py-2.5">
+              <Icon name="info" className="text-sm text-primary" />
+              <span className="text-xs text-primary">Gera lancamentos para os proximos 24 meses</span>
+            </div>
+          )}
+
           {/* Notes */}
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Observacoes (opcional)</label>
-            <textarea
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Notas adicionais..."
-              rows={2}
-              className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50 resize-none"
-            />
-          </div>
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            placeholder="Observacoes (opcional)"
+            rows={1}
+            className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50 resize-none"
+          />
+
+          {/* Cascade option for installment edit */}
+          {editingTx && (() => {
+            const tx = transactions.find((t) => t.id === editingTx)
+            return tx && isInstallment(tx) ? (
+              <label className="flex items-center gap-2.5 bg-tertiary-container/10 rounded-xl px-4 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editCascade}
+                  onChange={(e) => setEditCascade(e.target.checked)}
+                  className="w-4 h-4 rounded border-none bg-surface-container-highest text-tertiary focus:ring-tertiary/30 focus:ring-offset-0"
+                />
+                <div>
+                  <span className="text-sm font-medium text-on-surface">Aplicar a todas as parcelas</span>
+                  <p className="text-[10px] text-on-surface-variant">Altera valor, descricao e categoria em todas as parcelas</p>
+                </div>
+              </label>
+            ) : null
+          })()}
 
           {/* Submit */}
           <button
             type="submit"
-            className={`w-full py-4 rounded-xl font-headline font-bold text-sm active:scale-[0.98] transition-all relative overflow-hidden group ${
-              form.type === "EXPENSE"
-                ? "bg-gradient-to-br from-error to-error-container text-on-error shadow-[0_8px_32px_rgba(147,0,10,0.3)]"
-                : "bg-gradient-to-br from-tertiary to-tertiary-container text-on-tertiary shadow-[0_8px_32px_rgba(175,73,0,0.3)]"
+            className={`w-full py-3.5 rounded-xl font-headline font-bold text-sm active:scale-[0.98] transition-all relative overflow-hidden group ${
+              editingTx
+                ? "bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-[0_8px_32px_rgba(0,92,186,0.3)]"
+                : form.type === "EXPENSE"
+                  ? "bg-gradient-to-br from-error to-error-container text-on-error shadow-[0_8px_32px_rgba(147,0,10,0.3)]"
+                  : "bg-gradient-to-br from-income to-income-container text-on-income shadow-[0_8px_32px_rgba(0,94,42,0.3)]"
             }`}
           >
             <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="flex items-center justify-center gap-3 relative z-10">
-              <Icon name="done_all" />
-              <span>{form.type === "EXPENSE" ? "Registrar Despesa" : "Registrar Receita"}</span>
+            <div className="flex items-center justify-center gap-2 relative z-10">
+              <Icon name={editingTx ? "save" : "done_all"} />
+              <span>{editingTx ? "Salvar Alteracoes" : form.type === "EXPENSE" ? "Registrar Despesa" : "Registrar Receita"}</span>
             </div>
           </button>
         </form>

@@ -1,29 +1,34 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
 
 export function Accounts() {
+  const navigate = useNavigate()
   const { cards, banks, addCard, deleteCard, getCardBalance } = useFinanceStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState({
     bank_id: "",
+    custom_bank_name: "",
     name: "",
     last_digits: "",
   })
 
+  const isOtherBank = form.bank_id === "__other__"
   const checkingAccounts = cards.filter((c) => c.type === "CHECKING_ACCOUNT")
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.bank_id || !form.name) return
+    if ((!form.bank_id || isOtherBank && !form.custom_bank_name) || !form.name) return
     addCard({
-      bank_id: form.bank_id,
+      bank_id: isOtherBank ? undefined : form.bank_id,
+      custom_bank_name: isOtherBank ? form.custom_bank_name : undefined,
       name: form.name,
       type: "CHECKING_ACCOUNT",
       last_digits: form.last_digits || undefined,
     })
-    setForm({ bank_id: "", name: "", last_digits: "" })
+    setForm({ bank_id: "", custom_bank_name: "", name: "", last_digits: "" })
     setDialogOpen(false)
   }
 
@@ -91,10 +96,11 @@ export function Accounts() {
             return (
               <div
                 key={account.id}
-                className="group relative bg-surface-container-high rounded-xl p-6 ghost-border hover:bg-surface-container-highest transition-all duration-300"
+                onClick={() => navigate(`/transactions?card_id=${account.id}`)}
+                className="group relative bg-surface-container-high rounded-xl p-6 ghost-border hover:bg-surface-container-highest transition-all duration-300 cursor-pointer"
               >
                 <button
-                  onClick={() => deleteCard(account.id)}
+                  onClick={(e) => { e.stopPropagation(); deleteCard(account.id) }}
                   className="absolute top-4 right-4 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error-container/20 text-on-surface-variant hover:text-error"
                 >
                   <Icon name="delete" className="text-lg" />
@@ -138,7 +144,7 @@ export function Accounts() {
             </label>
             <select
               value={form.bank_id}
-              onChange={(e) => setForm({ ...form, bank_id: e.target.value })}
+              onChange={(e) => setForm({ ...form, bank_id: e.target.value, custom_bank_name: "" })}
               className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
               required
             >
@@ -146,7 +152,17 @@ export function Accounts() {
               {banks.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
+              <option value="__other__">Outro</option>
             </select>
+            {isOtherBank && (
+              <input
+                value={form.custom_bank_name}
+                onChange={(e) => setForm({ ...form, custom_bank_name: e.target.value })}
+                placeholder="Nome do banco"
+                className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50 mt-2"
+                required
+              />
+            )}
           </div>
 
           <div className="space-y-2">

@@ -36,6 +36,8 @@ export interface Transaction {
   is_scheduled: boolean
   scheduled_date: string | null
   is_realized: boolean
+  is_recurring: boolean
+  recurring_transaction_id: string | null
   notes: string | null
   created_at: string
   category?: Category
