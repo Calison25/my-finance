@@ -92,16 +92,16 @@ BEGIN
   -- 2. CARDS (3 contas correntes + 4 cartoes de credito)
   -- ============================================================
 
-  INSERT INTO cards (id, user_id, bank_id, name, type, last_digits, credit_limit, billing_day) VALUES
+  INSERT INTO cards (id, user_id, bank_id, name, type, last_digits, credit_limit, billing_day, due_day) VALUES
     -- Contas correntes
-    (v_nubank_cc,      '00000000-0000-0000-0000-000000000001', v_nubank_id, 'Conta Nubank',       'CHECKING_ACCOUNT', '8742', NULL, NULL),
-    (v_inter_cc,       '00000000-0000-0000-0000-000000000001', v_inter_id,  'Conta Inter',        'CHECKING_ACCOUNT', '3021', NULL, NULL),
-    (v_itau_cc,        '00000000-0000-0000-0000-000000000001', v_itau_id,   'Conta Itau Salario', 'CHECKING_ACCOUNT', '5590', NULL, NULL),
-    -- Cartoes de credito
-    (v_nubank_credito, '00000000-0000-0000-0000-000000000001', v_nubank_id, 'Nubank Platinum',    'CREDIT_CARD', '4455', 12000.00, 10),
-    (v_inter_credito,  '00000000-0000-0000-0000-000000000001', v_inter_id,  'Inter Gold',         'CREDIT_CARD', '7823', 8000.00, 15),
-    (v_itau_credito,   '00000000-0000-0000-0000-000000000001', v_itau_id,   'Itau Click',         'CREDIT_CARD', '1190', 5000.00, 5),
-    (v_c6_credito,     '00000000-0000-0000-0000-000000000001', v_c6_id,     'C6 Carbon',          'CREDIT_CARD', '6677', 15000.00, 20);
+    (v_nubank_cc,      '00000000-0000-0000-0000-000000000001', v_nubank_id, 'Conta Nubank',       'CHECKING_ACCOUNT', '8742', NULL, NULL, NULL),
+    (v_inter_cc,       '00000000-0000-0000-0000-000000000001', v_inter_id,  'Conta Inter',        'CHECKING_ACCOUNT', '3021', NULL, NULL, NULL),
+    (v_itau_cc,        '00000000-0000-0000-0000-000000000001', v_itau_id,   'Conta Itau Salario', 'CHECKING_ACCOUNT', '5590', NULL, NULL, NULL),
+    -- Cartoes de credito (billing_day = fechamento, due_day = vencimento)
+    (v_nubank_credito, '00000000-0000-0000-0000-000000000001', v_nubank_id, 'Nubank Platinum',    'CREDIT_CARD', '4455', 12000.00, 10, 17),
+    (v_inter_credito,  '00000000-0000-0000-0000-000000000001', v_inter_id,  'Inter Gold',         'CREDIT_CARD', '7823', 8000.00, 15, 22),
+    (v_itau_credito,   '00000000-0000-0000-0000-000000000001', v_itau_id,   'Itau Click',         'CREDIT_CARD', '1190', 5000.00, 5, 12),
+    (v_c6_credito,     '00000000-0000-0000-0000-000000000001', v_c6_id,     'C6 Carbon',          'CREDIT_CARD', '6677', 15000.00, 20, 27);
 
   -- ============================================================
   -- 3. TRANSACOES RECORRENTES (24 meses cada)
@@ -110,101 +110,101 @@ BEGIN
   -- Salario Nubank - R$ 8.500 (receita recorrente)
   FOR i IN 0..23 LOOP
     v_date := (date_trunc('month', v_today) + (i || ' months')::interval)::date + 4;
-    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id)
+    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id, is_bill)
     VALUES (v_nubank_cc, 'Salario - Empresa Tech', 8500.00, 'INCOME', v_cat_salario, v_date,
-            CASE WHEN i = 0 THEN FALSE ELSE TRUE END,
-            CASE WHEN i = 0 THEN TRUE ELSE FALSE END,
-            TRUE, v_rec_salario_nubank);
+            CASE WHEN i = 0 AND v_date <= v_today THEN FALSE ELSE TRUE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN TRUE ELSE FALSE END,
+            TRUE, v_rec_salario_nubank, TRUE);
   END LOOP;
 
   -- Freelance Inter - R$ 3.200 (receita recorrente)
   FOR i IN 0..23 LOOP
     v_date := (date_trunc('month', v_today) + (i || ' months')::interval)::date + 14;
-    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id)
+    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id, is_bill)
     VALUES (v_inter_cc, 'Freelance - Consultoria', 3200.00, 'INCOME', v_cat_salario, v_date,
-            CASE WHEN i = 0 THEN FALSE ELSE TRUE END,
-            CASE WHEN i = 0 THEN TRUE ELSE FALSE END,
-            TRUE, v_rec_salario_inter);
+            CASE WHEN i = 0 AND v_date <= v_today THEN FALSE ELSE TRUE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN TRUE ELSE FALSE END,
+            TRUE, v_rec_salario_inter, TRUE);
   END LOOP;
 
   -- Aluguel - R$ 2.800
   FOR i IN 0..23 LOOP
     v_date := (date_trunc('month', v_today) + (i || ' months')::interval)::date + 9;
-    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id)
+    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id, is_bill)
     VALUES (v_nubank_cc, 'Aluguel Apartamento', 2800.00, 'EXPENSE', v_cat_moradia, v_date,
-            CASE WHEN i = 0 THEN FALSE ELSE TRUE END,
-            CASE WHEN i = 0 THEN TRUE ELSE FALSE END,
-            TRUE, v_rec_aluguel);
+            CASE WHEN i = 0 AND v_date <= v_today THEN FALSE ELSE TRUE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN TRUE ELSE FALSE END,
+            TRUE, v_rec_aluguel, TRUE);
   END LOOP;
 
   -- Condominio - R$ 650
   FOR i IN 0..23 LOOP
     v_date := (date_trunc('month', v_today) + (i || ' months')::interval)::date + 9;
-    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id)
+    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id, is_bill)
     VALUES (v_nubank_cc, 'Condominio', 650.00, 'EXPENSE', v_cat_moradia, v_date,
-            CASE WHEN i = 0 THEN FALSE ELSE TRUE END,
-            CASE WHEN i = 0 THEN TRUE ELSE FALSE END,
-            TRUE, v_rec_condominio);
+            CASE WHEN i = 0 AND v_date <= v_today THEN FALSE ELSE TRUE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN TRUE ELSE FALSE END,
+            TRUE, v_rec_condominio, TRUE);
   END LOOP;
 
   -- Internet - R$ 149,90
   FOR i IN 0..23 LOOP
     v_date := (date_trunc('month', v_today) + (i || ' months')::interval)::date + 19;
-    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id)
+    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id, is_bill)
     VALUES (v_inter_cc, 'Vivo Fibra 600MB', 149.90, 'EXPENSE', v_cat_servicos, v_date,
-            CASE WHEN i = 0 THEN FALSE ELSE TRUE END,
-            CASE WHEN i = 0 THEN TRUE ELSE FALSE END,
-            TRUE, v_rec_internet);
+            CASE WHEN i = 0 AND v_date <= v_today THEN FALSE ELSE TRUE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN TRUE ELSE FALSE END,
+            TRUE, v_rec_internet, TRUE);
   END LOOP;
 
   -- Energia - R$ 280 (varia, mas seed fixo)
   FOR i IN 0..23 LOOP
     v_date := (date_trunc('month', v_today) + (i || ' months')::interval)::date + 21;
-    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id)
+    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id, is_bill)
     VALUES (v_nubank_cc, 'Conta de Energia', 280.00, 'EXPENSE', v_cat_moradia, v_date,
-            CASE WHEN i = 0 THEN FALSE ELSE TRUE END,
-            CASE WHEN i = 0 THEN TRUE ELSE FALSE END,
-            TRUE, v_rec_energia);
+            CASE WHEN i = 0 AND v_date <= v_today THEN FALSE ELSE TRUE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN TRUE ELSE FALSE END,
+            TRUE, v_rec_energia, TRUE);
   END LOOP;
 
   -- Academia - R$ 129,90
   FOR i IN 0..23 LOOP
     v_date := (date_trunc('month', v_today) + (i || ' months')::interval)::date;
-    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id)
+    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id, is_bill)
     VALUES (v_nubank_credito, 'Smart Fit Mensal', 129.90, 'EXPENSE', v_cat_saude, v_date,
-            CASE WHEN i = 0 THEN FALSE ELSE TRUE END,
-            CASE WHEN i = 0 THEN TRUE ELSE FALSE END,
-            TRUE, v_rec_academia);
+            CASE WHEN i = 0 AND v_date <= v_today THEN FALSE ELSE TRUE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN TRUE ELSE FALSE END,
+            TRUE, v_rec_academia, TRUE);
   END LOOP;
 
   -- Streaming (Netflix+Spotify) - R$ 89,80
   FOR i IN 0..23 LOOP
     v_date := (date_trunc('month', v_today) + (i || ' months')::interval)::date + 4;
-    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id)
+    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id, is_bill)
     VALUES (v_nubank_credito, 'Netflix + Spotify', 89.80, 'EXPENSE', v_cat_lazer, v_date,
-            CASE WHEN i = 0 THEN FALSE ELSE TRUE END,
-            CASE WHEN i = 0 THEN TRUE ELSE FALSE END,
-            TRUE, v_rec_streaming);
+            CASE WHEN i = 0 AND v_date <= v_today THEN FALSE ELSE TRUE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN TRUE ELSE FALSE END,
+            TRUE, v_rec_streaming, TRUE);
   END LOOP;
 
   -- Plano de Saude - R$ 520
   FOR i IN 0..23 LOOP
     v_date := (date_trunc('month', v_today) + (i || ' months')::interval)::date + 14;
-    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id)
+    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id, is_bill)
     VALUES (v_inter_cc, 'Unimed Plano Saude', 520.00, 'EXPENSE', v_cat_saude, v_date,
-            CASE WHEN i = 0 THEN FALSE ELSE TRUE END,
-            CASE WHEN i = 0 THEN TRUE ELSE FALSE END,
-            TRUE, v_rec_plano_saude);
+            CASE WHEN i = 0 AND v_date <= v_today THEN FALSE ELSE TRUE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN TRUE ELSE FALSE END,
+            TRUE, v_rec_plano_saude, TRUE);
   END LOOP;
 
   -- Seguro Auto - R$ 189,90
   FOR i IN 0..23 LOOP
     v_date := (date_trunc('month', v_today) + (i || ' months')::interval)::date + 24;
-    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id)
+    INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, is_recurring, recurring_transaction_id, is_bill)
     VALUES (v_itau_cc, 'Porto Seguro Auto', 189.90, 'EXPENSE', v_cat_servicos, v_date,
-            CASE WHEN i = 0 THEN FALSE ELSE TRUE END,
-            CASE WHEN i = 0 THEN TRUE ELSE FALSE END,
-            TRUE, v_rec_seguro_auto);
+            CASE WHEN i = 0 AND v_date <= v_today THEN FALSE ELSE TRUE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN TRUE ELSE FALSE END,
+            TRUE, v_rec_seguro_auto, TRUE);
   END LOOP;
 
   -- ============================================================
@@ -236,8 +236,8 @@ BEGIN
     v_date := (date_trunc('month', v_today) + (i || ' months')::interval)::date + 2;
     INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, notes)
     VALUES (v_nubank_credito, 'Alura Anual (' || (i+1) || '/6)', 166.50, 'EXPENSE', v_cat_educacao, v_date,
-            CASE WHEN i = 0 THEN FALSE ELSE TRUE END,
-            CASE WHEN i = 0 THEN TRUE ELSE FALSE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN FALSE ELSE TRUE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN TRUE ELSE FALSE END,
             'Plataforma de cursos');
   END LOOP;
 
@@ -256,8 +256,8 @@ BEGIN
     v_date := (date_trunc('month', v_today) + (i || ' months')::interval)::date + 8;
     INSERT INTO transactions (card_id, description, amount, type, category_id, date, is_scheduled, is_realized, notes)
     VALUES (v_c6_credito, 'Sofa Retratil 3 Lugares (' || (i+1) || '/5)', 599.80, 'EXPENSE', v_cat_compras, v_date,
-            CASE WHEN i = 0 THEN FALSE ELSE TRUE END,
-            CASE WHEN i = 0 THEN TRUE ELSE FALSE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN FALSE ELSE TRUE END,
+            CASE WHEN i = 0 AND v_date <= v_today THEN TRUE ELSE FALSE END,
             'Tok&Stok');
   END LOOP;
 

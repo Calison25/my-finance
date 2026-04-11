@@ -15,6 +15,7 @@ class CardCreate(BaseModel):
     last_digits: str | None = None
     credit_limit: Decimal | None = None
     billing_day: int | None = None
+    due_day: int | None = None
 
     @model_validator(mode="after")
     def validate_bank(self):
@@ -30,6 +31,7 @@ class CardUpdate(BaseModel):
     last_digits: str | None = None
     credit_limit: Decimal | None = None
     billing_day: int | None = None
+    due_day: int | None = None
 
 
 class CardResponse(BaseModel):
@@ -43,4 +45,5 @@ class CardResponse(BaseModel):
     last_digits: str | None
     credit_limit: Decimal | None
     billing_day: int | None
+    due_day: int | None
     created_at: datetime

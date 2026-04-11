@@ -16,4 +16,5 @@ class Card(BaseModel):
     last_digits: str | None = None
     credit_limit: Decimal | None = None
     billing_day: int | None = None
+    due_day: int | None = None
     created_at: datetime

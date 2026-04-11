@@ -56,6 +56,7 @@ class CreateCardUseCase:
             last_digits=data.last_digits,
             credit_limit=data.credit_limit,
             billing_day=data.billing_day,
+            due_day=data.due_day,
             created_at=datetime.now(UTC),
         )
         created = await self._card_repo.create(card)

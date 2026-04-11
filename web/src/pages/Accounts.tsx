@@ -5,32 +5,67 @@ import { MoneyValue } from "@/components/ui/MoneyValue"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
 
+const EMPTY_FORM = {
+  bank_id: "",
+  custom_bank_name: "",
+  name: "",
+  last_digits: "",
+}
+
 export function Accounts() {
   const navigate = useNavigate()
-  const { cards, banks, addCard, deleteCard, getCardBalance, valuesVisible, toggleValuesVisible } = useFinanceStore()
+  const { cards, banks, addCard, updateCard, deleteCard, getCardBalance, valuesVisible, toggleValuesVisible } = useFinanceStore()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [form, setForm] = useState({
-    bank_id: "",
-    custom_bank_name: "",
-    name: "",
-    last_digits: "",
-  })
+  const [editingCardId, setEditingCardId] = useState<string | null>(null)
+  const [form, setForm] = useState({ ...EMPTY_FORM })
 
   const isOtherBank = form.bank_id === "__other__"
   const checkingAccounts = cards.filter((c) => c.type === "CHECKING_ACCOUNT")
 
+  function openCreateDialog() {
+    setEditingCardId(null)
+    setForm({ ...EMPTY_FORM })
+    setDialogOpen(true)
+  }
+
+  function openEditDialog(accountId: string) {
+    const account = checkingAccounts.find((c) => c.id === accountId)
+    if (!account) return
+    setEditingCardId(accountId)
+    setForm({
+      bank_id: account.bank_id ?? "",
+      custom_bank_name: "",
+      name: account.name,
+      last_digits: account.last_digits ?? "",
+    })
+    setDialogOpen(true)
+  }
+
+  function closeDialog() {
+    setDialogOpen(false)
+    setEditingCardId(null)
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if ((!form.bank_id || isOtherBank && !form.custom_bank_name) || !form.name) return
-    addCard({
+
+    const payload = {
       bank_id: isOtherBank ? undefined : form.bank_id,
       custom_bank_name: isOtherBank ? form.custom_bank_name : undefined,
       name: form.name,
-      type: "CHECKING_ACCOUNT",
+      type: "CHECKING_ACCOUNT" as const,
       last_digits: form.last_digits || undefined,
-    })
-    setForm({ bank_id: "", custom_bank_name: "", name: "", last_digits: "" })
-    setDialogOpen(false)
+    }
+
+    if (editingCardId) {
+      updateCard(editingCardId, payload)
+    } else {
+      addCard(payload)
+    }
+
+    setForm({ ...EMPTY_FORM })
+    closeDialog()
   }
 
   function getBankForCard(bankId: string) {
@@ -48,11 +83,11 @@ export function Accounts() {
           <p className="text-on-surface-variant text-sm mt-1">Gerencie suas contas correntes</p>
         </div>
         <button
-          onClick={() => setDialogOpen(true)}
-          className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all atmos-shadow"
+          onClick={openCreateDialog}
+          className="flex items-center gap-2 p-3 sm:px-6 sm:py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all atmos-shadow"
         >
           <Icon name="add_circle" className="text-lg" />
-          Nova Conta
+          <span className="hidden sm:inline">Nova Conta</span>
         </button>
       </div>
 
@@ -89,7 +124,7 @@ export function Accounts() {
             Adicione sua conta corrente para registrar seu salario e controlar gastos
           </p>
           <button
-            onClick={() => setDialogOpen(true)}
+            onClick={openCreateDialog}
             className="mt-6 flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all"
           >
             <Icon name="add_circle" className="text-lg" />
@@ -108,12 +143,20 @@ export function Accounts() {
                 onClick={() => navigate(`/transactions?card_id=${account.id}`)}
                 className="group relative bg-surface-container-high rounded-xl p-6 ghost-border hover:bg-surface-container-highest transition-all duration-300 cursor-pointer"
               >
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteCard(account.id) }}
-                  className="absolute top-4 right-4 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error-container/20 text-on-surface-variant hover:text-error"
-                >
-                  <Icon name="delete" className="text-lg" />
-                </button>
+                <div className="absolute top-4 right-4 flex items-center gap-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openEditDialog(account.id) }}
+                    className="rounded-full p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-primary-container/20 text-on-surface-variant hover:text-primary"
+                  >
+                    <Icon name="edit" className="text-lg" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteCard(account.id) }}
+                    className="rounded-full p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-error-container/20 text-on-surface-variant hover:text-error"
+                  >
+                    <Icon name="delete" className="text-lg" />
+                  </button>
+                </div>
 
                 <div className="flex items-center gap-3 mb-6">
                   <div
@@ -145,7 +188,7 @@ export function Accounts() {
       )}
 
       {/* Dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title="Nova Conta Bancaria">
+      <Dialog open={dialogOpen} onClose={closeDialog} title={editingCardId ? "Editar Conta" : "Nova Conta Bancaria"}>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">
@@ -210,7 +253,7 @@ export function Accounts() {
             type="submit"
             className="w-full py-4 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-headline font-bold text-sm active:scale-[0.98] transition-all shadow-[0_8px_32px_rgba(0,102,204,0.3)]"
           >
-            Criar Conta
+            {editingCardId ? "Salvar" : "Criar Conta"}
           </button>
         </form>
       </Dialog>

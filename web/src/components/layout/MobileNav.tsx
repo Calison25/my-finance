@@ -4,30 +4,34 @@ import { cn } from "@/lib/utils"
 
 const navItems = [
   { to: "/", icon: "home", label: "Inicio" },
+  { to: "/transactions", icon: "receipt_long", label: "Transacoes" },
   { to: "/cards", icon: "credit_card", label: "Cartoes" },
-  { to: "/transactions", icon: "add_circle", label: "Novo" },
   { to: "/accounts", icon: "account_balance", label: "Contas" },
+  { to: "/bills", icon: "payments", label: "Vencimentos" },
   { to: "/reports", icon: "bar_chart", label: "Relatorios" },
 ]
 
 export function MobileNav() {
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-2 bg-surface-container-low/80 backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.3)] border-t border-outline-variant/15">
+    <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-1 pb-[env(safe-area-inset-bottom,8px)] pt-1.5 bg-surface-container-low/90 backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.3)] border-t border-outline-variant/15">
       {navItems.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
           className={({ isActive }) =>
             cn(
-              "flex flex-col items-center justify-center p-3 active:scale-90 transition-all duration-200",
+              "flex flex-col items-center justify-center gap-0.5 px-1.5 py-1.5 min-w-[44px] active:scale-90 transition-all duration-200",
               isActive
-                ? "bg-surface-container-highest text-primary rounded-xl shadow-[0_0_15px_rgba(0,102,204,0.2)]"
-                : "text-on-surface-variant opacity-60 hover:bg-surface-container-high hover:opacity-100"
+                ? "text-primary"
+                : "text-on-surface-variant opacity-50"
             )
           }
         >
           {({ isActive }) => (
-            <Icon name={item.icon} filled={isActive} />
+            <>
+              <Icon name={item.icon} filled={isActive} className="text-xl" />
+              <span className="text-[8px] font-medium leading-none">{item.label}</span>
+            </>
           )}
         </NavLink>
       ))}

@@ -109,8 +109,8 @@ class PostgresTransactionRepository:
                 INSERT INTO transactions
                     (id, card_id, description, amount, type, category_id,
                      date, is_scheduled, scheduled_date, is_realized,
-                     is_recurring, recurring_transaction_id, notes, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                     is_recurring, is_bill, recurring_transaction_id, notes, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                 RETURNING *
                 """,
                 transaction.id,
@@ -124,6 +124,7 @@ class PostgresTransactionRepository:
                 transaction.scheduled_date,
                 transaction.is_realized,
                 transaction.is_recurring,
+                transaction.is_bill,
                 transaction.recurring_transaction_id,
                 transaction.notes,
                 transaction.created_at,
@@ -138,7 +139,7 @@ class PostgresTransactionRepository:
                 SET description = $2, amount = $3, type = $4, category_id = $5,
                     date = $6, is_scheduled = $7, scheduled_date = $8,
                     is_realized = $9, notes = $10, is_recurring = $11,
-                    recurring_transaction_id = $12
+                    is_bill = $12, recurring_transaction_id = $13
                 WHERE id = $1
                 RETURNING *
                 """,
@@ -153,6 +154,7 @@ class PostgresTransactionRepository:
                 transaction.is_realized,
                 transaction.notes,
                 transaction.is_recurring,
+                transaction.is_bill,
                 transaction.recurring_transaction_id,
             )
         if row is None:
@@ -215,6 +217,7 @@ class PostgresTransactionRepository:
             scheduled_date=record["scheduled_date"],
             is_realized=record["is_realized"],
             is_recurring=record["is_recurring"],
+            is_bill=record["is_bill"],
             recurring_transaction_id=record["recurring_transaction_id"],
             notes=record["notes"],
             created_at=record["created_at"],

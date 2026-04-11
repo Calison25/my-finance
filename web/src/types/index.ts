@@ -19,6 +19,7 @@ export interface Card {
   last_digits: string | null
   credit_limit: number | null
   billing_day: number | null
+  due_day: number | null
   created_at: string
   bank?: Bank
 }
@@ -37,6 +38,7 @@ export interface Transaction {
   scheduled_date: string | null
   is_realized: boolean
   is_recurring: boolean
+  is_bill: boolean
   recurring_transaction_id: string | null
   notes: string | null
   created_at: string

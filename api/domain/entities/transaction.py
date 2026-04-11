@@ -19,6 +19,7 @@ class Transaction(BaseModel):
     scheduled_date: date | None = None
     is_realized: bool = False
     is_recurring: bool = False
+    is_bill: bool = False
     recurring_transaction_id: UUID | None = None
     notes: str | None = None
     created_at: datetime

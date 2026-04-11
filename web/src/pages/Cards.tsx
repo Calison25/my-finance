@@ -6,27 +6,60 @@ import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
 import type { CardType } from "@/types"
 
+const EMPTY_FORM = {
+  bank_id: "",
+  custom_bank_name: "",
+  name: "",
+  type: "CREDIT_CARD" as CardType,
+  last_digits: "",
+  credit_limit: "",
+  billing_day: "",
+  due_day: "",
+}
+
 export function Cards() {
   const navigate = useNavigate()
-  const { cards: allCards, banks, addCard, deleteCard, getCardBalance, getCardExpenses, valuesVisible, toggleValuesVisible } = useFinanceStore()
+  const { cards: allCards, banks, addCard, updateCard, deleteCard, getCardBalance, getCardExpenses, valuesVisible, toggleValuesVisible } = useFinanceStore()
   const cards = allCards.filter((c) => c.type === "CREDIT_CARD")
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [form, setForm] = useState({
-    bank_id: "",
-    custom_bank_name: "",
-    name: "",
-    type: "CREDIT_CARD" as CardType,
-    last_digits: "",
-    credit_limit: "",
-    billing_day: "",
-  })
+  const [editingCardId, setEditingCardId] = useState<string | null>(null)
+  const [form, setForm] = useState({ ...EMPTY_FORM })
 
   const isOtherBank = form.bank_id === "__other__"
+
+  function openCreateDialog() {
+    setEditingCardId(null)
+    setForm({ ...EMPTY_FORM })
+    setDialogOpen(true)
+  }
+
+  function openEditDialog(cardId: string) {
+    const card = cards.find((c) => c.id === cardId)
+    if (!card) return
+    setEditingCardId(cardId)
+    setForm({
+      bank_id: card.bank_id ?? "",
+      custom_bank_name: "",
+      name: card.name,
+      type: card.type,
+      last_digits: card.last_digits ?? "",
+      credit_limit: card.credit_limit != null ? String(card.credit_limit) : "",
+      billing_day: card.billing_day != null ? String(card.billing_day) : "",
+      due_day: card.due_day != null ? String(card.due_day) : "",
+    })
+    setDialogOpen(true)
+  }
+
+  function closeDialog() {
+    setDialogOpen(false)
+    setEditingCardId(null)
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if ((!form.bank_id || isOtherBank && !form.custom_bank_name) || !form.name) return
-    addCard({
+
+    const payload = {
       bank_id: isOtherBank ? undefined : form.bank_id,
       custom_bank_name: isOtherBank ? form.custom_bank_name : undefined,
       name: form.name,
@@ -34,9 +67,17 @@ export function Cards() {
       last_digits: form.last_digits || undefined,
       credit_limit: form.credit_limit ? Number(form.credit_limit) : undefined,
       billing_day: form.billing_day ? Number(form.billing_day) : undefined,
-    })
-    setForm({ bank_id: "", custom_bank_name: "", name: "", type: "CREDIT_CARD", last_digits: "", credit_limit: "", billing_day: "" })
-    setDialogOpen(false)
+      due_day: form.due_day ? Number(form.due_day) : undefined,
+    }
+
+    if (editingCardId) {
+      updateCard(editingCardId, payload)
+    } else {
+      addCard(payload)
+    }
+
+    setForm({ ...EMPTY_FORM })
+    closeDialog()
   }
 
   return (
@@ -48,11 +89,11 @@ export function Cards() {
           <p className="text-on-surface-variant text-sm mt-1">Gerencie seus cartoes de credito e debito</p>
         </div>
         <button
-          onClick={() => setDialogOpen(true)}
-          className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all atmos-shadow"
+          onClick={openCreateDialog}
+          className="flex items-center gap-2 p-3 sm:px-6 sm:py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all atmos-shadow"
         >
           <Icon name="add_circle" className="text-lg" />
-          Novo Cartao
+          <span className="hidden sm:inline">Novo Cartao</span>
         </button>
       </div>
 
@@ -98,7 +139,7 @@ export function Cards() {
           <p className="font-headline font-bold text-lg">Nenhum cartao cadastrado</p>
           <p className="text-sm text-on-surface-variant mt-2">Adicione seu primeiro cartao para comecar</p>
           <button
-            onClick={() => setDialogOpen(true)}
+            onClick={openCreateDialog}
             className="mt-6 flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all"
           >
             <Icon name="add_circle" className="text-lg" />
@@ -118,12 +159,20 @@ export function Cards() {
                 onClick={() => navigate(`/transactions?card_id=${card.id}`)}
                 className="group relative bg-surface-container-high rounded-xl p-6 ghost-border hover:bg-surface-container-highest transition-all duration-300 min-h-[200px] flex flex-col justify-between cursor-pointer"
               >
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteCard(card.id) }}
-                  className="absolute top-4 right-4 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error-container/20 text-on-surface-variant hover:text-error"
-                >
-                  <Icon name="delete" className="text-lg" />
-                </button>
+                <div className="absolute top-4 right-4 flex items-center gap-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openEditDialog(card.id) }}
+                    className="rounded-full p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-primary-container/20 text-on-surface-variant hover:text-primary"
+                  >
+                    <Icon name="edit" className="text-lg" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteCard(card.id) }}
+                    className="rounded-full p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-error-container/20 text-on-surface-variant hover:text-error"
+                  >
+                    <Icon name="delete" className="text-lg" />
+                  </button>
+                </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -141,10 +190,20 @@ export function Cards() {
                     </div>
                   </div>
 
-                  <div className="mt-2">
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
                     <span className="text-[10px] bg-surface-container-highest rounded-full px-2.5 py-1 text-on-surface-variant font-label uppercase tracking-wider">
                       {card.type === "CREDIT_CARD" ? "Credito" : "Conta Corrente"}
                     </span>
+                    {card.type === "CREDIT_CARD" && card.billing_day && (
+                      <span className="text-[10px] bg-surface-container-highest rounded-full px-2.5 py-1 text-on-surface-variant font-label tracking-wider">
+                        Fechamento: dia {card.billing_day}
+                      </span>
+                    )}
+                    {card.type === "CREDIT_CARD" && card.due_day && (
+                      <span className="text-[10px] bg-surface-container-highest rounded-full px-2.5 py-1 text-on-surface-variant font-label tracking-wider">
+                        Vencimento: dia {card.due_day}
+                      </span>
+                    )}
                   </div>
 
                   {card.last_digits && (
@@ -177,7 +236,7 @@ export function Cards() {
       )}
 
       {/* Dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title="Adicionar Cartao">
+      <Dialog open={dialogOpen} onClose={closeDialog} title={editingCardId ? "Editar Cartao" : "Adicionar Cartao"}>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Banco</label>
@@ -259,17 +318,31 @@ export function Cards() {
                   className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Dia do fechamento</label>
-                <input
-                  value={form.billing_day}
-                  onChange={(e) => setForm({ ...form, billing_day: e.target.value })}
-                  placeholder="15"
-                  type="number"
-                  min="1"
-                  max="31"
-                  className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Dia do fechamento</label>
+                  <input
+                    value={form.billing_day}
+                    onChange={(e) => setForm({ ...form, billing_day: e.target.value })}
+                    placeholder="15"
+                    type="number"
+                    min="1"
+                    max="31"
+                    className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Dia do vencimento</label>
+                  <input
+                    value={form.due_day}
+                    onChange={(e) => setForm({ ...form, due_day: e.target.value })}
+                    placeholder="25"
+                    type="number"
+                    min="1"
+                    max="31"
+                    className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
+                  />
+                </div>
               </div>
             </>
           )}
@@ -278,7 +351,7 @@ export function Cards() {
             type="submit"
             className="w-full py-4 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-headline font-bold text-sm active:scale-[0.98] transition-all shadow-[0_8px_32px_rgba(0,102,204,0.3)]"
           >
-            Adicionar
+            {editingCardId ? "Salvar" : "Adicionar"}
           </button>
         </form>
       </Dialog>

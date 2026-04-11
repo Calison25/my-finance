@@ -32,8 +32,8 @@ class PostgresCardRepository:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                INSERT INTO cards (id, user_id, bank_id, name, type, last_digits, credit_limit, billing_day, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                INSERT INTO cards (id, user_id, bank_id, name, type, last_digits, credit_limit, billing_day, due_day, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING *
                 """,
                 card.id,
@@ -44,6 +44,7 @@ class PostgresCardRepository:
                 card.last_digits,
                 card.credit_limit,
                 card.billing_day,
+                card.due_day,
                 card.created_at,
             )
         return self._row_to_card(row)
@@ -54,7 +55,7 @@ class PostgresCardRepository:
                 """
                 UPDATE cards
                 SET bank_id = $2, name = $3, type = $4, last_digits = $5,
-                    credit_limit = $6, billing_day = $7
+                    credit_limit = $6, billing_day = $7, due_day = $8
                 WHERE id = $1
                 RETURNING *
                 """,
@@ -65,6 +66,7 @@ class PostgresCardRepository:
                 card.last_digits,
                 card.credit_limit,
                 card.billing_day,
+                card.due_day,
             )
         if row is None:
             return None
@@ -87,5 +89,6 @@ class PostgresCardRepository:
             last_digits=record["last_digits"],
             credit_limit=record["credit_limit"],
             billing_day=record["billing_day"],
+            due_day=record["due_day"],
             created_at=record["created_at"],
         )

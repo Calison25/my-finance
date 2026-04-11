@@ -13,14 +13,16 @@ interface FinanceState {
   fetchAll: () => Promise<void>
   addBank: (data: { name: string; color: string }) => void
   deleteBank: (id: string) => void
-  addCard: (data: { bank_id?: string; custom_bank_name?: string; name: string; type: CardType; last_digits?: string; credit_limit?: number; billing_day?: number }) => void
+  addCard: (data: { bank_id?: string; custom_bank_name?: string; name: string; type: CardType; last_digits?: string; credit_limit?: number; billing_day?: number; due_day?: number }) => void
+  updateCard: (id: string, data: Record<string, unknown>) => void
   deleteCard: (id: string) => void
   addCategory: (name: string) => string
-  addTransaction: (data: { card_id: string; description: string; amount: number; type: TransactionType; category_id?: string; custom_category_name?: string; date: string; is_scheduled?: boolean; scheduled_date?: string; is_recurring?: boolean; notes?: string; installments?: number }) => void
+  addTransaction: (data: { card_id: string; description: string; amount: number; type: TransactionType; category_id?: string; custom_category_name?: string; date: string; is_scheduled?: boolean; scheduled_date?: string; is_recurring?: boolean; notes?: string; installments?: number; is_bill?: boolean }) => void
   updateTransaction: (id: string, data: { description?: string; amount?: number; type?: TransactionType; category_id?: string | null; notes?: string | null; is_recurring?: boolean }, cascade?: boolean) => void
   deleteTransaction: (id: string) => void
   deleteRecurringFuture: (id: string) => void
   realizeTransaction: (id: string) => void
+  unrealizeTransaction: (id: string) => void
   getCardBalance: (cardId: string) => number
   getCardExpenses: (cardId: string) => number
 }
@@ -68,13 +70,20 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
       last_digits?: string
       credit_limit?: number
       billing_day?: number
+      due_day?: number
     } = { name: data.name, type: data.type }
     if (data.bank_id) body.bank_id = data.bank_id
     if (data.custom_bank_name) body.custom_bank_name = data.custom_bank_name
     if (data.last_digits) body.last_digits = data.last_digits
     if (data.credit_limit) body.credit_limit = data.credit_limit
     if (data.billing_day) body.billing_day = data.billing_day
+    if (data.due_day) body.due_day = data.due_day
     await api.cards.create(body)
+    get().fetchAll()
+  },
+
+  updateCard: async (id, data) => {
+    await api.cards.update(id, data)
     get().fetchAll()
   },
 
@@ -109,6 +118,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
       is_recurring: data.is_recurring || false,
       notes: data.notes || undefined,
       installments: data.installments || undefined,
+      is_bill: data.is_bill || false,
     })
     get().fetchAll()
   },
@@ -130,7 +140,12 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
 
   realizeTransaction: async (id) => {
     await api.transactions.realize(id)
-    get().fetchAll()
+    await get().fetchAll()
+  },
+
+  unrealizeTransaction: async (id) => {
+    await api.transactions.update(id, { is_realized: false } as Record<string, unknown>)
+    await get().fetchAll()
   },
 
   getCardBalance: (cardId) => {

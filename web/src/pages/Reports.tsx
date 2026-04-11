@@ -37,6 +37,33 @@ function getChartColors() {
   }
 }
 
+function formatCompactValue(v: number): string {
+  if (v === 0) return ""
+  if (v >= 1000) {
+    const k = v / 1000
+    return k % 1 === 0 ? `${k.toFixed(0)}k` : `${k.toFixed(1).replace(".", ",")}k`
+  }
+  return v.toFixed(0)
+}
+
+function renderBarLabel(props: { x?: number; y?: number; width?: number; value?: number; fill?: string }) {
+  const { x = 0, y = 0, width = 0, value = 0 } = props
+  if (!value || value === 0) return null
+  const text = formatCompactValue(value)
+  return (
+    <text
+      x={x + width / 2}
+      y={y - 6}
+      textAnchor="middle"
+      fontSize={10}
+      fontWeight={600}
+      fill="var(--color-on-surface)"
+    >
+      {text}
+    </text>
+  )
+}
+
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null
   return (
@@ -253,13 +280,13 @@ export function Reports() {
           <h1 className="font-headline font-bold text-2xl">Relatorios</h1>
           <p className="text-xs text-on-surface-variant">Analise detalhada das suas financas</p>
         </div>
-        <div className="flex flex-col items-end gap-3">
-          <div className="flex gap-1 bg-surface-container-high rounded-full p-1 ghost-border">
+        <div className="flex flex-col items-start sm:items-end gap-3 w-full sm:w-auto">
+          <div className="flex gap-1 bg-surface-container-high rounded-full p-1 ghost-border overflow-x-auto w-full sm:w-auto scrollbar-thin">
             {(Object.keys(PERIOD_LABELS) as PeriodMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setPeriodMode(mode)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                className={`px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
                   periodMode === mode
                     ? "bg-primary text-on-primary shadow-lg shadow-primary/20"
                     : "text-on-surface-variant hover:bg-surface-container-highest"
@@ -425,49 +452,42 @@ export function Reports() {
           </div>
 
           {/* Monthly Evolution */}
-          <div className="bg-surface-container-low rounded-xl p-6 ghost-border">
+          <div className="bg-surface-container-low rounded-xl p-4 sm:p-6 ghost-border">
             <h3 className="font-headline font-bold text-lg mb-1">Evolucao Mensal</h3>
             <p className="text-xs text-on-surface-variant mb-6">Receitas vs despesas nos ultimos 6 meses</p>
 
-            <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={monthlyEvolution} margin={{ left: 10, right: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-outline-variant)" opacity={0.2} />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "var(--color-on-surface-variant)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "var(--color-on-surface-variant)" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend
-                  formatter={(value: string) => (
-                    <span className="text-xs text-on-surface-variant">{value}</span>
-                  )}
-                />
-                <Bar dataKey="income" name="Receitas" fill={chartColors.income} radius={[4, 4, 0, 0]}>
-                  <LabelList
-                    dataKey="income"
-                    position="top"
-                    formatter={(v: number) => v > 0 ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : ""}
-                    style={{ fontSize: 9, fill: "var(--color-on-surface-variant)" }}
+            <div className="w-full -ml-2 sm:ml-0">
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={monthlyEvolution} margin={{ left: 0, right: 5, top: 20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-outline-variant)" opacity={0.2} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: "var(--color-on-surface-variant)" }}
+                    axisLine={false}
+                    tickLine={false}
                   />
-                </Bar>
-                <Bar dataKey="expenses" name="Despesas" fill={chartColors.error} radius={[4, 4, 0, 0]}>
-                  <LabelList
-                    dataKey="expenses"
-                    position="top"
-                    formatter={(v: number) => v > 0 ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : ""}
-                    style={{ fontSize: 9, fill: "var(--color-on-surface-variant)" }}
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "var(--color-on-surface-variant)" }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+                    width={35}
                   />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend
+                    formatter={(value: string) => (
+                      <span className="text-xs text-on-surface-variant">{value}</span>
+                    )}
+                  />
+                  <Bar dataKey="income" name="Receitas" fill={chartColors.income} radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="income" content={renderBarLabel} />
+                  </Bar>
+                  <Bar dataKey="expenses" name="Despesas" fill={chartColors.error} radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="expenses" content={renderBarLabel} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* Top 5 + Financial Health */}

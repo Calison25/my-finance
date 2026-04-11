@@ -18,6 +18,7 @@ class TransactionCreate(BaseModel):
     is_scheduled: bool = False
     scheduled_date: dt.date | None = None
     is_recurring: bool = False
+    is_bill: bool = False
     notes: str | None = None
     installments: int | None = Field(default=None, ge=2, le=48)
 
@@ -30,7 +31,9 @@ class TransactionUpdate(BaseModel):
     date: dt.date | None = None
     is_scheduled: bool | None = None
     scheduled_date: dt.date | None = None
+    is_realized: bool | None = None
     is_recurring: bool | None = None
+    is_bill: bool | None = None
     notes: str | None = None
 
 
@@ -48,6 +51,7 @@ class TransactionResponse(BaseModel):
     scheduled_date: dt.date | None
     is_realized: bool
     is_recurring: bool
+    is_bill: bool
     recurring_transaction_id: UUID | None
     notes: str | None
     created_at: dt.datetime

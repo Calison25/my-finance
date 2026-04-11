@@ -107,6 +107,7 @@ class CreateTransactionUseCase:
                 scheduled_date=data.scheduled_date if is_first else tx_date,
                 is_realized=not data.is_scheduled if is_first else False,
                 is_recurring=True,
+                is_bill=data.is_bill,
                 recurring_transaction_id=recurring_id,
                 notes=data.notes,
                 created_at=datetime.now(UTC),
@@ -147,6 +148,7 @@ class CreateTransactionUseCase:
                 is_scheduled=data.is_scheduled if is_first else True,
                 scheduled_date=data.scheduled_date if is_first else tx_date,
                 is_realized=not data.is_scheduled if is_first else False,
+                is_bill=data.is_bill,
                 notes=data.notes,
                 created_at=datetime.now(UTC),
             )

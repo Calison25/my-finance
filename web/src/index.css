@@ -145,6 +145,13 @@ input[type="number"] {
 }
 
 /* ===== Base Styles ===== */
+html, body, #root {
+  height: auto;
+  overflow: visible;
+  overscroll-behavior: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 body {
   margin: 0;
   font-family: var(--font-body);

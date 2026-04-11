@@ -163,36 +163,36 @@ export function Dashboard() {
             </div>
 
             {/* Saldo Realizado vs Previsto vs Total */}
-            <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-outline-variant/30">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary-container/20 flex items-center justify-center">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-4 pt-4 border-t border-outline-variant/30">
+              <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
+                <div className="w-8 h-8 rounded-full bg-primary-container/20 flex items-center justify-center shrink-0">
                   <Icon name="check_circle" className="text-primary text-sm" />
                 </div>
-                <div>
+                <div className="text-center sm:text-left">
                   <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Realizado</p>
-                  <p className={`text-lg font-headline font-bold ${realizedBalance >= 0 ? "text-income" : "text-error"}`}>
+                  <p className={`text-sm sm:text-lg font-headline font-bold ${realizedBalance >= 0 ? "text-income" : "text-error"}`}>
                     <MoneyValue value={realizedBalance} />
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-secondary-container/20 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
+                <div className="w-8 h-8 rounded-full bg-secondary-container/20 flex items-center justify-center shrink-0">
                   <Icon name="schedule" className="text-secondary text-sm" />
                 </div>
-                <div>
+                <div className="text-center sm:text-left">
                   <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Previsto</p>
-                  <p className={`text-lg font-headline font-bold ${pendingBalance >= 0 ? "text-income" : "text-error"}`}>
+                  <p className={`text-sm sm:text-lg font-headline font-bold ${pendingBalance >= 0 ? "text-income" : "text-error"}`}>
                     <MoneyValue value={pendingBalance} />
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center">
+              <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
+                <div className="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0">
                   <Icon name="account_balance_wallet" className="text-on-surface text-sm" />
                 </div>
-                <div>
+                <div className="text-center sm:text-left">
                   <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Total</p>
-                  <p className={`text-lg font-headline font-bold ${(realizedBalance + pendingBalance) >= 0 ? "text-income" : "text-error"}`}>
+                  <p className={`text-sm sm:text-lg font-headline font-bold ${(realizedBalance + pendingBalance) >= 0 ? "text-income" : "text-error"}`}>
                     <MoneyValue value={realizedBalance + pendingBalance} />
                   </p>
                 </div>

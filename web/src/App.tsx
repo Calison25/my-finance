@@ -9,6 +9,7 @@ import { Accounts } from "@/pages/Accounts"
 import { Cards } from "@/pages/Cards"
 import { Transactions } from "@/pages/Transactions"
 import { Reports } from "@/pages/Reports"
+import { Bills } from "@/pages/Bills"
 import { Login } from "@/pages/Login"
 import { useFinanceStore } from "@/stores/finance-store"
 
@@ -30,10 +31,10 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-surface text-on-surface font-body">
+    <div className="min-h-dvh bg-surface text-on-surface font-body">
       <Header />
       <Sidebar />
-      <main className="max-w-7xl mx-auto px-6 pb-32 pt-4 md:ml-24">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pb-32 pt-4 md:ml-24">
         {children}
       </main>
       <MobileNav />
@@ -51,6 +52,7 @@ function App() {
           <Route path="/accounts" element={<AppLayout><Accounts /></AppLayout>} />
           <Route path="/cards" element={<AppLayout><Cards /></AppLayout>} />
           <Route path="/transactions" element={<AppLayout><Transactions /></AppLayout>} />
+          <Route path="/bills" element={<AppLayout><Bills /></AppLayout>} />
           <Route path="/reports" element={<AppLayout><Reports /></AppLayout>} />
         </Routes>
       </BrowserRouter>

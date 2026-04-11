@@ -25,6 +25,7 @@ function normalizeTransaction(raw: Record<string, unknown>): Transaction {
   return {
     ...(raw as unknown as Transaction),
     amount: toNumber(raw.amount),
+    is_bill: raw.is_bill === true,
     credit_limit: raw.credit_limit != null ? toNumber(raw.credit_limit) : undefined,
   } as Transaction
 }
@@ -33,6 +34,7 @@ function normalizeCard(raw: Record<string, unknown>): Card {
   return {
     ...(raw as unknown as Card),
     credit_limit: raw.credit_limit != null ? toNumber(raw.credit_limit) : null,
+    due_day: raw.due_day != null ? toNumber(raw.due_day) : null,
   }
 }
 
@@ -63,11 +65,17 @@ export const api = {
       last_digits?: string
       credit_limit?: number
       billing_day?: number
+      due_day?: number
     }) =>
       request<Card>(`/api/cards?user_id=${USER_ID}`, {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    update: (id: string, data: Record<string, unknown>) =>
+      request<Record<string, unknown>>(`/api/cards/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }).then(normalizeCard),
     delete: (id: string) =>
       request<void>(`/api/cards/${id}`, { method: "DELETE" }),
   },

@@ -55,6 +55,7 @@ export function Transactions() {
     is_installment: false,
     installments: "",
     is_recurring: false,
+    is_bill: false,
   })
 
   useEffect(() => {
@@ -94,6 +95,7 @@ export function Transactions() {
       is_installment: false,
       installments: "",
       is_recurring: tx.is_recurring,
+      is_bill: tx.is_bill,
     })
     setDialogOpen(true)
   }
@@ -119,6 +121,7 @@ export function Transactions() {
     is_installment: false,
     installments: "",
     is_recurring: false,
+    is_bill: false,
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -149,6 +152,7 @@ export function Transactions() {
         notes: form.notes || undefined,
         installments: form.is_installment && form.installments ? Number(form.installments) : undefined,
         is_recurring: form.is_recurring || undefined,
+        is_bill: form.is_bill || undefined,
       })
     }
 
@@ -237,93 +241,89 @@ export function Transactions() {
         </div>
         <button
           onClick={() => { setEditingTx(null); setForm(defaultForm); setDialogOpen(true) }}
-          className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all atmos-shadow"
+          className="flex items-center gap-2 p-3 sm:px-6 sm:py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all atmos-shadow"
         >
           <Icon name="add_circle" className="text-lg" />
-          Nova Transacao
+          <span className="hidden sm:inline">Nova Transacao</span>
         </button>
       </div>
 
-      {/* Search & Filters */}
-      <section>
-        <div className="relative group">
-          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-on-surface-variant">
-            <Icon name="search" />
-          </div>
-          <input
-            className="w-full bg-surface-container-high border-none rounded-xl py-4 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-highest transition-all duration-300"
-            placeholder="Buscar transacoes..."
-            type="text"
-          />
-        </div>
-
+      {/* Filters */}
+      <section className="bg-surface-container-low rounded-xl p-4 ghost-border space-y-3">
+        {/* Account filters */}
         {cards.length > 0 && (
-          <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-1">
             <button
               onClick={() => setFilterCardId("")}
-              className={`px-5 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-colors ${
+              className={`px-3 py-1.5 rounded-full font-medium text-xs whitespace-nowrap transition-colors ${
                 !filterCardId
                   ? "bg-primary-container text-on-primary-container"
-                  : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
               }`}
             >
               Todas
             </button>
             {cards.map((c) => {
               const bank = banks.find((b) => b.id === c.bank_id)
+              const initials = (bank?.name ?? "--").slice(0, 2).toUpperCase()
               return (
                 <button
                   key={c.id}
                   onClick={() => setFilterCardId(c.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm whitespace-nowrap transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${
                     filterCardId === c.id
                       ? "bg-primary-container text-on-primary-container"
-                      : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+                      : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
                   }`}
                 >
-                  <Icon
-                    name={c.type === "CREDIT_CARD" ? "credit_card" : "account_balance"}
-                    className="text-base"
-                  />
-                  {bank?.name} - {c.name}
+                  <span
+                    className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white shrink-0"
+                    style={{ backgroundColor: bank?.color ?? "#666" }}
+                  >
+                    {initials}
+                  </span>
+                  {c.name}
+                  <Icon name={c.type === "CREDIT_CARD" ? "credit_card" : "account_balance"} className="text-[14px] opacity-60" />
                 </button>
               )
             })}
           </div>
         )}
 
-        {/* Type Filter */}
-        <div className="flex gap-2 mt-4">
+      </section>
+
+      {/* Month Picker + Type Filter */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <button onClick={() => changeMonth(-1)} className="justify-self-start p-2 rounded-xl hover:bg-surface-container-high transition-colors">
+          <Icon name="chevron_left" className="text-on-surface-variant" />
+        </button>
+        <h3 className="font-headline font-bold text-lg text-on-surface capitalize">{monthLabel}</h3>
+        <button onClick={() => changeMonth(1)} className="justify-self-end p-2 rounded-xl hover:bg-surface-container-high transition-colors">
+          <Icon name="chevron_right" className="text-on-surface-variant" />
+        </button>
+      </div>
+
+      <div className="flex justify-center">
+        <div className="flex gap-1 bg-surface-container-high rounded-full p-0.5">
           {([
-            { value: "ALL", label: "Todas", icon: "swap_vert" },
+            { value: "ALL", label: "Todas", icon: "swap_horiz" },
             { value: "EXPENSE", label: "Despesas", icon: "trending_down" },
             { value: "INCOME", label: "Receitas", icon: "trending_up" },
           ] as const).map((opt) => (
             <button
               key={opt.value}
               onClick={() => setFilterType(opt.value)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold transition-all ${
                 filterType === opt.value
-                  ? opt.value === "EXPENSE" ? "bg-error-container/20 text-error" : opt.value === "INCOME" ? "bg-income-container/20 text-income" : "bg-primary-container text-on-primary-container"
-                  : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+                  ? opt.value === "EXPENSE" ? "bg-error text-white" : opt.value === "INCOME" ? "bg-income text-white" : "bg-primary text-on-primary"
+                  : "text-on-surface-variant hover:bg-surface-container-highest"
               }`}
             >
-              <Icon name={opt.icon} className="text-base" />
+              <Icon name={opt.icon} className="text-[12px]" />
               {opt.label}
             </button>
           ))}
         </div>
-      </section>
-
-      {/* Month Picker */}
-      <div className="flex items-center justify-between">
-        <button onClick={() => changeMonth(-1)} className="p-2 rounded-xl hover:bg-surface-container-high transition-colors">
-          <Icon name="chevron_left" className="text-on-surface-variant" />
-        </button>
-        <h3 className="font-headline font-bold text-lg text-on-surface capitalize">{monthLabel}</h3>
-        <button onClick={() => changeMonth(1)} className="p-2 rounded-xl hover:bg-surface-container-high transition-colors">
-          <Icon name="chevron_right" className="text-on-surface-variant" />
-        </button>
       </div>
 
       {/* Insights */}
@@ -522,33 +522,31 @@ export function Transactions() {
                   return (
                     <div
                       key={tx.id}
-                      className="group flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-surface-container-low transition-all duration-200"
+                      className="group flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-low transition-all duration-200"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-lg bg-surface-container-high flex items-center justify-center shrink-0">
-                          <Icon
-                            name={cat.icon}
-                            className={`text-lg ${tx.type === "INCOME" ? "text-income" : "text-primary"}`}
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-sm font-semibold text-on-surface truncate">{tx.description}</p>
-                            {tx.is_scheduled && !tx.is_realized && (
-                              <span className="text-[9px] bg-tertiary-container/20 text-tertiary rounded-full px-1.5 py-px font-medium shrink-0">
-                                Futuro
-                              </span>
-                            )}
-                            {tx.is_recurring && (
-                              <Icon name="repeat" className="text-xs text-primary shrink-0" />
-                            )}
-                          </div>
-                          <p className="text-[11px] text-on-surface-variant truncate">
-                            {cat.name} · {getCardName(tx.card_id)}
-                          </p>
-                        </div>
+                      <div className="w-9 h-9 rounded-lg bg-surface-container-high flex items-center justify-center shrink-0">
+                        <Icon
+                          name={cat.icon}
+                          className={`text-lg ${tx.type === "INCOME" ? "text-income" : "text-primary"}`}
+                        />
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-semibold text-on-surface truncate">{tx.description}</p>
+                          {tx.is_scheduled && !tx.is_realized && (
+                            <span className="text-[9px] bg-tertiary-container/20 text-tertiary rounded-full px-1.5 py-px font-medium shrink-0">
+                              Futuro
+                            </span>
+                          )}
+                          {tx.is_recurring && (
+                            <Icon name="repeat" className="text-xs text-primary shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-[11px] text-on-surface-variant truncate">
+                          {cat.name} · {getCardName(tx.card_id)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
                         <p className={`text-sm font-headline font-bold ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
                           {tx.type === "INCOME" ? "+" : "-"}<MoneyValue value={tx.amount} />
                         </p>
@@ -822,7 +820,8 @@ export function Transactions() {
                     const updates: Record<string, unknown> = { [key]: toggled }
                     if (key === "is_installment" && !toggled) updates.installments = ""
                     if (key === "is_installment" && toggled) { updates.is_recurring = false }
-                    if (key === "is_recurring" && toggled) { updates.is_installment = false; updates.installments = "" }
+                    if (key === "is_recurring" && toggled) { updates.is_installment = false; updates.installments = ""; updates.is_bill = true }
+                    if (key === "is_recurring" && !toggled) { updates.is_bill = false }
                     setForm({ ...form, ...updates })
                   }}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all ${
@@ -892,6 +891,20 @@ export function Transactions() {
             rows={1}
             className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50 resize-none"
           />
+
+          {/* Bill checkbox */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.is_bill}
+              onChange={(e) => setForm({ ...form, is_bill: e.target.checked })}
+              className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary/50"
+            />
+            <div>
+              <p className="text-sm font-medium">Aparece nos vencimentos</p>
+              <p className="text-[10px] text-on-surface-variant">Essa conta aparecera na tela de Vencimentos para controle de pagamento</p>
+            </div>
+          </label>
 
           {/* Cascade option for installment edit */}
           {editingTx && (() => {
