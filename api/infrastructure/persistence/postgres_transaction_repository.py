@@ -50,6 +50,48 @@ class PostgresTransactionRepository:
             rows = await conn.fetch(query, *params)
         return [self._row_to_transaction(row) for row in rows]
 
+    async def list_by_user(
+        self,
+        user_id: UUID,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        category_id: UUID | None = None,
+        is_scheduled: bool | None = None,
+    ) -> list[Transaction]:
+        query = """
+            SELECT t.* FROM transactions t
+            JOIN cards c ON t.card_id = c.id
+            WHERE c.user_id = $1
+        """
+        params: list = [user_id]
+        param_index = 2
+
+        if date_from is not None:
+            query += f" AND t.date >= ${param_index}"
+            params.append(date_from)
+            param_index += 1
+
+        if date_to is not None:
+            query += f" AND t.date <= ${param_index}"
+            params.append(date_to)
+            param_index += 1
+
+        if category_id is not None:
+            query += f" AND t.category_id = ${param_index}"
+            params.append(category_id)
+            param_index += 1
+
+        if is_scheduled is not None:
+            query += f" AND t.is_scheduled = ${param_index}"
+            params.append(is_scheduled)
+            param_index += 1
+
+        query += " ORDER BY t.date DESC, t.created_at DESC"
+
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(query, *params)
+        return [self._row_to_transaction(row) for row in rows]
+
     async def get_by_id(self, transaction_id: UUID) -> Transaction | None:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(

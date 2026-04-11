@@ -8,8 +8,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./api:/app
-      - ./requirements.txt:/app/requirements.txt
+      - .:/app
     depends_on:
       db:
         condition: service_healthy

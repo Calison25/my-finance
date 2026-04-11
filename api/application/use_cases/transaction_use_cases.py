@@ -21,19 +21,32 @@ class ListTransactionsUseCase:
 
     async def execute(
         self,
-        card_id: UUID,
+        card_id: UUID | None = None,
+        user_id: UUID | None = None,
         date_from: dt.date | None = None,
         date_to: dt.date | None = None,
         category_id: UUID | None = None,
         is_scheduled: bool | None = None,
     ) -> list[TransactionResponse]:
-        transactions = await self._repo.list_by_card(
-            card_id,
-            date_from=date_from,
-            date_to=date_to,
-            category_id=category_id,
-            is_scheduled=is_scheduled,
-        )
+        if card_id is not None:
+            transactions = await self._repo.list_by_card(
+                card_id,
+                date_from=date_from,
+                date_to=date_to,
+                category_id=category_id,
+                is_scheduled=is_scheduled,
+            )
+        elif user_id is not None:
+            transactions = await self._repo.list_by_user(
+                user_id,
+                date_from=date_from,
+                date_to=date_to,
+                category_id=category_id,
+                is_scheduled=is_scheduled,
+            )
+        else:
+            raise DomainException("card_id ou user_id deve ser informado")
+
         return [
             TransactionResponse.model_validate(t, from_attributes=True)
             for t in transactions

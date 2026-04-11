@@ -15,6 +15,15 @@ class TransactionRepository(Protocol):
         is_scheduled: bool | None = None,
     ) -> list[Transaction]: ...
 
+    async def list_by_user(
+        self,
+        user_id: UUID,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        category_id: UUID | None = None,
+        is_scheduled: bool | None = None,
+    ) -> list[Transaction]: ...
+
     async def get_by_id(self, transaction_id: UUID) -> Transaction | None: ...
 
     async def create(self, transaction: Transaction) -> Transaction: ...

@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Sidebar } from "@/components/layout/Sidebar"
@@ -8,10 +9,25 @@ import { Accounts } from "@/pages/Accounts"
 import { Cards } from "@/pages/Cards"
 import { Transactions } from "@/pages/Transactions"
 import { Login } from "@/pages/Login"
+import { useFinanceStore } from "@/stores/finance-store"
 
 const queryClient = new QueryClient()
 
 function AppLayout({ children }: { children: React.ReactNode }) {
+  const { fetchAll, isLoading } = useFinanceStore()
+
+  useEffect(() => {
+    fetchAll()
+  }, [fetchAll])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-surface text-on-surface font-body flex items-center justify-center">
+        <p className="text-muted text-lg">Carregando...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-surface text-on-surface font-body">
       <Header />

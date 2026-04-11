@@ -1,7 +1,7 @@
 from uuid import UUID
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.application.dtos.transaction_dto import (
     TransactionCreate,
@@ -30,15 +30,22 @@ router = APIRouter()
 
 @router.get("", response_model=list[TransactionResponse])
 async def list_transactions(
-    card_id: UUID = Query(...),
+    card_id: UUID | None = Query(default=None),
+    user_id: UUID | None = Query(default=None),
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
     category_id: UUID | None = Query(default=None),
     is_scheduled: bool | None = Query(default=None),
     use_case: ListTransactionsUseCase = Depends(get_list_transactions),
 ):
+    if card_id is None and user_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail="card_id ou user_id deve ser informado",
+        )
     return await use_case.execute(
-        card_id,
+        card_id=card_id,
+        user_id=user_id,
         date_from=date_from,
         date_to=date_to,
         category_id=category_id,
