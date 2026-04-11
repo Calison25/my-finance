@@ -11,18 +11,20 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  LabelList,
 } from "recharts"
 import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
 import { useFinanceStore } from "@/stores/finance-store"
 
-type PeriodMode = "month" | "quarter" | "semester" | "year"
+type PeriodMode = "month" | "quarter" | "semester" | "year" | "custom"
 
 const PERIOD_LABELS: Record<PeriodMode, string> = {
   month: "Mes",
   quarter: "Trimestre",
   semester: "Semestre",
   year: "Ano",
+  custom: "Personalizado",
 }
 
 const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
@@ -38,17 +40,19 @@ function getChartColors() {
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-surface-container-highest rounded-lg p-3 ghost-border shadow-xl text-sm">
-      {label && <p className="text-on-surface-variant text-xs mb-1">{label}</p>}
-      {payload.map((entry, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-          <span className="text-on-surface font-medium">{entry.name}:</span>
-          <span className="font-bold">
-            {entry.value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-          </span>
-        </div>
-      ))}
+    <div className="bg-surface-container-highest/95 backdrop-blur-md rounded-xl px-4 py-3 shadow-2xl border border-outline-variant/20 text-sm">
+      {label && <p className="text-on-surface-variant text-[10px] uppercase tracking-wider mb-2">{label}</p>}
+      <div className="space-y-1.5">
+        {payload.map((entry, i) => (
+          <div key={i} className="flex items-center gap-2.5">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-on-surface-variant text-xs">{entry.name}</span>
+            <span className="font-headline font-bold text-on-surface ml-auto">
+              {entry.value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -56,8 +60,22 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 export function Reports() {
   const { transactions, categories, cards, banks } = useFinanceStore()
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month")
+  const now = new Date()
+  const [customFrom, setCustomFrom] = useState(() => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
+  const [customTo, setCustomTo] = useState(() => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
 
   const { startDate, endDate } = useMemo(() => {
+    if (periodMode === "custom") {
+      const [fy, fm] = customFrom.split("-").map(Number)
+      const [ty, tm] = customTo.split("-").map(Number)
+      const start = new Date(fy, fm - 1, 1)
+      const end = new Date(ty, tm, 0)
+      return {
+        startDate: start.toISOString().slice(0, 10),
+        endDate: end.toISOString().slice(0, 10),
+      }
+    }
+
     const now = new Date()
     let start: Date
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
@@ -85,7 +103,7 @@ export function Reports() {
       startDate: start.toISOString().slice(0, 10),
       endDate: end.toISOString().slice(0, 10),
     }
-  }, [periodMode])
+  }, [periodMode, customFrom, customTo])
 
   const filteredTransactions = useMemo(
     () => transactions.filter((t) => t.date >= startDate && t.date <= endDate),
@@ -235,20 +253,39 @@ export function Reports() {
           <h1 className="font-headline font-bold text-2xl">Relatorios</h1>
           <p className="text-xs text-on-surface-variant">Analise detalhada das suas financas</p>
         </div>
-        <div className="flex gap-1 bg-surface-container-high rounded-full p-1 ghost-border">
-          {(Object.keys(PERIOD_LABELS) as PeriodMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setPeriodMode(mode)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                periodMode === mode
-                  ? "bg-primary text-on-primary shadow-lg shadow-primary/20"
-                  : "text-on-surface-variant hover:bg-surface-container-highest"
-              }`}
-            >
-              {PERIOD_LABELS[mode]}
-            </button>
-          ))}
+        <div className="flex flex-col items-end gap-3">
+          <div className="flex gap-1 bg-surface-container-high rounded-full p-1 ghost-border">
+            {(Object.keys(PERIOD_LABELS) as PeriodMode[]).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setPeriodMode(mode)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  periodMode === mode
+                    ? "bg-primary text-on-primary shadow-lg shadow-primary/20"
+                    : "text-on-surface-variant hover:bg-surface-container-highest"
+                }`}
+              >
+                {PERIOD_LABELS[mode]}
+              </button>
+            ))}
+          </div>
+          {periodMode === "custom" && (
+            <div className="flex items-center gap-2">
+              <input
+                type="month"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="bg-surface-container-high border-none rounded-lg px-3 py-2 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+              />
+              <span className="text-on-surface-variant text-sm">ate</span>
+              <input
+                type="month"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="bg-surface-container-high border-none rounded-lg px-3 py-2 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -351,7 +388,7 @@ export function Reports() {
               )}
             </div>
 
-            {/* Income Sources - Horizontal Bars */}
+            {/* Income Sources - List with progress bars */}
             <div className="lg:col-span-5 bg-surface-container-low rounded-xl p-6 ghost-border">
               <h3 className="font-headline font-bold text-lg mb-1">Fontes de Receita</h3>
               <p className="text-xs text-on-surface-variant mb-6">Principais origens de entrada</p>
@@ -359,21 +396,30 @@ export function Reports() {
               {incomeBySource.length === 0 ? (
                 <p className="text-sm text-on-surface-variant text-center py-10">Nenhuma receita no periodo</p>
               ) : (
-                <ResponsiveContainer width="100%" height={incomeBySource.length * 48 + 20}>
-                  <BarChart data={incomeBySource} layout="vertical" margin={{ left: 0, right: 20 }}>
-                    <XAxis type="number" hide />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      width={100}
-                      tick={{ fontSize: 12, fill: "var(--color-on-surface-variant)" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="value" name="Receita" fill={chartColors.income} radius={[0, 6, 6, 0]} barSize={24} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="space-y-4">
+                  {incomeBySource.map((source) => {
+                    const maxIncome = incomeBySource[0]?.value ?? 1
+                    const pct = (source.value / maxIncome) * 100
+                    const pctOfTotal = totalIncome > 0 ? ((source.value / totalIncome) * 100).toFixed(0) : "0"
+                    return (
+                      <div key={source.name} className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium truncate flex-1">{source.name}</span>
+                          <span className="text-xs text-on-surface-variant mr-2">{pctOfTotal}%</span>
+                          <span className="text-sm font-bold text-income w-28 text-right">
+                            <MoneyValue value={source.value} />
+                          </span>
+                        </div>
+                        <div className="h-2 bg-surface-container-highest rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${pct}%`, backgroundColor: chartColors.income }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               )}
             </div>
           </div>
@@ -404,8 +450,22 @@ export function Reports() {
                     <span className="text-xs text-on-surface-variant">{value}</span>
                   )}
                 />
-                <Bar dataKey="income" name="Receitas" fill={chartColors.income} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expenses" name="Despesas" fill={chartColors.error} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="income" name="Receitas" fill={chartColors.income} radius={[4, 4, 0, 0]}>
+                  <LabelList
+                    dataKey="income"
+                    position="top"
+                    formatter={(v: number) => v > 0 ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : ""}
+                    style={{ fontSize: 9, fill: "var(--color-on-surface-variant)" }}
+                  />
+                </Bar>
+                <Bar dataKey="expenses" name="Despesas" fill={chartColors.error} radius={[4, 4, 0, 0]}>
+                  <LabelList
+                    dataKey="expenses"
+                    position="top"
+                    formatter={(v: number) => v > 0 ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : ""}
+                    style={{ fontSize: 9, fill: "var(--color-on-surface-variant)" }}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

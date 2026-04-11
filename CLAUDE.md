@@ -72,6 +72,9 @@ cd web && npm run dev
 vercel dev
 ```
 
+## Regras de Workflow
+- **NUNCA fazer git commit ou git push sem autorizacao explicita do usuario**. Sempre esperar o usuario pedir "commit", "push" ou "commit e push" antes de executar. Mesmo que o trabalho esteja concluido, aguardar a autorizacao.
+
 ## Regras Especificas do Projeto
 - Backend dockerizado (Dockerfile no api/)
 - Deploy 100% no Vercel (frontend + backend serverless) + Supabase
