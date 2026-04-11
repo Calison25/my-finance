@@ -40,6 +40,7 @@ export function Transactions() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
   })
   const [expandedSection, setExpandedSection] = useState<"recurring" | "scheduled" | null>(null)
+  const [filterType, setFilterType] = useState<"ALL" | "EXPENSE" | "INCOME">("ALL")
   const [form, setForm] = useState({
     card_id: "",
     description: "",
@@ -173,6 +174,7 @@ export function Transactions() {
   const filtered = transactions
     .filter((t) => !filterCardId || t.card_id === filterCardId)
     .filter((t) => t.date.startsWith(selectedMonth))
+    .filter((t) => filterType === "ALL" || t.type === filterType)
 
   const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date))
 
@@ -289,6 +291,28 @@ export function Transactions() {
             })}
           </div>
         )}
+
+        {/* Type Filter */}
+        <div className="flex gap-2 mt-4">
+          {([
+            { value: "ALL", label: "Todas", icon: "swap_vert" },
+            { value: "EXPENSE", label: "Despesas", icon: "trending_down" },
+            { value: "INCOME", label: "Receitas", icon: "trending_up" },
+          ] as const).map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setFilterType(opt.value)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                filterType === opt.value
+                  ? opt.value === "EXPENSE" ? "bg-error-container/20 text-error" : opt.value === "INCOME" ? "bg-income-container/20 text-income" : "bg-primary-container text-on-primary-container"
+                  : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+              }`}
+            >
+              <Icon name={opt.icon} className="text-base" />
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </section>
 
       {/* Month Picker */}
@@ -305,49 +329,86 @@ export function Transactions() {
       {/* Insights */}
       {sorted.length > 0 && (
         <section className="space-y-3">
-          {/* Summary - Realizado vs Previsto */}
-          <div className="glass-card p-5 rounded-2xl relative overflow-hidden ghost-border">
+          {/* Summary - styled like Dashboard Fluxo Mensal */}
+          <div className="bg-surface-container-low rounded-xl p-6 ghost-border">
+            <div className="flex justify-between items-center mb-5">
+              <div>
+                <h3 className="font-headline font-bold text-base">{isCreditCardFilter ? "Fatura do Mes" : "Resumo do Mes"}</h3>
+                <p className="text-[10px] text-on-surface-variant">{sorted.length} transacao(es) em {monthLabel}</p>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-income" />
+                  <span className="text-[10px] font-medium text-on-surface-variant">Receitas</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-error" />
+                  <span className="text-[10px] font-medium text-on-surface-variant">Despesas</span>
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-primary-container/20 flex items-center justify-center shrink-0">
-                  <Icon name="check_circle" className="text-primary text-sm" />
+              <div className="bg-surface-container-high rounded-xl p-4 ghost-border">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className="w-8 h-8 rounded-full bg-income-container/20 flex items-center justify-center">
+                    <Icon name="trending_up" className="text-income text-sm" />
+                  </div>
+                  <p className="text-xs text-on-surface-variant">Receitas</p>
+                </div>
+                <p className="text-xl font-headline font-bold text-income"><MoneyValue value={realizedIncome} /></p>
+                {pendingIncome > 0 && (
+                  <p className="text-[10px] text-on-surface-variant mt-1">+ <MoneyValue value={pendingIncome} className="text-[10px]" /> previsto</p>
+                )}
+              </div>
+              <div className="bg-surface-container-high rounded-xl p-4 ghost-border">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className="w-8 h-8 rounded-full bg-error-container/20 flex items-center justify-center">
+                    <Icon name="trending_down" className="text-error text-sm" />
+                  </div>
+                  <p className="text-xs text-on-surface-variant">Despesas</p>
+                </div>
+                <p className="text-xl font-headline font-bold text-error"><MoneyValue value={realizedExpenses} /></p>
+                {pendingExpenses > 0 && (
+                  <p className="text-[10px] text-on-surface-variant mt-1">+ <MoneyValue value={pendingExpenses} className="text-[10px]" /> previsto</p>
+                )}
+              </div>
+            </div>
+
+            {/* Realizado / Previsto / Total */}
+            <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-outline-variant/30">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-primary-container/20 flex items-center justify-center">
+                  <Icon name="check_circle" className="text-primary text-xs" />
                 </div>
                 <div>
-                  <p className="text-on-surface-variant text-[10px] font-medium tracking-wide uppercase">
-                    {isCreditCardFilter ? "Fatura Realizada" : "Saldo Realizado"}
-                  </p>
-                  <p className={`text-xl font-headline font-extrabold ${isCreditCardFilter ? "text-error" : realizedBalance >= 0 ? "text-income" : "text-error"}`}>
+                  <p className="text-[9px] text-on-surface-variant uppercase tracking-wider">Realizado</p>
+                  <p className={`text-sm font-headline font-bold ${isCreditCardFilter ? "text-error" : realizedBalance >= 0 ? "text-income" : "text-error"}`}>
                     <MoneyValue value={isCreditCardFilter ? realizedExpenses : realizedBalance} />
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-secondary-container/20 flex items-center justify-center shrink-0">
-                  <Icon name="schedule" className="text-secondary text-sm" />
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-secondary-container/20 flex items-center justify-center">
+                  <Icon name="schedule" className="text-secondary text-xs" />
                 </div>
                 <div>
-                  <p className="text-on-surface-variant text-[10px] font-medium tracking-wide uppercase">
-                    {isCreditCardFilter ? "Fatura Prevista" : "Saldo Previsto"}
-                  </p>
-                  <p className={`text-xl font-headline font-extrabold ${isCreditCardFilter ? (pendingExpenses > 0 ? "text-error" : "text-on-surface") : pendingBalance >= 0 ? "text-income" : "text-error"}`}>
+                  <p className="text-[9px] text-on-surface-variant uppercase tracking-wider">Previsto</p>
+                  <p className={`text-sm font-headline font-bold ${isCreditCardFilter ? (pendingExpenses > 0 ? "text-error" : "text-on-surface") : pendingBalance >= 0 ? "text-income" : "text-error"}`}>
                     <MoneyValue value={isCreditCardFilter ? pendingExpenses : pendingBalance} />
                   </p>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-outline-variant/30">
-              <div className="flex items-center gap-2">
-                <Icon name="account_balance_wallet" className="text-sm text-on-surface-variant" />
-                <span className="text-[10px] text-on-surface-variant uppercase tracking-wider font-medium">
-                  {isCreditCardFilter ? "Fatura Total" : "Saldo Total"}
-                </span>
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-surface-container-highest flex items-center justify-center">
+                  <Icon name="account_balance_wallet" className="text-on-surface text-xs" />
+                </div>
+                <div>
+                  <p className="text-[9px] text-on-surface-variant uppercase tracking-wider">Total</p>
+                  <p className={`text-sm font-headline font-bold ${isCreditCardFilter ? "text-error" : (realizedBalance + pendingBalance) >= 0 ? "text-income" : "text-error"}`}>
+                    <MoneyValue value={isCreditCardFilter ? (realizedExpenses + pendingExpenses) : (realizedBalance + pendingBalance)} />
+                  </p>
+                </div>
               </div>
-              <p className={`text-lg font-headline font-extrabold ${isCreditCardFilter ? "text-error" : (realizedBalance + pendingBalance) >= 0 ? "text-income" : "text-error"}`}>
-                <MoneyValue value={isCreditCardFilter ? (realizedExpenses + pendingExpenses) : (realizedBalance + pendingBalance)} />
-              </p>
-            </div>
-            <div className="flex items-center justify-end mt-1">
-              <span className="text-on-surface-variant text-[10px] opacity-70">{sorted.length} transacao(es)</span>
             </div>
           </div>
 
