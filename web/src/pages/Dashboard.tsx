@@ -34,11 +34,16 @@ export function Dashboard() {
     .filter((t) => t.type === "EXPENSE" && t.is_scheduled && !t.is_realized)
     .reduce((acc, t) => acc + t.amount, 0)
 
-  const monthlyIncome = realizedIncome + scheduledIncome
-  const monthlyExpenses = realizedExpenses + scheduledExpenses
+  const pendingIncome = monthTxs
+    .filter((t) => t.type === "INCOME" && !t.is_realized)
+    .reduce((acc, t) => acc + t.amount, 0)
+
+  const pendingExpenses = monthTxs
+    .filter((t) => t.type === "EXPENSE" && !t.is_realized)
+    .reduce((acc, t) => acc + t.amount, 0)
 
   const realizedBalance = realizedIncome - realizedExpenses
-  const projectedBalance = monthlyIncome - monthlyExpenses
+  const pendingBalance = pendingIncome - pendingExpenses
 
   const recentTransactions = [...transactions]
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -92,19 +97,19 @@ export function Dashboard() {
                 <MoneyValue value={totalBalance} />
               </h2>
               <div className="flex flex-wrap gap-4">
-                {monthlyIncome > 0 && (
+                {realizedIncome > 0 && (
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-income-container/20 border border-income-container/30 text-income">
                     <Icon name="trending_up" className="text-sm" />
                     <span className="text-sm font-semibold">
-                      +<MoneyValue value={monthlyIncome} /> este mes
+                      +<MoneyValue value={realizedIncome} /> este mes
                     </span>
                   </div>
                 )}
-                {scheduledExpenses > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-container/20 border border-primary-container/30 text-primary">
-                    <Icon name="event_repeat" className="text-sm" />
+                {pendingExpenses > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary-container/20 border border-secondary-container/30 text-secondary">
+                    <Icon name="schedule" className="text-sm" />
                     <span className="text-sm font-semibold">
-                      <MoneyValue value={scheduledExpenses} /> agendados
+                      <MoneyValue value={pendingExpenses} /> previsto
                     </span>
                   </div>
                 )}
@@ -139,8 +144,8 @@ export function Dashboard() {
                   <p className="text-sm text-on-surface-variant">Receitas</p>
                 </div>
                 <p className="text-2xl font-headline font-bold text-income"><MoneyValue value={realizedIncome} /></p>
-                {scheduledIncome > 0 && (
-                  <p className="text-xs text-on-surface-variant mt-1">+ <MoneyValue value={scheduledIncome} className="text-xs" /> previsto</p>
+                {pendingIncome > 0 && (
+                  <p className="text-xs text-on-surface-variant mt-1">+ <MoneyValue value={pendingIncome} className="text-xs" /> previsto</p>
                 )}
               </div>
               <div className="bg-surface-container-high rounded-xl p-5 ghost-border">
@@ -151,20 +156,20 @@ export function Dashboard() {
                   <p className="text-sm text-on-surface-variant">Despesas</p>
                 </div>
                 <p className="text-2xl font-headline font-bold text-error"><MoneyValue value={realizedExpenses} /></p>
-                {scheduledExpenses > 0 && (
-                  <p className="text-xs text-on-surface-variant mt-1">+ <MoneyValue value={scheduledExpenses} className="text-xs" /> previsto</p>
+                {pendingExpenses > 0 && (
+                  <p className="text-xs text-on-surface-variant mt-1">+ <MoneyValue value={pendingExpenses} className="text-xs" /> previsto</p>
                 )}
               </div>
             </div>
 
-            {/* Saldo Realizado vs Previsto */}
-            <div className="grid grid-cols-2 gap-6 mt-4 pt-4 border-t border-outline-variant/30">
+            {/* Saldo Realizado vs Previsto vs Total */}
+            <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-outline-variant/30">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary-container/20 flex items-center justify-center">
                   <Icon name="check_circle" className="text-primary text-sm" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Saldo Realizado</p>
+                  <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Realizado</p>
                   <p className={`text-lg font-headline font-bold ${realizedBalance >= 0 ? "text-income" : "text-error"}`}>
                     <MoneyValue value={realizedBalance} />
                   </p>
@@ -175,9 +180,20 @@ export function Dashboard() {
                   <Icon name="schedule" className="text-secondary text-sm" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Saldo Previsto</p>
-                  <p className={`text-lg font-headline font-bold ${projectedBalance >= 0 ? "text-income" : "text-error"}`}>
-                    <MoneyValue value={projectedBalance} />
+                  <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Previsto</p>
+                  <p className={`text-lg font-headline font-bold ${pendingBalance >= 0 ? "text-income" : "text-error"}`}>
+                    <MoneyValue value={pendingBalance} />
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center">
+                  <Icon name="account_balance_wallet" className="text-on-surface text-sm" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Total</p>
+                  <p className={`text-lg font-headline font-bold ${(realizedBalance + pendingBalance) >= 0 ? "text-income" : "text-error"}`}>
+                    <MoneyValue value={realizedBalance + pendingBalance} />
                   </p>
                 </div>
               </div>

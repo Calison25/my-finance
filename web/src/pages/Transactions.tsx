@@ -186,8 +186,17 @@ export function Transactions() {
     return acc + (tx.type === "INCOME" ? tx.amount : -tx.amount)
   }, 0)
 
+  const realizedIncome = sorted.filter((t) => t.type === "INCOME" && t.is_realized).reduce((a, t) => a + t.amount, 0)
+  const realizedExpenses = sorted.filter((t) => t.type === "EXPENSE" && t.is_realized).reduce((a, t) => a + t.amount, 0)
+  const pendingIncome = sorted.filter((t) => t.type === "INCOME" && !t.is_realized).reduce((a, t) => a + t.amount, 0)
+  const pendingExpenses = sorted.filter((t) => t.type === "EXPENSE" && !t.is_realized).reduce((a, t) => a + t.amount, 0)
+  const realizedBalance = realizedIncome - realizedExpenses
+  const pendingBalance = pendingIncome - pendingExpenses
+
   const recurringTxs = sorted.filter((t) => t.is_recurring)
   const scheduledTxs = sorted.filter((t) => t.is_scheduled && !t.is_realized)
+  const recurringTotal = recurringTxs.reduce((a, t) => a + (t.type === "INCOME" ? t.amount : -t.amount), 0)
+  const scheduledTotal = scheduledTxs.reduce((a, t) => a + (t.type === "INCOME" ? t.amount : -t.amount), 0)
   const filterCard = filterCardId ? cards.find((c) => c.id === filterCardId) : null
   const isCreditCardFilter = filterCard?.type === "CREDIT_CARD"
 
@@ -296,35 +305,51 @@ export function Transactions() {
       {/* Insights */}
       {sorted.length > 0 && (
         <section className="space-y-3">
-          {/* Summary */}
-          {!isCreditCardFilter && (
-            <div className="glass-card p-5 rounded-2xl relative overflow-hidden ghost-border">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-on-surface-variant text-xs font-medium tracking-wide uppercase">Saldo do mes</p>
-                  <h2 className="text-2xl font-headline font-extrabold mt-0.5 text-on-surface"><MoneyValue value={Math.abs(totalMonth)} /></h2>
+          {/* Summary - Realizado vs Previsto */}
+          <div className="glass-card p-5 rounded-2xl relative overflow-hidden ghost-border">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary-container/20 flex items-center justify-center shrink-0">
+                  <Icon name="check_circle" className="text-primary text-sm" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`flex items-center text-xs font-semibold px-2 py-0.5 rounded ${totalMonth >= 0 ? "text-income bg-income-container/20" : "text-error bg-error-container/20"}`}>
-                    <Icon name={totalMonth >= 0 ? "trending_up" : "trending_down"} className="text-xs mr-1" />
-                    {totalMonth >= 0 ? "Positivo" : "Negativo"}
-                  </span>
-                  <span className="text-on-surface-variant text-[10px] opacity-70">{sorted.length} tx</span>
+                <div>
+                  <p className="text-on-surface-variant text-[10px] font-medium tracking-wide uppercase">
+                    {isCreditCardFilter ? "Fatura Realizada" : "Saldo Realizado"}
+                  </p>
+                  <p className={`text-xl font-headline font-extrabold ${isCreditCardFilter ? "text-error" : realizedBalance >= 0 ? "text-income" : "text-error"}`}>
+                    <MoneyValue value={isCreditCardFilter ? realizedExpenses : realizedBalance} />
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-secondary-container/20 flex items-center justify-center shrink-0">
+                  <Icon name="schedule" className="text-secondary text-sm" />
+                </div>
+                <div>
+                  <p className="text-on-surface-variant text-[10px] font-medium tracking-wide uppercase">
+                    {isCreditCardFilter ? "Fatura Prevista" : "Saldo Previsto"}
+                  </p>
+                  <p className={`text-xl font-headline font-extrabold ${isCreditCardFilter ? (pendingExpenses > 0 ? "text-error" : "text-on-surface") : pendingBalance >= 0 ? "text-income" : "text-error"}`}>
+                    <MoneyValue value={isCreditCardFilter ? pendingExpenses : pendingBalance} />
+                  </p>
                 </div>
               </div>
             </div>
-          )}
-          {isCreditCardFilter && (
-            <div className="glass-card p-5 rounded-2xl relative overflow-hidden ghost-border">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-on-surface-variant text-xs font-medium tracking-wide uppercase">Fatura do mes</p>
-                  <h2 className="text-2xl font-headline font-extrabold mt-0.5 text-error"><MoneyValue value={sorted.filter(t => t.type === "EXPENSE").reduce((a, t) => a + t.amount, 0)} /></h2>
-                </div>
-                <span className="text-on-surface-variant text-[10px] opacity-70">{sorted.length} transacao(es)</span>
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-outline-variant/30">
+              <div className="flex items-center gap-2">
+                <Icon name="account_balance_wallet" className="text-sm text-on-surface-variant" />
+                <span className="text-[10px] text-on-surface-variant uppercase tracking-wider font-medium">
+                  {isCreditCardFilter ? "Fatura Total" : "Saldo Total"}
+                </span>
               </div>
+              <p className={`text-lg font-headline font-extrabold ${isCreditCardFilter ? "text-error" : (realizedBalance + pendingBalance) >= 0 ? "text-income" : "text-error"}`}>
+                <MoneyValue value={isCreditCardFilter ? (realizedExpenses + pendingExpenses) : (realizedBalance + pendingBalance)} />
+              </p>
             </div>
-          )}
+            <div className="flex items-center justify-end mt-1">
+              <span className="text-on-surface-variant text-[10px] opacity-70">{sorted.length} transacao(es)</span>
+            </div>
+          </div>
 
           {/* Recurring + Scheduled */}
           <div className="grid grid-cols-2 gap-3">
@@ -332,25 +357,27 @@ export function Transactions() {
               onClick={() => setExpandedSection(expandedSection === "recurring" ? null : "recurring")}
               className={`p-4 rounded-2xl ghost-border text-left transition-colors ${expandedSection === "recurring" ? "bg-primary-container/10" : "bg-surface-container-low"}`}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Icon name="repeat" className="text-base text-primary" />
-                  <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">Recorrentes</span>
-                </div>
-                <span className="text-lg font-bold text-on-surface">{recurringTxs.length}</span>
+              <div className="flex items-center gap-2 mb-2">
+                <Icon name="repeat" className="text-base text-primary" />
+                <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">Recorrentes</span>
+                <span className="text-xs text-on-surface-variant ml-auto">{recurringTxs.length}</span>
               </div>
+              <p className={`text-lg font-headline font-bold ${recurringTotal >= 0 ? "text-income" : "text-error"}`}>
+                <MoneyValue value={recurringTotal} />
+              </p>
             </button>
             <button
               onClick={() => setExpandedSection(expandedSection === "scheduled" ? null : "scheduled")}
               className={`p-4 rounded-2xl ghost-border text-left transition-colors ${expandedSection === "scheduled" ? "bg-tertiary-container/10" : "bg-surface-container-low"}`}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Icon name="schedule" className="text-base text-tertiary" />
-                  <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">Agendados</span>
-                </div>
-                <span className="text-lg font-bold text-on-surface">{scheduledTxs.length}</span>
+              <div className="flex items-center gap-2 mb-2">
+                <Icon name="schedule" className="text-base text-tertiary" />
+                <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">Agendados</span>
+                <span className="text-xs text-on-surface-variant ml-auto">{scheduledTxs.length}</span>
               </div>
+              <p className={`text-lg font-headline font-bold ${scheduledTotal >= 0 ? "text-income" : "text-error"}`}>
+                <MoneyValue value={scheduledTotal} />
+              </p>
             </button>
           </div>
 
