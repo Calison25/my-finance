@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useSearchParams } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
+import { MoneyValue } from "@/components/ui/MoneyValue"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
 import type { TransactionType } from "@/types"
@@ -181,8 +182,6 @@ export function Transactions() {
     return acc
   }, {})
 
-  const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-
   const totalMonth = sorted.reduce((acc, tx) => {
     return acc + (tx.type === "INCOME" ? tx.amount : -tx.amount)
   }, 0)
@@ -212,12 +211,12 @@ export function Transactions() {
             <p className="text-on-surface-variant text-sm mt-1 flex items-center gap-2">
               <span>{isCreditCardFilter ? "Fatura:" : "Saldo:"}</span>
               <span className={`font-bold ${isCreditCardFilter ? "text-error" : getCardBalance(filterCard.id) >= 0 ? "text-primary" : "text-error"}`}>
-                {fmt(isCreditCardFilter ? getCardExpenses(filterCard.id) : getCardBalance(filterCard.id))}
+                <MoneyValue value={isCreditCardFilter ? getCardExpenses(filterCard.id) : getCardBalance(filterCard.id)} />
               </span>
               {isCreditCardFilter && filterCard.credit_limit && (
                 <>
                   <span className="text-on-surface-variant/50">|</span>
-                  <span>Limite: {fmt(filterCard.credit_limit)}</span>
+                  <span>Limite: <MoneyValue value={filterCard.credit_limit} /></span>
                 </>
               )}
             </p>
@@ -303,7 +302,7 @@ export function Transactions() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-on-surface-variant text-xs font-medium tracking-wide uppercase">Saldo do mes</p>
-                  <h2 className="text-2xl font-headline font-extrabold mt-0.5 text-on-surface">{fmt(Math.abs(totalMonth))}</h2>
+                  <h2 className="text-2xl font-headline font-extrabold mt-0.5 text-on-surface"><MoneyValue value={Math.abs(totalMonth)} /></h2>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`flex items-center text-xs font-semibold px-2 py-0.5 rounded ${totalMonth >= 0 ? "text-income bg-income-container/20" : "text-error bg-error-container/20"}`}>
@@ -320,7 +319,7 @@ export function Transactions() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-on-surface-variant text-xs font-medium tracking-wide uppercase">Fatura do mes</p>
-                  <h2 className="text-2xl font-headline font-extrabold mt-0.5 text-error">{fmt(sorted.filter(t => t.type === "EXPENSE").reduce((a, t) => a + t.amount, 0))}</h2>
+                  <h2 className="text-2xl font-headline font-extrabold mt-0.5 text-error"><MoneyValue value={sorted.filter(t => t.type === "EXPENSE").reduce((a, t) => a + t.amount, 0)} /></h2>
                 </div>
                 <span className="text-on-surface-variant text-[10px] opacity-70">{sorted.length} transacao(es)</span>
               </div>
@@ -367,7 +366,7 @@ export function Transactions() {
                       <span className="text-sm text-on-surface">{tx.description}</span>
                     </div>
                     <span className={`text-sm font-bold ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
-                      {tx.type === "INCOME" ? "+" : "-"}{fmt(tx.amount)}
+                      {tx.type === "INCOME" ? "+" : "-"}<MoneyValue value={tx.amount} />
                     </span>
                   </div>
                 )
@@ -391,7 +390,7 @@ export function Transactions() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`text-sm font-bold ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
-                        {tx.type === "INCOME" ? "+" : "-"}{fmt(tx.amount)}
+                        {tx.type === "INCOME" ? "+" : "-"}<MoneyValue value={tx.amount} />
                       </span>
                       <button
                         onClick={() => realizeTransaction(tx.id)}
@@ -463,7 +462,7 @@ export function Transactions() {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <p className={`text-sm font-headline font-bold ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
-                          {tx.type === "INCOME" ? "+" : "-"}{fmt(tx.amount)}
+                          {tx.type === "INCOME" ? "+" : "-"}<MoneyValue value={tx.amount} />
                         </p>
                         {tx.is_scheduled && !tx.is_realized && (
                           <button

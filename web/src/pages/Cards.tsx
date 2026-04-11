@@ -1,13 +1,14 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
+import { MoneyValue } from "@/components/ui/MoneyValue"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
 import type { CardType } from "@/types"
 
 export function Cards() {
   const navigate = useNavigate()
-  const { cards: allCards, banks, addCard, deleteCard, getCardBalance, getCardExpenses } = useFinanceStore()
+  const { cards: allCards, banks, addCard, deleteCard, getCardBalance, getCardExpenses, valuesVisible, toggleValuesVisible } = useFinanceStore()
   const cards = allCards.filter((c) => c.type === "CREDIT_CARD")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState({
@@ -38,8 +39,6 @@ export function Cards() {
     setDialogOpen(false)
   }
 
-  const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-
   return (
     <div className="space-y-8">
       {/* Page Header */}
@@ -61,8 +60,17 @@ export function Cards() {
       {cards.length > 0 && (
         <div className="glass-card ghost-border rounded-xl p-8 relative overflow-hidden group">
           <div className="absolute -top-12 -right-12 w-32 h-32 bg-error/10 rounded-full blur-3xl group-hover:bg-error/20 transition-all duration-700" />
-          <p className="text-on-surface-variant font-label text-sm mb-1">Fatura Total dos Cartoes</p>
-          <p className="font-headline font-bold text-4xl text-error">{fmt(cards.reduce((acc, c) => acc + getCardExpenses(c.id), 0))}</p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-on-surface-variant font-label text-sm">Fatura Total dos Cartoes</p>
+            <button
+              onClick={toggleValuesVisible}
+              className="opacity-40 hover:opacity-100 transition-opacity"
+              title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
+            >
+              <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
+            </button>
+          </div>
+          <p className="font-headline font-bold text-4xl text-error"><MoneyValue value={cards.reduce((acc, c) => acc + getCardExpenses(c.id), 0)} /></p>
           <div className="flex items-center gap-6 mt-4">
             <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm">
               <Icon name="credit_card" className="text-base" />
@@ -73,7 +81,7 @@ export function Cards() {
               return totalLimit > 0 ? (
                 <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm">
                   <Icon name="account_balance_wallet" className="text-base" />
-                  <span>Limite total: {fmt(totalLimit)}</span>
+                  <span>Limite total: <MoneyValue value={totalLimit} /></span>
                 </div>
               ) : null
             })()}
@@ -152,13 +160,13 @@ export function Cards() {
                       {card.type === "CREDIT_CARD" ? "Fatura" : "Saldo"}
                     </p>
                     <p className={`text-lg font-headline font-bold ${card.type === "CREDIT_CARD" ? "text-error" : balance >= 0 ? "text-primary" : "text-error"}`}>
-                      {fmt(card.type === "CREDIT_CARD" ? expenses : balance)}
+                      <MoneyValue value={card.type === "CREDIT_CARD" ? expenses : balance} />
                     </p>
                   </div>
                   {card.type === "CREDIT_CARD" && card.credit_limit && (
                     <div className="text-right">
                       <p className="text-[10px] uppercase text-on-surface-variant font-label tracking-wider">Limite</p>
-                      <p className="text-sm font-semibold">{fmt(card.credit_limit)}</p>
+                      <p className="text-sm font-semibold"><MoneyValue value={card.credit_limit} /></p>
                     </div>
                   )}
                 </div>

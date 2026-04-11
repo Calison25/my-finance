@@ -8,6 +8,8 @@ interface FinanceState {
   transactions: Transaction[]
   categories: Category[]
   isLoading: boolean
+  valuesVisible: boolean
+  toggleValuesVisible: () => void
   fetchAll: () => Promise<void>
   addBank: (data: { name: string; color: string }) => void
   deleteBank: (id: string) => void
@@ -29,6 +31,12 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   transactions: [],
   categories: [],
   isLoading: true,
+  valuesVisible: localStorage.getItem("values-visible") !== "false",
+  toggleValuesVisible: () => set((s) => {
+    const next = !s.valuesVisible
+    localStorage.setItem("values-visible", String(next))
+    return { valuesVisible: next }
+  }),
 
   fetchAll: async () => {
     set({ isLoading: true })

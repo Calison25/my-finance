@@ -1,12 +1,13 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
+import { MoneyValue } from "@/components/ui/MoneyValue"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
 
 export function Accounts() {
   const navigate = useNavigate()
-  const { cards, banks, addCard, deleteCard, getCardBalance } = useFinanceStore()
+  const { cards, banks, addCard, deleteCard, getCardBalance, valuesVisible, toggleValuesVisible } = useFinanceStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState({
     bank_id: "",
@@ -37,7 +38,6 @@ export function Accounts() {
   }
 
   const totalBalance = checkingAccounts.reduce((acc, c) => acc + getCardBalance(c.id), 0)
-  const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 
   return (
     <div className="space-y-8">
@@ -60,8 +60,17 @@ export function Accounts() {
       {checkingAccounts.length > 0 && (
         <div className="glass-card ghost-border rounded-xl p-8 relative overflow-hidden group">
           <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all duration-700" />
-          <p className="text-on-surface-variant font-label text-sm mb-1">Saldo Total em Contas</p>
-          <p className="font-headline font-bold text-4xl text-on-surface">{fmt(totalBalance)}</p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-on-surface-variant font-label text-sm">Saldo Total em Contas</p>
+            <button
+              onClick={toggleValuesVisible}
+              className="opacity-40 hover:opacity-100 transition-opacity"
+              title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
+            >
+              <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
+            </button>
+          </div>
+          <p className="font-headline font-bold text-4xl text-on-surface"><MoneyValue value={totalBalance} /></p>
           <div className="mt-4 flex items-center gap-2 text-primary font-medium text-sm">
             <Icon name="account_balance" className="text-base" />
             <span>{checkingAccounts.length} conta(s) cadastrada(s)</span>
@@ -126,7 +135,7 @@ export function Accounts() {
                 <div>
                   <p className="text-xs text-on-surface-variant font-label uppercase tracking-wider">Saldo atual</p>
                   <p className={`text-2xl font-headline font-bold mt-1 ${balance >= 0 ? "text-primary" : "text-error"}`}>
-                    {fmt(balance)}
+                    <MoneyValue value={balance} />
                   </p>
                 </div>
               </div>
