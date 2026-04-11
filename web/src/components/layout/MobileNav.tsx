@@ -7,6 +7,7 @@ const navItems = [
   { to: "/cards", icon: "credit_card", label: "Cartoes" },
   { to: "/transactions", icon: "add_circle", label: "Novo" },
   { to: "/accounts", icon: "account_balance", label: "Contas" },
+  { to: "/reports", icon: "bar_chart", label: "Relatorios" },
 ]
 
 export function MobileNav() {

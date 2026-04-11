@@ -8,6 +8,7 @@ import { Dashboard } from "@/pages/Dashboard"
 import { Accounts } from "@/pages/Accounts"
 import { Cards } from "@/pages/Cards"
 import { Transactions } from "@/pages/Transactions"
+import { Reports } from "@/pages/Reports"
 import { Login } from "@/pages/Login"
 import { useFinanceStore } from "@/stores/finance-store"
 
@@ -50,6 +51,7 @@ function App() {
           <Route path="/accounts" element={<AppLayout><Accounts /></AppLayout>} />
           <Route path="/cards" element={<AppLayout><Cards /></AppLayout>} />
           <Route path="/transactions" element={<AppLayout><Transactions /></AppLayout>} />
+          <Route path="/reports" element={<AppLayout><Reports /></AppLayout>} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

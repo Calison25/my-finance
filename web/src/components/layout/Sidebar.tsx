@@ -7,6 +7,7 @@ const navItems = [
   { to: "/accounts", icon: "account_balance_wallet", label: "Contas" },
   { to: "/cards", icon: "credit_card", label: "Cartoes" },
   { to: "/transactions", icon: "receipt_long", label: "Transacoes" },
+  { to: "/reports", icon: "bar_chart", label: "Relatorios" },
 ]
 
 export function Sidebar() {
