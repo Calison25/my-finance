@@ -136,26 +136,26 @@ export function Dashboard() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-6">
-              <div className="bg-surface-container-high rounded-xl p-5 ghost-border">
+              <div className="bg-surface-container-high rounded-xl p-5 ghost-border overflow-hidden">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-income-container/20 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-income-container/20 flex items-center justify-center shrink-0">
                     <Icon name="trending_up" className="text-income" />
                   </div>
                   <p className="text-sm text-on-surface-variant">Receitas</p>
                 </div>
-                <p className="text-2xl font-headline font-bold text-income"><MoneyValue value={realizedIncome} /></p>
+                <p className="text-lg sm:text-2xl font-headline font-bold text-income truncate"><MoneyValue value={realizedIncome} /></p>
                 {pendingIncome > 0 && (
                   <p className="text-xs text-on-surface-variant mt-1">+ <MoneyValue value={pendingIncome} className="text-xs" /> previsto</p>
                 )}
               </div>
-              <div className="bg-surface-container-high rounded-xl p-5 ghost-border">
+              <div className="bg-surface-container-high rounded-xl p-5 ghost-border overflow-hidden">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-error-container/20 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-error-container/20 flex items-center justify-center shrink-0">
                     <Icon name="trending_down" className="text-error" />
                   </div>
                   <p className="text-sm text-on-surface-variant">Despesas</p>
                 </div>
-                <p className="text-2xl font-headline font-bold text-error"><MoneyValue value={realizedExpenses} /></p>
+                <p className="text-lg sm:text-2xl font-headline font-bold text-error truncate"><MoneyValue value={realizedExpenses} /></p>
                 {pendingExpenses > 0 && (
                   <p className="text-xs text-on-surface-variant mt-1">+ <MoneyValue value={pendingExpenses} className="text-xs" /> previsto</p>
                 )}

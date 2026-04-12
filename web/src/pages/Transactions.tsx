@@ -1,10 +1,27 @@
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { useSearchParams } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
 import type { TransactionType } from "@/types"
+
+function formatCentsToBRL(cents: number): string {
+  if (cents === 0) return ""
+  const reais = Math.floor(cents / 100)
+  const centavos = cents % 100
+  const reaisStr = reais.toLocaleString("pt-BR")
+  return `${reaisStr},${String(centavos).padStart(2, "0")}`
+}
+
+function parseBRLToCents(formatted: string): number {
+  const digits = formatted.replace(/\D/g, "")
+  return digits ? parseInt(digits, 10) : 0
+}
+
+function parseBRLToNumber(formatted: string): number {
+  return parseBRLToCents(formatted) / 100
+}
 
 const CATEGORY_ICONS: Record<string, string> = {
   "Alimentacao": "restaurant",
@@ -41,6 +58,7 @@ export function Transactions() {
   })
   const [expandedSection, setExpandedSection] = useState<"recurring" | "scheduled" | null>(null)
   const [filterType, setFilterType] = useState<"ALL" | "EXPENSE" | "INCOME">("ALL")
+  const [categorySuggested, setCategorySuggested] = useState(false)
   const [form, setForm] = useState({
     card_id: "",
     description: "",
@@ -70,6 +88,31 @@ export function Transactions() {
 
   const isOtherCategory = form.category_id === "__other__"
 
+  const suggestCategoryFromDescription = useCallback((description: string) => {
+    if (!description.trim()) {
+      setCategorySuggested(false)
+      return
+    }
+    const needle = description.trim().toLowerCase()
+    const match = transactions.find(
+      (t) => t.category_id && t.description.toLowerCase().includes(needle),
+    )
+    if (!match) {
+      const reverseMatch = transactions.find(
+        (t) => t.category_id && needle.includes(t.description.toLowerCase()),
+      )
+      if (reverseMatch?.category_id) {
+        setForm((prev) => ({ ...prev, category_id: reverseMatch.category_id! }))
+        setCategorySuggested(true)
+        return
+      }
+      setCategorySuggested(false)
+      return
+    }
+    setForm((prev) => ({ ...prev, category_id: match.category_id! }))
+    setCategorySuggested(true)
+  }, [transactions])
+
   function isInstallment(tx: { description: string }) {
     return /\(\d+\/\d+\)$/.test(tx.description)
   }
@@ -84,7 +127,7 @@ export function Transactions() {
     setForm({
       card_id: tx.card_id,
       description: getBaseDescription(tx.description),
-      amount: String(tx.amount),
+      amount: formatCentsToBRL(Math.round(tx.amount * 100)),
       type: tx.type,
       category_id: tx.category_id ?? "",
       custom_category_name: "",
@@ -105,6 +148,7 @@ export function Transactions() {
     setDropdownOpen(false)
     setEditingTx(null)
     setEditCascade(false)
+    setCategorySuggested(false)
   }
 
   const defaultForm = {
@@ -126,13 +170,15 @@ export function Transactions() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.card_id || !form.description || !form.amount) return
+    const amountNum = parseBRLToNumber(form.amount)
+    if (!form.card_id || !form.description || !amountNum) return
+    if (!form.category_id) return
     if (isOtherCategory && !form.custom_category_name) return
 
     if (editingTx) {
       updateTransaction(editingTx, {
         description: form.description,
-        amount: Number(form.amount),
+        amount: amountNum,
         type: form.type,
         category_id: isOtherCategory ? null : (form.category_id || null),
         notes: form.notes || null,
@@ -142,7 +188,7 @@ export function Transactions() {
       addTransaction({
         card_id: form.card_id,
         description: form.description,
-        amount: Number(form.amount),
+        amount: amountNum,
         type: form.type,
         category_id: isOtherCategory ? undefined : (form.category_id || undefined),
         custom_category_name: isOtherCategory ? form.custom_category_name : undefined,
@@ -608,11 +654,13 @@ export function Transactions() {
               <span className={`text-3xl font-headline font-extrabold ${form.type === "EXPENSE" ? "text-error/60" : "text-income/60"}`}>R$</span>
               <input
                 value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, "")
+                  const cents = raw ? parseInt(raw, 10) : 0
+                  setForm({ ...form, amount: formatCentsToBRL(cents) })
+                }}
                 placeholder="0,00"
-                type="number"
-                step="0.01"
-                min="0.01"
+                inputMode="numeric"
                 className="bg-transparent border-none text-left text-4xl font-headline font-extrabold text-on-surface placeholder:text-on-surface/20 focus:ring-0 focus:outline-none p-0"
                 style={{ width: `${Math.max(3.5, (form.amount?.length || 0) + 1.5)}ch` }}
                 required
@@ -623,26 +671,44 @@ export function Transactions() {
           {/* Description */}
           <input
             value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            onChange={(e) => {
+              setForm({ ...form, description: e.target.value })
+              setCategorySuggested(false)
+            }}
+            onBlur={(e) => {
+              if (!editingTx) suggestCategoryFromDescription(e.target.value)
+            }}
             placeholder="Descricao (ex: Supermercado)"
             className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
             required
           />
 
-          {/* Category chips */}
+          {/* Category chips (obrigatório) */}
           <div className="space-y-1.5">
-            <label className="font-label text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-1">Categoria</label>
+            <label className="font-label text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-1">
+              Categoria <span className="text-error">*</span>
+            </label>
+            {!form.category_id && (
+              <p className="text-[10px] text-on-surface-variant/60 px-1">Selecione uma categoria</p>
+            )}
+            {categorySuggested && form.category_id && !isOtherCategory && (
+              <p className="text-[10px] text-primary/70 px-1 flex items-center gap-1">
+                <Icon name="auto_awesome" className="text-xs" />
+                Sugerido com base em transacoes anteriores
+              </p>
+            )}
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
               <button
                 type="button"
-                onClick={() => setForm({ ...form, category_id: "", custom_category_name: "" })}
+                onClick={() => { setForm({ ...form, category_id: "__other__", custom_category_name: "" }); setCategorySuggested(false) }}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  !form.category_id
+                  isOtherCategory
                     ? "bg-primary-container/20 text-primary border border-primary/20"
                     : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
                 }`}
               >
-                Nenhuma
+                <Icon name="add" className="text-sm" />
+                Outra
               </button>
               {categories.map((c) => {
                 const iconName = CATEGORY_ICONS[c.name] ?? "receipt_long"
@@ -650,7 +716,7 @@ export function Transactions() {
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => setForm({ ...form, category_id: c.id, custom_category_name: "" })}
+                    onClick={() => { setForm({ ...form, category_id: c.id, custom_category_name: "" }); setCategorySuggested(false) }}
                     className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                       form.category_id === c.id
                         ? "bg-primary-container/20 text-primary border border-primary/20"
@@ -662,18 +728,6 @@ export function Transactions() {
                   </button>
                 )
               })}
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, category_id: "__other__", custom_category_name: "" })}
-                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  isOtherCategory
-                    ? "bg-primary-container/20 text-primary border border-primary/20"
-                    : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-                }`}
-              >
-                <Icon name="add" className="text-sm" />
-                Outra
-              </button>
             </div>
             {isOtherCategory && (
               <input
@@ -855,7 +909,7 @@ export function Transactions() {
               />
               {form.amount && form.installments && Number(form.installments) >= 2 && (
                 <span className="text-xs text-on-surface-variant whitespace-nowrap">
-                  {Number(form.installments)}x {(Number(form.amount) / Number(form.installments)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  {Number(form.installments)}x {(parseBRLToNumber(form.amount) / Number(form.installments)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                 </span>
               )}
             </div>
