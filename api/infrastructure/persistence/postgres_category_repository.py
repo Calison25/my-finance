@@ -26,6 +26,14 @@ class PostgresCategoryRepository:
                 )
         return [self._row_to_category(row) for row in rows]
 
+    async def list_by_household(self, household_id: UUID) -> list[Category]:
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM categories WHERE is_default = TRUE OR household_id = $1 ORDER BY name",
+                household_id,
+            )
+        return [self._row_to_category(row) for row in rows]
+
     async def get_by_id(self, category_id: UUID) -> Category | None:
         query = "SELECT * FROM categories WHERE id = $1"
         async with self._pool.acquire() as conn:
@@ -36,8 +44,8 @@ class PostgresCategoryRepository:
 
     async def create(self, category: Category) -> Category:
         query = """
-            INSERT INTO categories (id, name, icon, color, is_default, user_id)
-            VALUES ($1, $2, $3, $4, FALSE, $5)
+            INSERT INTO categories (id, name, icon, color, is_default, user_id, household_id)
+            VALUES ($1, $2, $3, $4, FALSE, $5, $6)
             RETURNING *
         """
         async with self._pool.acquire() as conn:
@@ -48,6 +56,7 @@ class PostgresCategoryRepository:
                 category.icon,
                 category.color,
                 category.user_id,
+                category.household_id,
             )
         return self._row_to_category(row)
 

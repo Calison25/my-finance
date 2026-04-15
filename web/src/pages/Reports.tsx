@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   PieChart,
   Pie,
@@ -15,6 +15,7 @@ import {
 } from "recharts"
 import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
+import { FinancialSummaryCards } from "@/components/ui/FinancialSummaryCards"
 import { useFinanceStore } from "@/stores/finance-store"
 
 type PeriodMode = "month" | "quarter" | "semester" | "year" | "custom"
@@ -85,11 +86,27 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export function Reports() {
-  const { transactions, categories, cards, banks } = useFinanceStore()
+  const { transactions, categories, cards, banks, transactionSummary, fetchTransactionSummary } = useFinanceStore()
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month")
-  const now = new Date()
-  const [customFrom, setCustomFrom] = useState(() => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
-  const [customTo, setCustomTo] = useState(() => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
+  const [customFrom, setCustomFrom] = useState(() => {
+    const next = new Date()
+    next.setMonth(next.getMonth() + 1)
+    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
+  })
+  const [customTo, setCustomTo] = useState(() => {
+    const next = new Date()
+    next.setMonth(next.getMonth() + 1)
+    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
+  })
+
+  useEffect(() => {
+    if (periodMode === "month") {
+      const now = new Date()
+      const refMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      const month = `${refMonth.getFullYear()}-${String(refMonth.getMonth() + 1).padStart(2, "0")}`
+      fetchTransactionSummary(month)
+    }
+  }, [periodMode, transactions.length, fetchTransactionSummary])
 
   const { startDate, endDate } = useMemo(() => {
     if (periodMode === "custom") {
@@ -104,12 +121,13 @@ export function Reports() {
     }
 
     const now = new Date()
+    const refMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
     let start: Date
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    const end = new Date(refMonth.getFullYear(), refMonth.getMonth() + 1, 0)
 
     switch (periodMode) {
       case "month":
-        start = new Date(now.getFullYear(), now.getMonth(), 1)
+        start = new Date(refMonth.getFullYear(), refMonth.getMonth(), 1)
         break
       case "quarter": {
         const quarterStart = Math.floor(now.getMonth() / 3) * 3
@@ -208,6 +226,37 @@ export function Reports() {
         name: MONTH_NAMES[d.getMonth()],
         income: monthTxs.filter((t) => t.type === "INCOME").reduce((a, t) => a + t.amount, 0),
         expenses: monthTxs.filter((t) => t.type === "EXPENSE").reduce((a, t) => a + t.amount, 0),
+      })
+    }
+
+    return months
+  }, [transactions])
+
+  const installmentEvolution = useMemo(() => {
+    const INSTALLMENT_RE = /\(\d+\/\d+\)$/
+    const installmentTxs = transactions.filter(
+      (t) => t.type === "EXPENSE" && (t.classification === "installment" || INSTALLMENT_RE.test(t.description)),
+    )
+
+    if (installmentTxs.length === 0) return []
+
+    const now = new Date()
+    const months: Array<{ name: string; fullLabel: string; amount: number; isFuture: boolean }> = []
+
+    for (let i = -3; i <= 8; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+      const mStart = d.toISOString().slice(0, 10)
+      const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10)
+
+      const monthAmount = installmentTxs
+        .filter((t) => t.date >= mStart && t.date <= mEnd)
+        .reduce((a, t) => a + t.amount, 0)
+
+      months.push({
+        name: MONTH_NAMES[d.getMonth()],
+        fullLabel: `${MONTH_NAMES[d.getMonth()]}/${d.getFullYear().toString().slice(2)}`,
+        amount: monthAmount,
+        isFuture: i > 0,
       })
     }
 
@@ -328,42 +377,46 @@ export function Reports() {
         </div>
       ) : (
         <>
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-surface-container-high rounded-xl p-5 ghost-border">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-income-container/20 flex items-center justify-center">
-                  <Icon name="trending_up" className="text-income" />
+          {/* Resumo Financeiro */}
+          {transactionSummary?.financial_summary ? (
+            <FinancialSummaryCards summary={transactionSummary.financial_summary} />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-surface-container-high rounded-xl p-5 ghost-border">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-income-container/20 flex items-center justify-center">
+                    <Icon name="trending_up" className="text-income" />
+                  </div>
+                  <p className="text-sm text-on-surface-variant">Receitas</p>
                 </div>
-                <p className="text-sm text-on-surface-variant">Receitas</p>
+                <p className="text-2xl font-headline font-bold text-income">
+                  <MoneyValue value={totalIncome} />
+                </p>
               </div>
-              <p className="text-2xl font-headline font-bold text-income">
-                <MoneyValue value={totalIncome} />
-              </p>
-            </div>
-            <div className="bg-surface-container-high rounded-xl p-5 ghost-border">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-error-container/20 flex items-center justify-center">
-                  <Icon name="trending_down" className="text-error" />
+              <div className="bg-surface-container-high rounded-xl p-5 ghost-border">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-error-container/20 flex items-center justify-center">
+                    <Icon name="trending_down" className="text-error" />
+                  </div>
+                  <p className="text-sm text-on-surface-variant">Despesas</p>
                 </div>
-                <p className="text-sm text-on-surface-variant">Despesas</p>
+                <p className="text-2xl font-headline font-bold text-error">
+                  <MoneyValue value={totalExpenses} />
+                </p>
               </div>
-              <p className="text-2xl font-headline font-bold text-error">
-                <MoneyValue value={totalExpenses} />
-              </p>
-            </div>
-            <div className="bg-surface-container-high rounded-xl p-5 ghost-border">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center">
-                  <Icon name="account_balance_wallet" className="text-primary" />
+              <div className="bg-surface-container-high rounded-xl p-5 ghost-border">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center">
+                    <Icon name="account_balance_wallet" className="text-primary" />
+                  </div>
+                  <p className="text-sm text-on-surface-variant">Saldo do Periodo</p>
                 </div>
-                <p className="text-sm text-on-surface-variant">Saldo do Periodo</p>
+                <p className={`text-2xl font-headline font-bold ${periodBalance >= 0 ? "text-income" : "text-error"}`}>
+                  <MoneyValue value={periodBalance} />
+                </p>
               </div>
-              <p className={`text-2xl font-headline font-bold ${periodBalance >= 0 ? "text-income" : "text-error"}`}>
-                <MoneyValue value={periodBalance} />
-              </p>
             </div>
-          </div>
+          )}
 
           {/* Donut + Income Sources */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -489,6 +542,90 @@ export function Reports() {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {/* Installment Evolution */}
+          {installmentEvolution.length > 0 && installmentEvolution.some((m) => m.amount > 0) && (
+            <div className="bg-surface-container-low rounded-xl p-4 sm:p-6 ghost-border">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-8 h-8 rounded-full bg-secondary-container/20 flex items-center justify-center">
+                  <Icon name="credit_card" className="text-secondary text-lg" />
+                </div>
+                <h3 className="font-headline font-bold text-lg">Comprometimento com Parcelas</h3>
+              </div>
+              <p className="text-xs text-on-surface-variant mb-6 ml-11">
+                Quanto voce esta pagando em compras parceladas por mes
+              </p>
+
+              <div className="w-full -ml-2 sm:ml-0">
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={installmentEvolution} margin={{ left: 0, right: 5, top: 20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-outline-variant)" opacity={0.2} />
+                    <XAxis
+                      dataKey="fullLabel"
+                      tick={{ fontSize: 10, fill: "var(--color-on-surface-variant)" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: "var(--color-on-surface-variant)" }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+                      width={35}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="amount" name="Parcelas" fill="var(--color-secondary)" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="amount" content={renderBarLabel} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Summary cards below chart */}
+              {(() => {
+                const now = new Date()
+                const refMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+                const INSTALLMENT_RE = /\(\d+\/\d+\)$/
+                const installmentTxs = transactions.filter(
+                  (t) => t.type === "EXPENSE" && (t.classification === "installment" || INSTALLMENT_RE.test(t.description)),
+                )
+                const refMonthStart = new Date(refMonth.getFullYear(), refMonth.getMonth(), 1).toISOString().slice(0, 10)
+                const refMonthEnd = new Date(refMonth.getFullYear(), refMonth.getMonth() + 1, 0).toISOString().slice(0, 10)
+                const thisMonthTotal = installmentTxs
+                  .filter((t) => t.date >= refMonthStart && t.date <= refMonthEnd)
+                  .reduce((a, t) => a + t.amount, 0)
+                const futureTotal = installmentTxs
+                  .filter((t) => t.date > refMonthEnd)
+                  .reduce((a, t) => a + t.amount, 0)
+                const activeCount = new Set(
+                  installmentTxs
+                    .filter((t) => t.date >= refMonthStart)
+                    .map((t) => t.description.replace(/\s*\(\d+\/\d+\)$/, "")),
+                ).size
+
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
+                    <div className="bg-surface-container-high rounded-xl p-4 ghost-border text-center">
+                      <p className="text-[10px] uppercase tracking-wider text-on-surface-variant mb-1">Este mes</p>
+                      <p className="text-lg font-headline font-bold text-secondary">
+                        <MoneyValue value={thisMonthTotal} />
+                      </p>
+                    </div>
+                    <div className="bg-surface-container-high rounded-xl p-4 ghost-border text-center">
+                      <p className="text-[10px] uppercase tracking-wider text-on-surface-variant mb-1">Restante futuro</p>
+                      <p className="text-lg font-headline font-bold text-on-surface">
+                        <MoneyValue value={futureTotal} />
+                      </p>
+                    </div>
+                    <div className="bg-surface-container-high rounded-xl p-4 ghost-border text-center">
+                      <p className="text-[10px] uppercase tracking-wider text-on-surface-variant mb-1">Compras ativas</p>
+                      <p className="text-lg font-headline font-bold text-on-surface">{activeCount}</p>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
 
           {/* Top 5 + Financial Health */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

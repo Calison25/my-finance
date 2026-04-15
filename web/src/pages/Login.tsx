@@ -1,8 +1,17 @@
+import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
+import { useAuthStore } from "@/stores/auth-store"
 
 export function Login() {
   const navigate = useNavigate()
+  const { signInWithGoogle, isAuthenticated, isLoading, error } = useAuthStore()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/", { replace: true })
+    }
+  }, [isAuthenticated, navigate])
 
   return (
     <div className="bg-surface text-on-surface font-body min-h-screen flex items-center justify-center p-4">
@@ -46,7 +55,7 @@ export function Login() {
           </div>
         </section>
 
-        {/* Right Side: Login Form */}
+        {/* Right Side: Login */}
         <section className="col-span-1 md:col-span-7 p-8 md:p-16 flex flex-col justify-center bg-surface">
           {/* Mobile Brand */}
           <div className="flex md:hidden items-center gap-2 mb-10">
@@ -62,94 +71,53 @@ export function Login() {
                 Acesso Seguro
               </h2>
               <p className="text-on-surface-variant">
-                Entre com suas credenciais para acessar sua conta.
+                Entre com sua conta Google para acessar suas financas.
               </p>
             </header>
 
-            <form
-              className="space-y-6"
-              onSubmit={(e) => {
-                e.preventDefault()
-                navigate("/")
-              }}
-            >
-              <div className="space-y-2">
-                <label
-                  className="block font-label text-xs font-bold uppercase tracking-widest text-on-surface-variant/80"
-                  htmlFor="email"
-                >
-                  Email
-                </label>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Icon
-                      name="mail"
-                      className="text-on-surface-variant text-xl group-focus-within:text-primary transition-colors"
-                    />
-                  </div>
-                  <input
-                    className="block w-full pl-12 pr-4 py-4 bg-surface-container-highest border-none rounded-xl text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50 transition-all duration-300"
-                    id="email"
-                    type="email"
-                    placeholder="nome@email.com"
-                    disabled
-                  />
+            <div className="space-y-6">
+              {error && (
+                <div className="p-4 rounded-xl bg-error-container/20 border border-error/20">
+                  <p className="text-sm text-error">{error}</p>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label
-                    className="block font-label text-xs font-bold uppercase tracking-widest text-on-surface-variant/80"
-                    htmlFor="password"
-                  >
-                    Senha
-                  </label>
-                  <a className="text-xs font-semibold text-primary hover:text-primary-fixed-dim transition-colors" href="#">
-                    Esqueceu a senha?
-                  </a>
-                </div>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Icon
-                      name="lock"
-                      className="text-on-surface-variant text-xl group-focus-within:text-primary transition-colors"
-                    />
-                  </div>
-                  <input
-                    className="block w-full pl-12 pr-12 py-4 bg-surface-container-highest border-none rounded-xl text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50 transition-all duration-300"
-                    id="password"
-                    type="password"
-                    placeholder="********"
-                    disabled
-                  />
-                  <button className="absolute inset-y-0 right-0 pr-4 flex items-center" type="button">
-                    <Icon name="visibility" className="text-on-surface-variant hover:text-on-surface transition-colors" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  className="w-5 h-5 rounded border-none bg-surface-container-highest text-primary focus:ring-primary/30 focus:ring-offset-0"
-                  id="remember"
-                  type="checkbox"
-                />
-                <label className="ml-3 text-sm text-on-surface-variant" htmlFor="remember">
-                  Manter conectado por 30 dias
-                </label>
-              </div>
+              )}
 
               <button
-                type="submit"
-                className="w-full py-4 px-6 rounded-xl font-headline font-bold text-on-primary bg-gradient-to-br from-primary to-primary-container shadow-[0_10px_20px_rgba(0,102,204,0.3)] hover:shadow-[0_15px_30px_rgba(0,102,204,0.4)] hover:-translate-y-0.5 transition-all duration-300 active:scale-95"
+                type="button"
+                onClick={signInWithGoogle}
+                disabled={isLoading}
+                className="w-full py-4 px-6 rounded-xl font-headline font-bold text-on-surface bg-surface-container-highest hover:bg-surface-container-high transition-all duration-300 active:scale-95 flex items-center justify-center gap-3 ghost-border disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Entrar
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                      <path
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                        fill="#4285F4"
+                      />
+                      <path
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        fill="#34A853"
+                      />
+                      <path
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                        fill="#FBBC05"
+                      />
+                      <path
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        fill="#EA4335"
+                      />
+                    </svg>
+                    Entrar com Google
+                  </>
+                )}
               </button>
-            </form>
+            </div>
 
             <p className="mt-8 text-center text-xs text-on-surface-variant">
-              Autenticacao sera implementada futuramente
+              Ao entrar, voce concorda com nossos termos de uso.
             </p>
           </div>
         </section>

@@ -17,10 +17,10 @@ class GetDashboardSummaryUseCase:
 
     async def execute(
         self,
-        user_id: UUID,
+        household_id: UUID,
         period: str | None = None,
     ) -> DashboardSummary:
-        cards = await self._card_repo.list_by_user(user_id)
+        cards = await self._card_repo.list_by_household(household_id)
 
         card_balances: list[CardBalance] = []
         total_income = Decimal("0")

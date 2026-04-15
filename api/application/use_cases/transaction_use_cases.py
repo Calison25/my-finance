@@ -1,4 +1,5 @@
 import datetime as dt
+import re
 from datetime import UTC, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid4
@@ -10,9 +11,22 @@ from api.application.dtos.transaction_dto import (
 )
 from api.domain.entities.category import Category
 from api.domain.entities.transaction import Transaction
-from api.domain.exceptions import DomainException, NotFoundError
+from api.domain.exceptions import DomainException, ForbiddenError, NotFoundError
+from api.domain.repositories.card_repository import CardRepository
 from api.domain.repositories.category_repository import CategoryRepository
 from api.domain.repositories.transaction_repository import TransactionRepository
+
+_INSTALLMENT_RE = re.compile(r"\(\d+/\d+\)$")
+
+
+def classify_transaction(tx: Transaction) -> str:
+    if tx.is_scheduled and not tx.is_realized:
+        return "scheduled"
+    if tx.is_recurring:
+        return "recurring"
+    if _INSTALLMENT_RE.search(tx.description):
+        return "installment"
+    return "regular"
 
 
 class ListTransactionsUseCase:
@@ -22,7 +36,7 @@ class ListTransactionsUseCase:
     async def execute(
         self,
         card_id: UUID | None = None,
-        user_id: UUID | None = None,
+        household_id: UUID | None = None,
         date_from: dt.date | None = None,
         date_to: dt.date | None = None,
         category_id: UUID | None = None,
@@ -36,21 +50,23 @@ class ListTransactionsUseCase:
                 category_id=category_id,
                 is_scheduled=is_scheduled,
             )
-        elif user_id is not None:
-            transactions = await self._repo.list_by_user(
-                user_id,
+        elif household_id is not None:
+            transactions = await self._repo.list_by_household(
+                household_id,
                 date_from=date_from,
                 date_to=date_to,
                 category_id=category_id,
                 is_scheduled=is_scheduled,
             )
         else:
-            raise DomainException("card_id ou user_id deve ser informado")
+            raise DomainException("card_id ou household_id deve ser informado")
 
-        return [
-            TransactionResponse.model_validate(t, from_attributes=True)
-            for t in transactions
-        ]
+        results = []
+        for t in transactions:
+            resp = TransactionResponse.model_validate(t, from_attributes=True)
+            resp.classification = classify_transaction(t)
+            results.append(resp)
+        return results
 
 
 class CreateTransactionUseCase:
@@ -58,11 +74,19 @@ class CreateTransactionUseCase:
         self,
         transaction_repo: TransactionRepository,
         category_repo: CategoryRepository,
+        card_repo: CardRepository,
     ):
         self._transaction_repo = transaction_repo
         self._category_repo = category_repo
+        self._card_repo = card_repo
 
-    async def execute(self, data: TransactionCreate) -> list[TransactionResponse]:
+    async def execute(
+        self, data: TransactionCreate, household_id: UUID
+    ) -> list[TransactionResponse]:
+        card = await self._card_repo.get_by_id(data.card_id)
+        if card is None or card.household_id != household_id:
+            raise ForbiddenError("Acesso negado a este recurso")
+
         if data.is_recurring and data.installments and data.installments > 1:
             raise DomainException(
                 "Recorrência e parcelamento são mutuamente exclusivos"
@@ -76,6 +100,7 @@ class CreateTransactionUseCase:
                 color="#6B7280",
                 is_default=False,
                 user_id=None,
+                household_id=household_id,
             )
             created_cat = await self._category_repo.create(new_cat)
             category_id = created_cat.id
@@ -103,9 +128,9 @@ class CreateTransactionUseCase:
                 type=data.type,
                 category_id=category_id,
                 date=tx_date,
-                is_scheduled=data.is_scheduled if is_first else True,
-                scheduled_date=data.scheduled_date if is_first else tx_date,
-                is_realized=not data.is_scheduled if is_first else False,
+                is_scheduled=data.is_scheduled,
+                scheduled_date=tx_date if data.is_scheduled else None,
+                is_realized=not data.is_scheduled,
                 is_recurring=True,
                 is_bill=data.is_bill,
                 recurring_transaction_id=recurring_id,
@@ -174,15 +199,19 @@ class CreateTransactionUseCase:
 
 
 class UpdateTransactionUseCase:
-    def __init__(self, repo: TransactionRepository):
+    def __init__(self, repo: TransactionRepository, card_repo: CardRepository):
         self._repo = repo
+        self._card_repo = card_repo
 
     async def execute(
-        self, transaction_id: UUID, data: TransactionUpdate
+        self, transaction_id: UUID, data: TransactionUpdate, household_id: UUID
     ) -> TransactionResponse:
         transaction = await self._repo.get_by_id(transaction_id)
         if transaction is None:
             raise NotFoundError("Transaction", str(transaction_id))
+        card = await self._card_repo.get_by_id(transaction.card_id)
+        if card is None or card.household_id != household_id:
+            raise ForbiddenError("Acesso negado a este recurso")
         update_data = data.model_dump(exclude_unset=True)
         updated_txn = transaction.model_copy(update=update_data)
         updated = await self._repo.update(updated_txn)
@@ -190,13 +219,19 @@ class UpdateTransactionUseCase:
 
 
 class RealizeTransactionUseCase:
-    def __init__(self, repo: TransactionRepository):
+    def __init__(self, repo: TransactionRepository, card_repo: CardRepository):
         self._repo = repo
+        self._card_repo = card_repo
 
-    async def execute(self, transaction_id: UUID) -> TransactionResponse:
+    async def execute(
+        self, transaction_id: UUID, household_id: UUID
+    ) -> TransactionResponse:
         transaction = await self._repo.get_by_id(transaction_id)
         if transaction is None:
             raise NotFoundError("Transaction", str(transaction_id))
+        card = await self._card_repo.get_by_id(transaction.card_id)
+        if card is None or card.household_id != household_id:
+            raise ForbiddenError("Acesso negado a este recurso")
         realized = transaction.model_copy(
             update={"is_realized": True, "is_scheduled": False}
         )
@@ -205,24 +240,32 @@ class RealizeTransactionUseCase:
 
 
 class DeleteTransactionUseCase:
-    def __init__(self, repo: TransactionRepository):
+    def __init__(self, repo: TransactionRepository, card_repo: CardRepository):
         self._repo = repo
+        self._card_repo = card_repo
 
-    async def execute(self, transaction_id: UUID) -> None:
+    async def execute(self, transaction_id: UUID, household_id: UUID) -> None:
         transaction = await self._repo.get_by_id(transaction_id)
         if transaction is None:
             raise NotFoundError("Transaction", str(transaction_id))
+        card = await self._card_repo.get_by_id(transaction.card_id)
+        if card is None or card.household_id != household_id:
+            raise ForbiddenError("Acesso negado a este recurso")
         await self._repo.delete(transaction_id)
 
 
 class DeleteRecurringTransactionsUseCase:
-    def __init__(self, repo: TransactionRepository):
+    def __init__(self, repo: TransactionRepository, card_repo: CardRepository):
         self._repo = repo
+        self._card_repo = card_repo
 
-    async def execute(self, transaction_id: UUID) -> None:
+    async def execute(self, transaction_id: UUID, household_id: UUID) -> None:
         transaction = await self._repo.get_by_id(transaction_id)
         if transaction is None:
             raise NotFoundError("Transaction", str(transaction_id))
+        card = await self._card_repo.get_by_id(transaction.card_id)
+        if card is None or card.household_id != household_id:
+            raise ForbiddenError("Acesso negado a este recurso")
         if not transaction.recurring_transaction_id:
             raise DomainException("Transação não é recorrente")
         await self._repo.delete_by_recurring_id(

@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
+import { FinancialSummaryCards } from "@/components/ui/FinancialSummaryCards"
 import type { TransactionType } from "@/types"
 
 function formatCentsToBRL(cents: number): string {
@@ -37,7 +38,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 }
 
 export function Transactions() {
-  const { transactions, cards, categories, banks, addTransaction, updateTransaction, deleteTransaction, realizeTransaction, getCardBalance, getCardExpenses } = useFinanceStore()
+  const { transactions, cards, categories, banks, addTransaction, updateTransaction, deleteTransaction, realizeTransaction, getCardBalance, getCardExpenses, transactionSummary, fetchTransactionSummary } = useFinanceStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<string | null>(null)
   const [editCascade, setEditCascade] = useState(false)
@@ -53,12 +54,14 @@ export function Transactions() {
     }
   }
   const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+    const next = new Date()
+    next.setMonth(next.getMonth() + 1)
+    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
   })
-  const [expandedSection, setExpandedSection] = useState<"recurring" | "scheduled" | null>(null)
+  const [expandedSection, setExpandedSection] = useState<"recurring" | "scheduled" | "installments" | null>(null)
   const [filterType, setFilterType] = useState<"ALL" | "EXPENSE" | "INCOME">("ALL")
   const [categorySuggested, setCategorySuggested] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
   const [form, setForm] = useState({
     card_id: "",
     description: "",
@@ -75,6 +78,10 @@ export function Transactions() {
     is_recurring: false,
     is_bill: false,
   })
+
+  useEffect(() => {
+    fetchTransactionSummary(selectedMonth, filterCardId || undefined)
+  }, [selectedMonth, filterCardId, transactions.length, fetchTransactionSummary])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -113,10 +120,6 @@ export function Transactions() {
     setCategorySuggested(true)
   }, [transactions])
 
-  function isInstallment(tx: { description: string }) {
-    return /\(\d+\/\d+\)$/.test(tx.description)
-  }
-
   function getBaseDescription(desc: string) {
     return desc.replace(/\s\(\d+\/\d+\)$/, "")
   }
@@ -149,6 +152,7 @@ export function Transactions() {
     setEditingTx(null)
     setEditCascade(false)
     setCategorySuggested(false)
+    setValidationErrors({})
   }
 
   const defaultForm = {
@@ -158,7 +162,7 @@ export function Transactions() {
     type: "EXPENSE" as TransactionType,
     category_id: "",
     custom_category_name: "",
-    date: new Date().toISOString().slice(0, 10),
+    date: `${selectedMonth}-01`,
     is_scheduled: false,
     scheduled_date: "",
     notes: "",
@@ -171,9 +175,17 @@ export function Transactions() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const amountNum = parseBRLToNumber(form.amount)
-    if (!form.card_id || !form.description || !amountNum) return
-    if (!form.category_id) return
-    if (isOtherCategory && !form.custom_category_name) return
+    const errors: Record<string, boolean> = {}
+    if (!amountNum) errors.amount = true
+    if (!form.description) errors.description = true
+    if (!form.card_id) errors.card_id = true
+    if (!form.category_id) errors.category = true
+    if (isOtherCategory && !form.custom_category_name) errors.custom_category_name = true
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
+      return
+    }
+    setValidationErrors({})
 
     if (editingTx) {
       updateTransaction(editingTx, {
@@ -234,21 +246,21 @@ export function Transactions() {
     return acc
   }, {})
 
-  const totalMonth = sorted.reduce((acc, tx) => {
-    return acc + (tx.type === "INCOME" ? tx.amount : -tx.amount)
-  }, 0)
+  // Totais do backend
+  const s = transactionSummary
 
-  const realizedIncome = sorted.filter((t) => t.type === "INCOME" && t.is_realized).reduce((a, t) => a + t.amount, 0)
-  const realizedExpenses = sorted.filter((t) => t.type === "EXPENSE" && t.is_realized).reduce((a, t) => a + t.amount, 0)
-  const pendingIncome = sorted.filter((t) => t.type === "INCOME" && !t.is_realized).reduce((a, t) => a + t.amount, 0)
-  const pendingExpenses = sorted.filter((t) => t.type === "EXPENSE" && !t.is_realized).reduce((a, t) => a + t.amount, 0)
-  const realizedBalance = realizedIncome - realizedExpenses
-  const pendingBalance = pendingIncome - pendingExpenses
-
-  const recurringTxs = sorted.filter((t) => t.is_recurring)
-  const scheduledTxs = sorted.filter((t) => t.is_scheduled && !t.is_realized)
-  const recurringTotal = recurringTxs.reduce((a, t) => a + (t.type === "INCOME" ? t.amount : -t.amount), 0)
-  const scheduledTotal = scheduledTxs.reduce((a, t) => a + (t.type === "INCOME" ? t.amount : -t.amount), 0)
+  // Classificação vem do backend (campo classification)
+  const recurringTxs = sorted.filter((t) => t.classification === "recurring")
+  const recurringIncomeTxs = recurringTxs.filter((t) => t.type === "INCOME")
+  const recurringExpenseTxs = recurringTxs.filter((t) => t.type === "EXPENSE")
+  const installmentTxs = sorted.filter((t) => t.classification === "installment")
+  const scheduledTxs = sorted.filter((t) => t.classification === "scheduled")
+  const recurringTotal = s?.recurring.total ?? 0
+  const recurringIncomeTotal = s?.recurring.income_total ?? 0
+  const recurringExpenseTotal = s?.recurring.expense_total ?? 0
+  const installmentTotal = s?.installments.total ?? 0
+  const installmentExpenseTotal = s?.installments.expense_total ?? 0
+  const scheduledTotal = s?.scheduled.total ?? 0
   const filterCard = filterCardId ? cards.find((c) => c.id === filterCardId) : null
   const isCreditCardFilter = filterCard?.type === "CREDIT_CARD"
 
@@ -375,91 +387,13 @@ export function Transactions() {
       {/* Insights */}
       {sorted.length > 0 && (
         <section className="space-y-3">
-          {/* Summary - styled like Dashboard Fluxo Mensal */}
-          <div className="bg-surface-container-low rounded-xl p-6 ghost-border">
-            <div className="flex justify-between items-center mb-5">
-              <div>
-                <h3 className="font-headline font-bold text-base">{isCreditCardFilter ? "Fatura do Mes" : "Resumo do Mes"}</h3>
-                <p className="text-[10px] text-on-surface-variant">{sorted.length} transacao(es) em {monthLabel}</p>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-income" />
-                  <span className="text-[10px] font-medium text-on-surface-variant">Receitas</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-error" />
-                  <span className="text-[10px] font-medium text-on-surface-variant">Despesas</span>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-surface-container-high rounded-xl p-4 ghost-border">
-                <div className="flex items-center gap-2.5 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-income-container/20 flex items-center justify-center">
-                    <Icon name="trending_up" className="text-income text-sm" />
-                  </div>
-                  <p className="text-xs text-on-surface-variant">Receitas</p>
-                </div>
-                <p className="text-xl font-headline font-bold text-income"><MoneyValue value={realizedIncome} /></p>
-                {pendingIncome > 0 && (
-                  <p className="text-[10px] text-on-surface-variant mt-1">+ <MoneyValue value={pendingIncome} className="text-[10px]" /> previsto</p>
-                )}
-              </div>
-              <div className="bg-surface-container-high rounded-xl p-4 ghost-border">
-                <div className="flex items-center gap-2.5 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-error-container/20 flex items-center justify-center">
-                    <Icon name="trending_down" className="text-error text-sm" />
-                  </div>
-                  <p className="text-xs text-on-surface-variant">Despesas</p>
-                </div>
-                <p className="text-xl font-headline font-bold text-error"><MoneyValue value={realizedExpenses} /></p>
-                {pendingExpenses > 0 && (
-                  <p className="text-[10px] text-on-surface-variant mt-1">+ <MoneyValue value={pendingExpenses} className="text-[10px]" /> previsto</p>
-                )}
-              </div>
-            </div>
+          {/* Resumo Financeiro */}
+          {transactionSummary?.financial_summary && (
+            <FinancialSummaryCards summary={transactionSummary.financial_summary} />
+          )}
 
-            {/* Realizado / Previsto / Total */}
-            <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-outline-variant/30">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-full bg-primary-container/20 flex items-center justify-center">
-                  <Icon name="check_circle" className="text-primary text-xs" />
-                </div>
-                <div>
-                  <p className="text-[9px] text-on-surface-variant uppercase tracking-wider">Realizado</p>
-                  <p className={`text-sm font-headline font-bold ${isCreditCardFilter ? "text-error" : realizedBalance >= 0 ? "text-income" : "text-error"}`}>
-                    <MoneyValue value={isCreditCardFilter ? realizedExpenses : realizedBalance} />
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-full bg-secondary-container/20 flex items-center justify-center">
-                  <Icon name="schedule" className="text-secondary text-xs" />
-                </div>
-                <div>
-                  <p className="text-[9px] text-on-surface-variant uppercase tracking-wider">Previsto</p>
-                  <p className={`text-sm font-headline font-bold ${isCreditCardFilter ? (pendingExpenses > 0 ? "text-error" : "text-on-surface") : pendingBalance >= 0 ? "text-income" : "text-error"}`}>
-                    <MoneyValue value={isCreditCardFilter ? pendingExpenses : pendingBalance} />
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-full bg-surface-container-highest flex items-center justify-center">
-                  <Icon name="account_balance_wallet" className="text-on-surface text-xs" />
-                </div>
-                <div>
-                  <p className="text-[9px] text-on-surface-variant uppercase tracking-wider">Total</p>
-                  <p className={`text-sm font-headline font-bold ${isCreditCardFilter ? "text-error" : (realizedBalance + pendingBalance) >= 0 ? "text-income" : "text-error"}`}>
-                    <MoneyValue value={isCreditCardFilter ? (realizedExpenses + pendingExpenses) : (realizedBalance + pendingBalance)} />
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Recurring + Scheduled */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Recurring + Installments + Scheduled */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <button
               onClick={() => setExpandedSection(expandedSection === "recurring" ? null : "recurring")}
               className={`p-4 rounded-2xl ghost-border text-left transition-colors ${expandedSection === "recurring" ? "bg-primary-container/10" : "bg-surface-container-low"}`}
@@ -469,8 +403,31 @@ export function Transactions() {
                 <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">Recorrentes</span>
                 <span className="text-xs text-on-surface-variant ml-auto">{recurringTxs.length}</span>
               </div>
-              <p className={`text-lg font-headline font-bold ${recurringTotal >= 0 ? "text-income" : "text-error"}`}>
-                <MoneyValue value={recurringTotal} />
+              <div className="flex items-center justify-between gap-3">
+                <p className={`text-lg font-headline font-bold ${recurringTotal >= 0 ? "text-income" : "text-error"}`}>
+                  <MoneyValue value={recurringTotal} />
+                </p>
+                <div className="flex items-center gap-3">
+                  {recurringIncomeTotal > 0 && (
+                    <span className="text-[11px] text-income font-medium whitespace-nowrap">+<MoneyValue value={recurringIncomeTotal} /></span>
+                  )}
+                  {recurringExpenseTotal > 0 && (
+                    <span className="text-[11px] text-error font-medium whitespace-nowrap">-<MoneyValue value={recurringExpenseTotal} /></span>
+                  )}
+                </div>
+              </div>
+            </button>
+            <button
+              onClick={() => setExpandedSection(expandedSection === "installments" ? null : "installments")}
+              className={`p-4 rounded-2xl ghost-border text-left transition-colors ${expandedSection === "installments" ? "bg-secondary-container/10" : "bg-surface-container-low"}`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <Icon name="payments" className="text-base text-secondary" />
+                <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">Parcelados</span>
+                <span className="text-xs text-on-surface-variant ml-auto">{installmentTxs.length}</span>
+              </div>
+              <p className={`text-lg font-headline font-bold ${installmentTotal >= 0 ? "text-income" : "text-error"}`}>
+                <MoneyValue value={installmentTotal} />
               </p>
             </button>
             <button
@@ -490,16 +447,75 @@ export function Transactions() {
 
           {/* Expanded: Recurring list */}
           {expandedSection === "recurring" && recurringTxs.length > 0 && (
+            <div className="space-y-3">
+              {recurringIncomeTxs.length > 0 && (
+                <div className="bg-surface-container-low rounded-2xl ghost-border overflow-hidden">
+                  <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 bg-income/5 border-b border-outline-variant/10">
+                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                      <Icon name="trending_up" className="text-sm text-income shrink-0" />
+                      <span className="text-[10px] sm:text-xs font-bold text-income uppercase tracking-wider truncate">Receitas recorrentes</span>
+                    </div>
+                    <span className="text-[10px] sm:text-xs font-bold text-income whitespace-nowrap ml-2">+<MoneyValue value={recurringIncomeTotal} /></span>
+                  </div>
+                  {recurringIncomeTxs.map((tx) => {
+                    const cat = getCategoryInfo(tx.category_id)
+                    return (
+                      <div key={tx.id} className="flex items-center justify-between px-3 sm:px-4 py-2.5 border-b border-outline-variant/10 last:border-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Icon name={cat.icon} className="text-sm text-income shrink-0" />
+                          <span className="text-sm text-on-surface truncate">{tx.description}</span>
+                        </div>
+                        <span className="text-sm font-bold text-income whitespace-nowrap ml-2">+<MoneyValue value={tx.amount} /></span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              {recurringExpenseTxs.length > 0 && (
+                <div className="bg-surface-container-low rounded-2xl ghost-border overflow-hidden">
+                  <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 bg-error/5 border-b border-outline-variant/10">
+                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                      <Icon name="trending_down" className="text-sm text-error shrink-0" />
+                      <span className="text-[10px] sm:text-xs font-bold text-error uppercase tracking-wider truncate">Despesas recorrentes</span>
+                    </div>
+                    <span className="text-[10px] sm:text-xs font-bold text-error whitespace-nowrap ml-2">-<MoneyValue value={recurringExpenseTotal} /></span>
+                  </div>
+                  {recurringExpenseTxs.map((tx) => {
+                    const cat = getCategoryInfo(tx.category_id)
+                    return (
+                      <div key={tx.id} className="flex items-center justify-between px-3 sm:px-4 py-2.5 border-b border-outline-variant/10 last:border-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Icon name={cat.icon} className="text-sm text-error shrink-0" />
+                          <span className="text-sm text-on-surface truncate">{tx.description}</span>
+                        </div>
+                        <span className="text-sm font-bold text-error whitespace-nowrap ml-2">-<MoneyValue value={tx.amount} /></span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Expanded: Installments list */}
+          {expandedSection === "installments" && installmentTxs.length > 0 && (
             <div className="bg-surface-container-low rounded-2xl ghost-border overflow-hidden">
-              {recurringTxs.map((tx) => {
+              <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 bg-secondary/5 border-b border-outline-variant/10">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                  <Icon name="payments" className="text-sm text-secondary shrink-0" />
+                  <span className="text-[10px] sm:text-xs font-bold text-secondary uppercase tracking-wider truncate">Parcelados do mes</span>
+                </div>
+                <span className="text-[10px] sm:text-xs font-bold text-error whitespace-nowrap ml-2">-<MoneyValue value={installmentExpenseTotal} /></span>
+              </div>
+              {installmentTxs.map((tx) => {
                 const cat = getCategoryInfo(tx.category_id)
                 return (
-                  <div key={tx.id} className="flex items-center justify-between px-4 py-2.5 border-b border-outline-variant/10 last:border-0">
-                    <div className="flex items-center gap-2.5">
-                      <Icon name={cat.icon} className="text-sm text-primary" />
-                      <span className="text-sm text-on-surface">{tx.description}</span>
+                  <div key={tx.id} className="flex items-center justify-between px-3 sm:px-4 py-2.5 border-b border-outline-variant/10 last:border-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Icon name={cat.icon} className="text-sm text-secondary shrink-0" />
+                      <span className="text-sm text-on-surface truncate">{tx.description}</span>
                     </div>
-                    <span className={`text-sm font-bold ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
+                    <span className={`text-sm font-bold whitespace-nowrap ml-2 ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
                       {tx.type === "INCOME" ? "+" : "-"}<MoneyValue value={tx.amount} />
                     </span>
                   </div>
@@ -650,46 +666,57 @@ export function Transactions() {
                 </button>
               ))}
             </div>
-            <div className="flex items-baseline justify-center gap-1 w-fit mx-auto">
-              <span className={`text-3xl font-headline font-extrabold ${form.type === "EXPENSE" ? "text-error/60" : "text-income/60"}`}>R$</span>
-              <input
-                value={form.amount}
-                onChange={(e) => {
-                  const raw = e.target.value.replace(/\D/g, "")
-                  const cents = raw ? parseInt(raw, 10) : 0
-                  setForm({ ...form, amount: formatCentsToBRL(cents) })
-                }}
-                placeholder="0,00"
-                inputMode="numeric"
-                className="bg-transparent border-none text-left text-4xl font-headline font-extrabold text-on-surface placeholder:text-on-surface/20 focus:ring-0 focus:outline-none p-0"
-                style={{ width: `${Math.max(3.5, (form.amount?.length || 0) + 1.5)}ch` }}
-                required
-              />
+            <div className="flex flex-col items-center gap-1 w-fit mx-auto">
+              <div className={`flex items-baseline justify-center gap-1 rounded-xl px-3 py-1 transition-all ${validationErrors.amount ? "ring-2 ring-error/60 bg-error/5" : ""}`}>
+                <span className={`text-3xl font-headline font-extrabold ${form.type === "EXPENSE" ? "text-error/60" : "text-income/60"}`}>R$</span>
+                <input
+                  value={form.amount}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "")
+                    const cents = raw ? parseInt(raw, 10) : 0
+                    setForm({ ...form, amount: formatCentsToBRL(cents) })
+                    if (validationErrors.amount) setValidationErrors((v) => ({ ...v, amount: false }))
+                  }}
+                  placeholder="0,00"
+                  inputMode="numeric"
+                  className="bg-transparent border-none text-left text-4xl font-headline font-extrabold text-on-surface placeholder:text-on-surface/20 focus:ring-0 focus:outline-none p-0"
+                  style={{ width: `${Math.max(3.5, (form.amount?.length || 0) + 1.5)}ch` }}
+                  required
+                />
+              </div>
+              {validationErrors.amount && <span className="text-[11px] text-error font-medium">Informe o valor</span>}
             </div>
           </div>
 
           {/* Description */}
-          <input
-            value={form.description}
-            onChange={(e) => {
-              setForm({ ...form, description: e.target.value })
-              setCategorySuggested(false)
-            }}
-            onBlur={(e) => {
-              if (!editingTx) suggestCategoryFromDescription(e.target.value)
-            }}
-            placeholder="Descricao (ex: Supermercado)"
-            className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-            required
-          />
+          <div className="space-y-1">
+            <input
+              value={form.description}
+              onChange={(e) => {
+                setForm({ ...form, description: e.target.value })
+                setCategorySuggested(false)
+                if (validationErrors.description) setValidationErrors((v) => ({ ...v, description: false }))
+              }}
+              onBlur={(e) => {
+                if (!editingTx) suggestCategoryFromDescription(e.target.value)
+              }}
+              placeholder="Descricao (ex: Supermercado)"
+              className={`w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 ${validationErrors.description ? "ring-1 ring-error/60 bg-error/5" : "focus:ring-primary/50"}`}
+              required
+            />
+            {validationErrors.description && <span className="text-[11px] text-error font-medium px-1">Informe a descricao</span>}
+          </div>
 
           {/* Category chips (obrigatório) */}
-          <div className="space-y-1.5">
+          <div className={`space-y-1.5 rounded-xl p-2 -mx-2 transition-all ${validationErrors.category ? "ring-2 ring-error/60 bg-error/5" : ""}`}>
             <label className="font-label text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-1">
               Categoria <span className="text-error">*</span>
             </label>
-            {!form.category_id && (
+            {!form.category_id && !validationErrors.category && (
               <p className="text-[10px] text-on-surface-variant/60 px-1">Selecione uma categoria</p>
+            )}
+            {validationErrors.category && (
+              <p className="text-[11px] text-error font-medium px-1">Selecione uma categoria</p>
             )}
             {categorySuggested && form.category_id && !isOtherCategory && (
               <p className="text-[10px] text-primary/70 px-1 flex items-center gap-1">
@@ -700,7 +727,7 @@ export function Transactions() {
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
               <button
                 type="button"
-                onClick={() => { setForm({ ...form, category_id: "__other__", custom_category_name: "" }); setCategorySuggested(false) }}
+                onClick={() => { setForm({ ...form, category_id: "__other__", custom_category_name: "" }); setCategorySuggested(false); if (validationErrors.category) setValidationErrors((v) => ({ ...v, category: false })) }}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                   isOtherCategory
                     ? "bg-primary-container/20 text-primary border border-primary/20"
@@ -716,7 +743,7 @@ export function Transactions() {
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => { setForm({ ...form, category_id: c.id, custom_category_name: "" }); setCategorySuggested(false) }}
+                    onClick={() => { setForm({ ...form, category_id: c.id, custom_category_name: "" }); setCategorySuggested(false); if (validationErrors.category) setValidationErrors((v) => ({ ...v, category: false })) }}
                     className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                       form.category_id === c.id
                         ? "bg-primary-container/20 text-primary border border-primary/20"
@@ -730,14 +757,20 @@ export function Transactions() {
               })}
             </div>
             {isOtherCategory && (
-              <input
-                value={form.custom_category_name}
-                onChange={(e) => setForm({ ...form, custom_category_name: e.target.value })}
-                placeholder="Nome da categoria"
-                className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-                required
-                autoFocus
-              />
+              <div className="space-y-1">
+                <input
+                  value={form.custom_category_name}
+                  onChange={(e) => {
+                    setForm({ ...form, custom_category_name: e.target.value })
+                    if (validationErrors.custom_category_name) setValidationErrors((v) => ({ ...v, custom_category_name: false }))
+                  }}
+                  placeholder="Nome da categoria"
+                  className={`w-full bg-surface-container-highest border-none rounded-xl px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 ${validationErrors.custom_category_name ? "ring-1 ring-error/60 bg-error/5" : "focus:ring-primary/50"}`}
+                  required
+                  autoFocus
+                />
+                {validationErrors.custom_category_name && <span className="text-[11px] text-error font-medium px-1">Informe o nome da categoria</span>}
+              </div>
             )}
           </div>
 
@@ -745,12 +778,12 @@ export function Transactions() {
           {!editingTx && <div className="grid grid-cols-2 gap-3">
             {/* Account Selector */}
             <div className="relative">
-              <label className="font-label text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-1 mb-1 block">Conta</label>
+              <label className={`font-label text-[10px] font-bold uppercase tracking-wider px-1 mb-1 block ${validationErrors.card_id ? "text-error" : "text-on-surface-variant"}`}>Conta {validationErrors.card_id && <span className="text-error">*</span>}</label>
               <input type="hidden" name="card_id" value={form.card_id} required />
               <button
                 type="button"
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="w-full flex items-center justify-between bg-surface-container-highest rounded-xl px-3 py-2.5 text-sm text-on-surface"
+                onClick={() => { setDropdownOpen(!dropdownOpen); if (validationErrors.card_id) setValidationErrors((v) => ({ ...v, card_id: false })) }}
+                className={`w-full flex items-center justify-between bg-surface-container-highest rounded-xl px-3 py-2.5 text-sm text-on-surface ${validationErrors.card_id ? "ring-2 ring-error/60 bg-error/5" : ""}`}
               >
                 {form.card_id ? (
                   (() => {
@@ -787,7 +820,7 @@ export function Transactions() {
                           <button
                             key={c.id}
                             type="button"
-                            onClick={() => { setForm({ ...form, card_id: c.id }); setDropdownOpen(false) }}
+                            onClick={() => { setForm({ ...form, card_id: c.id }); setDropdownOpen(false); if (validationErrors.card_id) setValidationErrors((v) => ({ ...v, card_id: false })) }}
                             className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-container-highest transition-colors ${form.card_id === c.id ? "bg-primary/10" : ""}`}
                           >
                             <div
@@ -819,7 +852,7 @@ export function Transactions() {
                           <button
                             key={c.id}
                             type="button"
-                            onClick={() => { setForm({ ...form, card_id: c.id }); setDropdownOpen(false) }}
+                            onClick={() => { setForm({ ...form, card_id: c.id }); setDropdownOpen(false); if (validationErrors.card_id) setValidationErrors((v) => ({ ...v, card_id: false })) }}
                             className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-container-highest transition-colors ${form.card_id === c.id ? "bg-primary/10" : ""}`}
                           >
                             <div
@@ -963,7 +996,7 @@ export function Transactions() {
           {/* Cascade option for installment edit */}
           {editingTx && (() => {
             const tx = transactions.find((t) => t.id === editingTx)
-            return tx && isInstallment(tx) ? (
+            return tx && tx.classification === "installment" ? (
               <label className="flex items-center gap-2.5 bg-tertiary-container/10 rounded-xl px-4 py-3 cursor-pointer">
                 <input
                   type="checkbox"

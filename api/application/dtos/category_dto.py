@@ -1,14 +1,13 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CategoryCreate(BaseModel):
-    name: str
-    icon: str | None = None
-    color: str
-    user_id: UUID | None = None
+    name: str = Field(max_length=100)
+    icon: str | None = Field(default=None, max_length=50)
+    color: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
 
 
 class CategoryResponse(BaseModel):
@@ -20,4 +19,5 @@ class CategoryResponse(BaseModel):
     color: str
     is_default: bool
     user_id: UUID | None
+    household_id: UUID | None
     created_at: datetime

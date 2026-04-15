@@ -1,15 +1,40 @@
-import type { Bank, Card, Transaction, Category } from "@/types"
+import type { Bank, Card, Transaction, TransactionSummary, Category, Member, HouseholdInvite } from "@/types"
+import { supabase } from "@/lib/supabase"
 
-const USER_ID = "00000000-0000-0000-0000-000000000001"
+async function getAccessToken(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession()
+  return data.session?.access_token ?? null
+}
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    ...options,
-  })
+  const token = await getAccessToken()
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options?.headers as Record<string, string>),
+  }
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`
+  }
+
+  const res = await fetch(url, { ...options, headers })
+
+  if (res.status === 401) {
+    window.location.href = "/login"
+    throw new Error("Unauthorized")
+  }
+
   if (!res.ok) {
-    const body = await res.text().catch(() => "")
-    throw new Error(`API Error ${res.status}: ${body}`)
+    if (res.status === 422) {
+      const body = await res.json().catch(() => ({ detail: "" }))
+      throw new Error(body.detail || "Dados inválidos")
+    }
+    const statusMessages: Record<number, string> = {
+      400: "Requisição inválida",
+      403: "Acesso negado",
+      404: "Recurso não encontrado",
+      500: "Erro interno do servidor",
+    }
+    throw new Error(statusMessages[res.status] || `Erro ${res.status}`)
   }
   if (res.status === 204) return undefined as T
   return res.json()
@@ -44,7 +69,7 @@ export const api = {
     create: (data: { name: string; color: string }) =>
       request<Bank>("/api/banks", {
         method: "POST",
-        body: JSON.stringify({ ...data, user_id: USER_ID }),
+        body: JSON.stringify(data),
       }),
     delete: (id: string) =>
       request<void>(`/api/banks/${id}`, { method: "DELETE" }),
@@ -52,9 +77,7 @@ export const api = {
 
   cards: {
     list: async () => {
-      const raw = await request<Record<string, unknown>[]>(
-        `/api/cards?user_id=${USER_ID}`,
-      )
+      const raw = await request<Record<string, unknown>[]>("/api/cards")
       return raw.map(normalizeCard)
     },
     create: (data: {
@@ -67,7 +90,7 @@ export const api = {
       billing_day?: number
       due_day?: number
     }) =>
-      request<Card>(`/api/cards?user_id=${USER_ID}`, {
+      request<Card>("/api/cards", {
         method: "POST",
         body: JSON.stringify(data),
       }),
@@ -82,9 +105,7 @@ export const api = {
 
   transactions: {
     list: async () => {
-      const raw = await request<Record<string, unknown>[]>(
-        `/api/transactions?user_id=${USER_ID}`,
-      )
+      const raw = await request<Record<string, unknown>[]>("/api/transactions")
       return raw.map(normalizeTransaction)
     },
     create: (data: {
@@ -124,6 +145,11 @@ export const api = {
       request<void>(`/api/transactions/${id}/recurring-future`, {
         method: "DELETE",
       }),
+    summary: (month: string, cardId?: string) => {
+      const params = new URLSearchParams({ month })
+      if (cardId) params.set("card_id", cardId)
+      return request<TransactionSummary>(`/api/transactions/summary?${params}`)
+    },
   },
 
   categories: {
@@ -131,9 +157,24 @@ export const api = {
     create: (data: { name: string; color: string }) =>
       request<Category>("/api/categories", {
         method: "POST",
-        body: JSON.stringify({ ...data, user_id: USER_ID }),
+        body: JSON.stringify(data),
       }),
     delete: (id: string) =>
       request<void>(`/api/categories/${id}`, { method: "DELETE" }),
+  },
+
+  household: {
+    listMembers: () => request<Member[]>("/api/households/members"),
+    invite: (email: string) =>
+      request<HouseholdInvite>("/api/households/invites", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+    listInvites: () =>
+      request<HouseholdInvite[]>("/api/households/invites"),
+    cancelInvite: (id: string) =>
+      request<void>(`/api/households/invites/${id}`, { method: "DELETE" }),
+    removeMember: (userId: string) =>
+      request<void>(`/api/households/members/${userId}`, { method: "DELETE" }),
   },
 }

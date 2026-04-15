@@ -1,0 +1,16 @@
+from typing import Protocol
+from uuid import UUID
+
+from api.domain.entities.user import User
+
+
+class UserRepository(Protocol):
+    async def get_by_id(self, user_id: UUID) -> User | None: ...
+
+    async def get_by_email(self, email: str) -> User | None: ...
+
+    async def create(self, user: User) -> User: ...
+
+    async def list_by_household(self, household_id: UUID) -> list[User]: ...
+
+    async def delete(self, user_id: UUID) -> None: ...

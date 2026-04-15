@@ -9,6 +9,7 @@ const navItems = [
   { to: "/transactions", icon: "receipt_long", label: "Transacoes" },
   { to: "/bills", icon: "payments", label: "Vencimentos" },
   { to: "/reports", icon: "bar_chart", label: "Relatorios" },
+  { to: "/settings", icon: "settings", label: "Configuracoes" },
 ]
 
 export function Sidebar() {

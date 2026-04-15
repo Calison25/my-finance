@@ -18,6 +18,14 @@ class PostgresCardRepository:
             )
         return [self._row_to_card(row) for row in rows]
 
+    async def list_by_household(self, household_id: UUID) -> list[Card]:
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM cards WHERE household_id = $1 ORDER BY created_at DESC",
+                household_id,
+            )
+        return [self._row_to_card(row) for row in rows]
+
     async def get_by_id(self, card_id: UUID) -> Card | None:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -32,13 +40,14 @@ class PostgresCardRepository:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                INSERT INTO cards (id, user_id, bank_id, name, type, last_digits, credit_limit, billing_day, due_day, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                INSERT INTO cards (id, user_id, bank_id, household_id, name, type, last_digits, credit_limit, billing_day, due_day, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 RETURNING *
                 """,
                 card.id,
                 card.user_id,
                 card.bank_id,
+                card.household_id,
                 card.name,
                 card.type.value,
                 card.last_digits,
@@ -84,6 +93,7 @@ class PostgresCardRepository:
             id=record["id"],
             user_id=record["user_id"],
             bank_id=record["bank_id"],
+            household_id=record["household_id"],
             name=record["name"],
             type=CardType(record["type"]),
             last_digits=record["last_digits"],

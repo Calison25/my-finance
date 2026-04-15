@@ -92,16 +92,16 @@ BEGIN
   -- 2. CARDS (3 contas correntes + 4 cartoes de credito)
   -- ============================================================
 
-  INSERT INTO cards (id, user_id, bank_id, name, type, last_digits, credit_limit, billing_day, due_day) VALUES
+  INSERT INTO cards (id, user_id, bank_id, household_id, name, type, last_digits, credit_limit, billing_day, due_day) VALUES
     -- Contas correntes
-    (v_nubank_cc,      '00000000-0000-0000-0000-000000000001', v_nubank_id, 'Conta Nubank',       'CHECKING_ACCOUNT', '8742', NULL, NULL, NULL),
-    (v_inter_cc,       '00000000-0000-0000-0000-000000000001', v_inter_id,  'Conta Inter',        'CHECKING_ACCOUNT', '3021', NULL, NULL, NULL),
-    (v_itau_cc,        '00000000-0000-0000-0000-000000000001', v_itau_id,   'Conta Itau Salario', 'CHECKING_ACCOUNT', '5590', NULL, NULL, NULL),
+    (v_nubank_cc,      '51fc729a-817d-4c32-861a-b69866588a84', v_nubank_id, 'b377889c-28c2-4210-a56c-8e454dda61ea', 'Conta Nubank',       'CHECKING_ACCOUNT', '8742', NULL, NULL, NULL),
+    (v_inter_cc,       '51fc729a-817d-4c32-861a-b69866588a84', v_inter_id,  'b377889c-28c2-4210-a56c-8e454dda61ea', 'Conta Inter',        'CHECKING_ACCOUNT', '3021', NULL, NULL, NULL),
+    (v_itau_cc,        '51fc729a-817d-4c32-861a-b69866588a84', v_itau_id,   'b377889c-28c2-4210-a56c-8e454dda61ea', 'Conta Itau Salario', 'CHECKING_ACCOUNT', '5590', NULL, NULL, NULL),
     -- Cartoes de credito (billing_day = fechamento, due_day = vencimento)
-    (v_nubank_credito, '00000000-0000-0000-0000-000000000001', v_nubank_id, 'Nubank Platinum',    'CREDIT_CARD', '4455', 12000.00, 10, 17),
-    (v_inter_credito,  '00000000-0000-0000-0000-000000000001', v_inter_id,  'Inter Gold',         'CREDIT_CARD', '7823', 8000.00, 15, 22),
-    (v_itau_credito,   '00000000-0000-0000-0000-000000000001', v_itau_id,   'Itau Click',         'CREDIT_CARD', '1190', 5000.00, 5, 12),
-    (v_c6_credito,     '00000000-0000-0000-0000-000000000001', v_c6_id,     'C6 Carbon',          'CREDIT_CARD', '6677', 15000.00, 20, 27);
+    (v_nubank_credito, '51fc729a-817d-4c32-861a-b69866588a84', v_nubank_id, 'b377889c-28c2-4210-a56c-8e454dda61ea', 'Nubank Platinum',    'CREDIT_CARD', '4455', 12000.00, 10, 17),
+    (v_inter_credito,  '51fc729a-817d-4c32-861a-b69866588a84', v_inter_id,  'b377889c-28c2-4210-a56c-8e454dda61ea', 'Inter Gold',         'CREDIT_CARD', '7823', 8000.00, 15, 22),
+    (v_itau_credito,   '51fc729a-817d-4c32-861a-b69866588a84', v_itau_id,   'b377889c-28c2-4210-a56c-8e454dda61ea', 'Itau Click',         'CREDIT_CARD', '1190', 5000.00, 5, 12),
+    (v_c6_credito,     '51fc729a-817d-4c32-861a-b69866588a84', v_c6_id,     'b377889c-28c2-4210-a56c-8e454dda61ea', 'C6 Carbon',          'CREDIT_CARD', '6677', 15000.00, 20, 27);
 
   -- ============================================================
   -- 3. TRANSACOES RECORRENTES (24 meses cada)

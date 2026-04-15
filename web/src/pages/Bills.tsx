@@ -19,8 +19,9 @@ export function Bills() {
   const { transactions, cards, banks, realizeTransaction, unrealizeTransaction } = useFinanceStore()
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+    const next = new Date()
+    next.setMonth(next.getMonth() + 1)
+    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
   })
 
   const [year, month] = selectedMonth.split("-").map(Number)

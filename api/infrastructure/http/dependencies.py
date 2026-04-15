@@ -13,6 +13,15 @@ from api.infrastructure.persistence.postgres_card_repository import (
 from api.infrastructure.persistence.postgres_transaction_repository import (
     PostgresTransactionRepository,
 )
+from api.infrastructure.persistence.postgres_user_repository import (
+    PostgresUserRepository,
+)
+from api.infrastructure.persistence.postgres_household_repository import (
+    PostgresHouseholdRepository,
+)
+from api.infrastructure.persistence.postgres_household_invite_repository import (
+    PostgresHouseholdInviteRepository,
+)
 
 from api.application.use_cases.bank_use_cases import (
     CreateBankUseCase,
@@ -39,7 +48,18 @@ from api.application.use_cases.transaction_use_cases import (
     RealizeTransactionUseCase,
     UpdateTransactionUseCase,
 )
+from api.application.use_cases.transaction_summary_use_case import (
+    GetTransactionSummaryUseCase,
+)
 from api.application.use_cases.dashboard_use_case import GetDashboardSummaryUseCase
+from api.application.use_cases.provision_user_use_case import ProvisionUserUseCase
+from api.application.use_cases.invite_use_cases import InviteMemberUseCase
+from api.application.use_cases.household_use_cases import (
+    CancelInviteUseCase,
+    ListInvitesUseCase,
+    ListMembersUseCase,
+    RemoveMemberUseCase,
+)
 
 
 def get_db_pool(request: Request) -> asyncpg.Pool:
@@ -71,6 +91,24 @@ def get_transaction_repository(
     pool: asyncpg.Pool = Depends(get_db_pool),
 ) -> PostgresTransactionRepository:
     return PostgresTransactionRepository(pool)
+
+
+def get_user_repository(
+    pool: asyncpg.Pool = Depends(get_db_pool),
+) -> PostgresUserRepository:
+    return PostgresUserRepository(pool)
+
+
+def get_household_repository(
+    pool: asyncpg.Pool = Depends(get_db_pool),
+) -> PostgresHouseholdRepository:
+    return PostgresHouseholdRepository(pool)
+
+
+def get_household_invite_repository(
+    pool: asyncpg.Pool = Depends(get_db_pool),
+) -> PostgresHouseholdInviteRepository:
+    return PostgresHouseholdInviteRepository(pool)
 
 
 # --- Use case factories: Bank ---
@@ -161,32 +199,43 @@ def get_list_transactions(
 def get_create_transaction(
     transaction_repo: PostgresTransactionRepository = Depends(get_transaction_repository),
     category_repo: PostgresCategoryRepository = Depends(get_category_repository),
+    card_repo: PostgresCardRepository = Depends(get_card_repository),
 ) -> CreateTransactionUseCase:
-    return CreateTransactionUseCase(transaction_repo, category_repo)
+    return CreateTransactionUseCase(transaction_repo, category_repo, card_repo)
 
 
 def get_update_transaction(
     repo: PostgresTransactionRepository = Depends(get_transaction_repository),
+    card_repo: PostgresCardRepository = Depends(get_card_repository),
 ) -> UpdateTransactionUseCase:
-    return UpdateTransactionUseCase(repo)
+    return UpdateTransactionUseCase(repo, card_repo)
 
 
 def get_realize_transaction(
     repo: PostgresTransactionRepository = Depends(get_transaction_repository),
+    card_repo: PostgresCardRepository = Depends(get_card_repository),
 ) -> RealizeTransactionUseCase:
-    return RealizeTransactionUseCase(repo)
+    return RealizeTransactionUseCase(repo, card_repo)
 
 
 def get_delete_transaction(
     repo: PostgresTransactionRepository = Depends(get_transaction_repository),
+    card_repo: PostgresCardRepository = Depends(get_card_repository),
 ) -> DeleteTransactionUseCase:
-    return DeleteTransactionUseCase(repo)
+    return DeleteTransactionUseCase(repo, card_repo)
 
 
 def get_delete_recurring_transactions(
     repo: PostgresTransactionRepository = Depends(get_transaction_repository),
+    card_repo: PostgresCardRepository = Depends(get_card_repository),
 ) -> DeleteRecurringTransactionsUseCase:
-    return DeleteRecurringTransactionsUseCase(repo)
+    return DeleteRecurringTransactionsUseCase(repo, card_repo)
+
+
+def get_transaction_summary(
+    repo: PostgresTransactionRepository = Depends(get_transaction_repository),
+) -> GetTransactionSummaryUseCase:
+    return GetTransactionSummaryUseCase(repo)
 
 
 # --- Use case factories: Dashboard ---
@@ -199,3 +248,56 @@ def get_dashboard_summary(
     ),
 ) -> GetDashboardSummaryUseCase:
     return GetDashboardSummaryUseCase(card_repo, transaction_repo)
+
+
+# --- Use case factories: Auth ---
+
+
+def get_provision_user(
+    user_repo: PostgresUserRepository = Depends(get_user_repository),
+    household_repo: PostgresHouseholdRepository = Depends(get_household_repository),
+    invite_repo: PostgresHouseholdInviteRepository = Depends(
+        get_household_invite_repository
+    ),
+) -> ProvisionUserUseCase:
+    return ProvisionUserUseCase(user_repo, household_repo, invite_repo)
+
+
+# --- Use case factories: Household ---
+
+
+def get_invite_member(
+    invite_repo: PostgresHouseholdInviteRepository = Depends(
+        get_household_invite_repository
+    ),
+    user_repo: PostgresUserRepository = Depends(get_user_repository),
+) -> InviteMemberUseCase:
+    return InviteMemberUseCase(invite_repo, user_repo)
+
+
+def get_list_members(
+    user_repo: PostgresUserRepository = Depends(get_user_repository),
+) -> ListMembersUseCase:
+    return ListMembersUseCase(user_repo)
+
+
+def get_remove_member(
+    user_repo: PostgresUserRepository = Depends(get_user_repository),
+) -> RemoveMemberUseCase:
+    return RemoveMemberUseCase(user_repo)
+
+
+def get_list_invites(
+    invite_repo: PostgresHouseholdInviteRepository = Depends(
+        get_household_invite_repository
+    ),
+) -> ListInvitesUseCase:
+    return ListInvitesUseCase(invite_repo)
+
+
+def get_cancel_invite(
+    invite_repo: PostgresHouseholdInviteRepository = Depends(
+        get_household_invite_repository
+    ),
+) -> CancelInviteUseCase:
+    return CancelInviteUseCase(invite_repo)

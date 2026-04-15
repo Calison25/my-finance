@@ -9,10 +9,10 @@ BEGIN;
 
 -- Transacoes dependem de cards (CASCADE), entao basta deletar cards
 DELETE FROM transactions WHERE card_id IN (
-  SELECT id FROM cards WHERE user_id = '00000000-0000-0000-0000-000000000001'
+  SELECT id FROM cards WHERE user_id = '51fc729a-817d-4c32-861a-b69866588a84'
 );
 
-DELETE FROM cards WHERE user_id = '00000000-0000-0000-0000-000000000001';
+DELETE FROM cards WHERE user_id = '51fc729a-817d-4c32-861a-b69866588a84';
 
 COMMIT;
 

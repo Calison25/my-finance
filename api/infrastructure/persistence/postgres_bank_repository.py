@@ -26,6 +26,14 @@ class PostgresBankRepository:
                 )
         return [self._row_to_bank(row) for row in rows]
 
+    async def list_by_household(self, household_id: UUID) -> list[Bank]:
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM banks WHERE is_default = TRUE OR household_id = $1 ORDER BY name",
+                household_id,
+            )
+        return [self._row_to_bank(row) for row in rows]
+
     async def get_by_id(self, bank_id: UUID) -> Bank | None:
         query = "SELECT * FROM banks WHERE id = $1"
         async with self._pool.acquire() as conn:
@@ -36,8 +44,8 @@ class PostgresBankRepository:
 
     async def create(self, bank: Bank) -> Bank:
         query = """
-            INSERT INTO banks (id, name, code, logo_url, color, is_default, user_id)
-            VALUES ($1, $2, $3, $4, $5, FALSE, $6)
+            INSERT INTO banks (id, name, code, logo_url, color, is_default, user_id, household_id)
+            VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7)
             RETURNING *
         """
         async with self._pool.acquire() as conn:
@@ -49,6 +57,7 @@ class PostgresBankRepository:
                 bank.logo_url,
                 bank.color,
                 bank.user_id,
+                bank.household_id,
             )
         return self._row_to_bank(row)
 

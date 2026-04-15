@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import type { Bank, Card, Transaction, Category, CardType, TransactionType } from "@/types"
+import type { Bank, Card, Transaction, TransactionSummary, Category, CardType, TransactionType } from "@/types"
 import { api } from "@/services/api"
 
 interface FinanceState {
@@ -25,6 +25,11 @@ interface FinanceState {
   unrealizeTransaction: (id: string) => void
   getCardBalance: (cardId: string) => number
   getCardExpenses: (cardId: string) => number
+  getCardExpensesByMonth: (cardId: string, month: string) => number
+  getCardBalanceByMonth: (cardId: string, month: string) => number
+  transactionSummary: TransactionSummary | null
+  fetchTransactionSummary: (month: string, cardId?: string) => Promise<void>
+  reset: () => void
 }
 
 export const useFinanceStore = create<FinanceState>()((set, get) => ({
@@ -52,7 +57,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
 
   addBank: async (data) => {
-    await api.banks.create({ name: data.name, color: data.color })
+    await api.banks.create(data)
     get().fetchAll()
   },
 
@@ -97,7 +102,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     set((s) => ({
       categories: [
         ...s.categories,
-        { id: tempId, name, icon: null, color: "#6B7280", is_default: false, user_id: null },
+        { id: tempId, name, icon: null, color: "#6B7280", is_default: false, user_id: null, household_id: null },
       ],
     }))
     api.categories.create({ name, color: "#6B7280" }).then(() => get().fetchAll())
@@ -156,7 +161,8 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
 
   getCardExpenses: (cardId) => {
     const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const refMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    const monthStart = new Date(refMonth.getFullYear(), refMonth.getMonth(), 1)
       .toISOString()
       .slice(0, 10)
     return get()
@@ -164,5 +170,76 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
         (t) => t.card_id === cardId && t.type === "EXPENSE" && t.date >= monthStart,
       )
       .reduce((acc, t) => acc + t.amount, 0)
+  },
+
+  getCardBalanceByMonth: (cardId, month) => {
+    const [year, m] = month.split("-").map(Number)
+    const monthStart = new Date(year, m - 1, 1).toISOString().slice(0, 10)
+    const monthEnd = new Date(year, m, 0).toISOString().slice(0, 10)
+    return get()
+      .transactions.filter(
+        (t) => t.card_id === cardId && t.date >= monthStart && t.date <= monthEnd,
+      )
+      .reduce((acc, t) => (t.type === "INCOME" ? acc + t.amount : acc - t.amount), 0)
+  },
+
+  getCardExpensesByMonth: (cardId, month) => {
+    const [year, m] = month.split("-").map(Number)
+    const monthStart = new Date(year, m - 1, 1).toISOString().slice(0, 10)
+    const monthEnd = new Date(year, m, 0).toISOString().slice(0, 10)
+    return get()
+      .transactions.filter(
+        (t) => t.card_id === cardId && t.type === "EXPENSE" && t.date >= monthStart && t.date <= monthEnd,
+      )
+      .reduce((acc, t) => acc + t.amount, 0)
+  },
+
+  reset: () => set({
+    banks: [],
+    cards: [],
+    transactions: [],
+    categories: [],
+    transactionSummary: null,
+    isLoading: false,
+  }),
+
+  transactionSummary: null,
+  fetchTransactionSummary: async (month, cardId) => {
+    try {
+      const raw = await api.transactions.summary(month, cardId)
+      const toNum = (v: unknown) => Number(v) || 0
+      const fixBalance = (b: typeof raw.realized) => ({
+        income: toNum(b.income),
+        expenses: toNum(b.expenses),
+        balance: toNum(b.balance),
+      })
+      const fixGroup = (g: typeof raw.recurring) => ({
+        income_total: toNum(g.income_total),
+        expense_total: toNum(g.expense_total),
+        total: toNum(g.total),
+        count: g.count,
+      })
+      const fs = raw.financial_summary
+      set({
+        transactionSummary: {
+          total_month: toNum(raw.total_month),
+          realized: fixBalance(raw.realized),
+          pending: fixBalance(raw.pending),
+          recurring: fixGroup(raw.recurring),
+          installments: fixGroup(raw.installments),
+          scheduled: fixGroup(raw.scheduled),
+          financial_summary: {
+            total_income: toNum(fs?.total_income),
+            realized_expenses: toNum(fs?.realized_expenses),
+            scheduled_expenses: toNum(fs?.scheduled_expenses),
+            total_expenses: toNum(fs?.total_expenses),
+            current_balance: toNum(fs?.current_balance),
+            projected_balance: toNum(fs?.projected_balance),
+          },
+        },
+      })
+    } catch {
+      // silent - summary is optional, page works with fallback zeros
+    }
   },
 }))

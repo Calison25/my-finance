@@ -14,10 +14,15 @@ const EMPTY_FORM = {
 
 export function Accounts() {
   const navigate = useNavigate()
-  const { cards, banks, addCard, updateCard, deleteCard, getCardBalance, valuesVisible, toggleValuesVisible } = useFinanceStore()
+  const { cards, banks, addCard, updateCard, deleteCard, getCardBalanceByMonth, valuesVisible, toggleValuesVisible } = useFinanceStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingCardId, setEditingCardId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...EMPTY_FORM })
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const next = new Date()
+    next.setMonth(next.getMonth() + 1)
+    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
+  })
 
   const isOtherBank = form.bank_id === "__other__"
   const checkingAccounts = cards.filter((c) => c.type === "CHECKING_ACCOUNT")
@@ -72,7 +77,7 @@ export function Accounts() {
     return banks.find((b) => b.id === bankId)
   }
 
-  const totalBalance = checkingAccounts.reduce((acc, c) => acc + getCardBalance(c.id), 0)
+  const totalBalance = checkingAccounts.reduce((acc, c) => acc + getCardBalanceByMonth(c.id, selectedMonth), 0)
 
   return (
     <div className="space-y-8">
@@ -94,18 +99,45 @@ export function Accounts() {
       {/* Total Balance Card */}
       {checkingAccounts.length > 0 && (
         <div className="glass-card ghost-border rounded-xl p-8 relative overflow-hidden group">
-          <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all duration-700" />
-          <div className="flex items-center gap-2 mb-1">
-            <p className="text-on-surface-variant font-label text-sm">Saldo Total em Contas</p>
-            <button
-              onClick={toggleValuesVisible}
-              className="opacity-40 hover:opacity-100 transition-opacity"
-              title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
-            >
-              <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
-            </button>
+          <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all duration-700 pointer-events-none" />
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <p className="text-on-surface-variant font-label text-sm">Saldo Total em Contas</p>
+              <button
+                onClick={toggleValuesVisible}
+                className="opacity-40 hover:opacity-100 transition-opacity"
+                title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
+              >
+                <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
+              </button>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  const [y, m] = selectedMonth.split("-").map(Number)
+                  const prev = new Date(y, m - 2, 1)
+                  setSelectedMonth(`${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`)
+                }}
+                className="p-1.5 rounded-lg hover:bg-surface-container-highest transition-colors"
+              >
+                <Icon name="chevron_left" className="text-lg text-on-surface-variant" />
+              </button>
+              <span className="text-sm font-medium text-on-surface min-w-[100px] text-center capitalize">
+                {new Date(Number(selectedMonth.split("-")[0]), Number(selectedMonth.split("-")[1]) - 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+              </span>
+              <button
+                onClick={() => {
+                  const [y, m] = selectedMonth.split("-").map(Number)
+                  const next = new Date(y, m, 1)
+                  setSelectedMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`)
+                }}
+                className="p-1.5 rounded-lg hover:bg-surface-container-highest transition-colors"
+              >
+                <Icon name="chevron_right" className="text-lg text-on-surface-variant" />
+              </button>
+            </div>
           </div>
-          <p className="font-headline font-bold text-4xl text-on-surface"><MoneyValue value={totalBalance} /></p>
+          <p className={`font-headline font-bold text-4xl ${totalBalance >= 0 ? "text-on-surface" : "text-error"}`}><MoneyValue value={totalBalance} /></p>
           <div className="mt-4 flex items-center gap-2 text-primary font-medium text-sm">
             <Icon name="account_balance" className="text-base" />
             <span>{checkingAccounts.length} conta(s) cadastrada(s)</span>
@@ -135,7 +167,7 @@ export function Accounts() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {checkingAccounts.map((account) => {
             const bank = getBankForCard(account.bank_id)
-            const balance = getCardBalance(account.id)
+            const balance = getCardBalanceByMonth(account.id, selectedMonth)
 
             return (
               <div

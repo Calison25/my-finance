@@ -9,6 +9,7 @@ const navItems = [
   { to: "/accounts", icon: "account_balance", label: "Contas" },
   { to: "/bills", icon: "payments", label: "Vencimentos" },
   { to: "/reports", icon: "bar_chart", label: "Relatorios" },
+  { to: "/settings", icon: "settings", label: "Config" },
 ]
 
 export function MobileNav() {

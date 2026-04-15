@@ -11,6 +11,7 @@ class Card(BaseModel):
     id: UUID
     user_id: UUID
     bank_id: UUID
+    household_id: UUID
     name: str
     type: CardType
     last_digits: str | None = None

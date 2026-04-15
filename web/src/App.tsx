@@ -11,7 +11,10 @@ import { Transactions } from "@/pages/Transactions"
 import { Reports } from "@/pages/Reports"
 import { Bills } from "@/pages/Bills"
 import { Login } from "@/pages/Login"
+import { Settings } from "@/pages/Settings"
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
 import { useFinanceStore } from "@/stores/finance-store"
+import { useAuthStore } from "@/stores/auth-store"
 
 const queryClient = new QueryClient()
 
@@ -42,19 +45,33 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   )
 }
 
+function AuthInitializer({ children }: { children: React.ReactNode }) {
+  const initialize = useAuthStore((s) => s.initialize)
+
+  useEffect(() => {
+    const unsubscribe = initialize()
+    return unsubscribe
+  }, [initialize])
+
+  return <>{children}</>
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<AppLayout><Dashboard /></AppLayout>} />
-          <Route path="/accounts" element={<AppLayout><Accounts /></AppLayout>} />
-          <Route path="/cards" element={<AppLayout><Cards /></AppLayout>} />
-          <Route path="/transactions" element={<AppLayout><Transactions /></AppLayout>} />
-          <Route path="/bills" element={<AppLayout><Bills /></AppLayout>} />
-          <Route path="/reports" element={<AppLayout><Reports /></AppLayout>} />
-        </Routes>
+        <AuthInitializer>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
+            <Route path="/accounts" element={<ProtectedRoute><AppLayout><Accounts /></AppLayout></ProtectedRoute>} />
+            <Route path="/cards" element={<ProtectedRoute><AppLayout><Cards /></AppLayout></ProtectedRoute>} />
+            <Route path="/transactions" element={<ProtectedRoute><AppLayout><Transactions /></AppLayout></ProtectedRoute>} />
+            <Route path="/bills" element={<ProtectedRoute><AppLayout><Bills /></AppLayout></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><AppLayout><Reports /></AppLayout></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><AppLayout><Settings /></AppLayout></ProtectedRoute>} />
+          </Routes>
+        </AuthInitializer>
       </BrowserRouter>
     </QueryClientProvider>
   )

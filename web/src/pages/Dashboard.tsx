@@ -1,53 +1,47 @@
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
+import { FinancialSummaryCards } from "@/components/ui/FinancialSummaryCards"
 import { useFinanceStore } from "@/stores/finance-store"
 
 export function Dashboard() {
   const navigate = useNavigate()
-  const { cards, transactions, banks, categories, getCardBalance, getCardExpenses, valuesVisible, toggleValuesVisible } = useFinanceStore()
+  const { cards, transactions, banks, categories, getCardBalanceByMonth, getCardExpensesByMonth, valuesVisible, toggleValuesVisible, transactionSummary, fetchTransactionSummary } = useFinanceStore()
 
-  const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const next = new Date()
+    next.setMonth(next.getMonth() + 1)
+    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
+  })
 
+  useEffect(() => {
+    fetchTransactionSummary(selectedMonth)
+  }, [selectedMonth, transactions.length, fetchTransactionSummary])
+
+  const s = transactionSummary
   const totalBalance = cards
     .filter((c) => c.type === "CHECKING_ACCOUNT")
-    .reduce((acc, c) => acc + getCardBalance(c.id), 0)
+    .reduce((acc, c) => acc + getCardBalanceByMonth(c.id, selectedMonth), 0)
 
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
+  const realizedIncome = s?.realized.income ?? 0
+  const pendingExpenses = s?.pending.expenses ?? 0
 
-  const monthTxs = transactions.filter((t) => t.date >= monthStart && t.date <= monthEnd)
-
-  const realizedIncome = monthTxs
-    .filter((t) => t.type === "INCOME" && t.is_realized)
-    .reduce((acc, t) => acc + t.amount, 0)
-
-  const realizedExpenses = monthTxs
-    .filter((t) => t.type === "EXPENSE" && t.is_realized)
-    .reduce((acc, t) => acc + t.amount, 0)
-
-  const scheduledIncome = monthTxs
-    .filter((t) => t.type === "INCOME" && t.is_scheduled && !t.is_realized)
-    .reduce((acc, t) => acc + t.amount, 0)
-
-  const scheduledExpenses = monthTxs
-    .filter((t) => t.type === "EXPENSE" && t.is_scheduled && !t.is_realized)
-    .reduce((acc, t) => acc + t.amount, 0)
-
-  const pendingIncome = monthTxs
-    .filter((t) => t.type === "INCOME" && !t.is_realized)
-    .reduce((acc, t) => acc + t.amount, 0)
-
-  const pendingExpenses = monthTxs
-    .filter((t) => t.type === "EXPENSE" && !t.is_realized)
-    .reduce((acc, t) => acc + t.amount, 0)
-
-  const realizedBalance = realizedIncome - realizedExpenses
-  const pendingBalance = pendingIncome - pendingExpenses
-
+  const [y, m] = selectedMonth.split("-").map(Number)
+  const monthStart = new Date(y, m - 1, 1).toISOString().slice(0, 10)
+  const monthEnd = new Date(y, m, 0).toISOString().slice(0, 10)
   const recentTransactions = [...transactions]
+    .filter((t) => t.date >= monthStart && t.date <= monthEnd)
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 5)
+
+  function changeMonth(delta: number) {
+    const [cy, cm] = selectedMonth.split("-").map(Number)
+    const d = new Date(cy, cm - 1 + delta, 1)
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+  }
+
+  const monthLabel = new Date(y, m - 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
 
   function getCategoryIcon(catId: string | null): { emoji: string | null; icon: string } {
     if (!catId) return { emoji: null, icon: "receipt_long" }
@@ -79,19 +73,30 @@ export function Dashboard() {
         {/* Hero Balance Section */}
         <section className="lg:col-span-8 flex flex-col gap-8">
           <div className="relative overflow-hidden rounded-xl p-8 bg-gradient-to-br from-surface-container-low to-surface-container-lowest ghost-border">
-            <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary-container/10 rounded-full blur-[100px]" />
+            <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary-container/10 rounded-full blur-[100px] pointer-events-none" />
             <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-2">
-                <p className="text-on-surface-variant font-label uppercase tracking-widest text-xs">
-                  Patrimonio Total
-                </p>
-                <button
-                  onClick={toggleValuesVisible}
-                  className="opacity-40 hover:opacity-100 transition-opacity"
-                  title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
-                >
-                  <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
-                </button>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-on-surface-variant font-label uppercase tracking-widest text-xs">
+                    Patrimonio Total
+                  </p>
+                  <button
+                    onClick={toggleValuesVisible}
+                    className="opacity-40 hover:opacity-100 transition-opacity"
+                    title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
+                  >
+                    <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => changeMonth(-1)} className="p-1.5 rounded-lg hover:bg-surface-container-highest transition-colors">
+                    <Icon name="chevron_left" className="text-lg text-on-surface-variant" />
+                  </button>
+                  <span className="text-sm font-medium text-on-surface min-w-[100px] text-center capitalize">{monthLabel}</span>
+                  <button onClick={() => changeMonth(1)} className="p-1.5 rounded-lg hover:bg-surface-container-highest transition-colors">
+                    <Icon name="chevron_right" className="text-lg text-on-surface-variant" />
+                  </button>
+                </div>
               </div>
               <h2 className="text-5xl md:text-6xl font-extrabold font-headline tracking-tighter text-on-surface mb-6">
                 <MoneyValue value={totalBalance} />
@@ -101,7 +106,7 @@ export function Dashboard() {
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-income-container/20 border border-income-container/30 text-income">
                     <Icon name="trending_up" className="text-sm" />
                     <span className="text-sm font-semibold">
-                      +<MoneyValue value={realizedIncome} /> este mes
+                      +<MoneyValue value={realizedIncome} />
                     </span>
                   </div>
                 )}
@@ -117,100 +122,22 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Monthly Summary */}
-          <div className="bg-surface-container-low rounded-xl p-6 ghost-border">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h3 className="font-headline font-bold text-lg">Fluxo Mensal</h3>
-                <p className="text-xs text-on-surface-variant">Entradas vs saidas do mes</p>
-              </div>
-              <div className="flex gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-income" />
-                  <span className="text-xs font-medium text-on-surface-variant">Receitas</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-error" />
-                  <span className="text-xs font-medium text-on-surface-variant">Despesas</span>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-surface-container-high rounded-xl p-5 ghost-border overflow-hidden">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-income-container/20 flex items-center justify-center shrink-0">
-                    <Icon name="trending_up" className="text-income" />
-                  </div>
-                  <p className="text-sm text-on-surface-variant">Receitas</p>
-                </div>
-                <p className="text-lg sm:text-2xl font-headline font-bold text-income truncate"><MoneyValue value={realizedIncome} /></p>
-                {pendingIncome > 0 && (
-                  <p className="text-xs text-on-surface-variant mt-1">+ <MoneyValue value={pendingIncome} className="text-xs" /> previsto</p>
-                )}
-              </div>
-              <div className="bg-surface-container-high rounded-xl p-5 ghost-border overflow-hidden">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-error-container/20 flex items-center justify-center shrink-0">
-                    <Icon name="trending_down" className="text-error" />
-                  </div>
-                  <p className="text-sm text-on-surface-variant">Despesas</p>
-                </div>
-                <p className="text-lg sm:text-2xl font-headline font-bold text-error truncate"><MoneyValue value={realizedExpenses} /></p>
-                {pendingExpenses > 0 && (
-                  <p className="text-xs text-on-surface-variant mt-1">+ <MoneyValue value={pendingExpenses} className="text-xs" /> previsto</p>
-                )}
-              </div>
-            </div>
-
-            {/* Saldo Realizado vs Previsto vs Total */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-4 pt-4 border-t border-outline-variant/30">
-              <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary-container/20 flex items-center justify-center shrink-0">
-                  <Icon name="check_circle" className="text-primary text-sm" />
-                </div>
-                <div className="text-center sm:text-left">
-                  <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Realizado</p>
-                  <p className={`text-sm sm:text-lg font-headline font-bold ${realizedBalance >= 0 ? "text-income" : "text-error"}`}>
-                    <MoneyValue value={realizedBalance} />
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
-                <div className="w-8 h-8 rounded-full bg-secondary-container/20 flex items-center justify-center shrink-0">
-                  <Icon name="schedule" className="text-secondary text-sm" />
-                </div>
-                <div className="text-center sm:text-left">
-                  <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Previsto</p>
-                  <p className={`text-sm sm:text-lg font-headline font-bold ${pendingBalance >= 0 ? "text-income" : "text-error"}`}>
-                    <MoneyValue value={pendingBalance} />
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
-                <div className="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0">
-                  <Icon name="account_balance_wallet" className="text-on-surface text-sm" />
-                </div>
-                <div className="text-center sm:text-left">
-                  <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Total</p>
-                  <p className={`text-sm sm:text-lg font-headline font-bold ${(realizedBalance + pendingBalance) >= 0 ? "text-income" : "text-error"}`}>
-                    <MoneyValue value={realizedBalance + pendingBalance} />
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Resumo Financeiro */}
+          {transactionSummary?.financial_summary && (
+            <FinancialSummaryCards summary={transactionSummary.financial_summary} />
+          )}
 
           {/* Credit Cards - inside left column to fill space */}
           {cards.filter(c => c.type === "CREDIT_CARD").length > 0 && (
             <div>
               <div className="mb-4">
                 <h3 className="font-headline font-bold text-lg">Cartoes de Credito</h3>
-                <p className="text-xs text-on-surface-variant">Faturas do mes atual</p>
+                <p className="text-xs text-on-surface-variant capitalize">Faturas de {monthLabel}</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {cards.filter(c => c.type === "CREDIT_CARD").slice(0, 4).map((card) => {
+                {cards.filter(c => c.type === "CREDIT_CARD").map((card) => {
                   const bank = banks.find((b) => b.id === card.bank_id)
-                  const expenses = getCardExpenses(card.id)
+                  const expenses = getCardExpensesByMonth(card.id, selectedMonth)
 
                   return (
                     <div
@@ -256,9 +183,9 @@ export function Dashboard() {
           <div>
             <h3 className="font-headline font-bold text-lg mb-4 px-2">Minhas Contas</h3>
             <div className="flex flex-col gap-4">
-              {cards.filter(c => c.type === "CHECKING_ACCOUNT").slice(0, 2).map((card, idx) => {
+              {cards.filter(c => c.type === "CHECKING_ACCOUNT").map((card, idx) => {
                 const bank = banks.find((b) => b.id === card.bank_id)
-                const balance = getCardBalance(card.id)
+                const balance = getCardBalanceByMonth(card.id, selectedMonth)
 
                 return (
                   <div

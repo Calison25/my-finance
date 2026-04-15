@@ -6,6 +6,7 @@ export interface Bank {
   color: string
   is_default: boolean
   user_id: string | null
+  household_id: string | null
 }
 
 export type CardType = "CHECKING_ACCOUNT" | "CREDIT_CARD"
@@ -14,6 +15,7 @@ export interface Card {
   id: string
   user_id: string
   bank_id: string
+  household_id: string
   name: string
   type: CardType
   last_digits: string | null
@@ -42,7 +44,40 @@ export interface Transaction {
   recurring_transaction_id: string | null
   notes: string | null
   created_at: string
+  classification: string | null
   category?: Category
+}
+
+export interface BalanceSummary {
+  income: number
+  expenses: number
+  balance: number
+}
+
+export interface GroupSummary {
+  income_total: number
+  expense_total: number
+  total: number
+  count: number
+}
+
+export interface FinancialSummary {
+  total_income: number
+  realized_expenses: number
+  scheduled_expenses: number
+  total_expenses: number
+  current_balance: number
+  projected_balance: number
+}
+
+export interface TransactionSummary {
+  total_month: number
+  realized: BalanceSummary
+  pending: BalanceSummary
+  recurring: GroupSummary
+  installments: GroupSummary
+  scheduled: GroupSummary
+  financial_summary: FinancialSummary
 }
 
 export interface Category {
@@ -52,6 +87,7 @@ export interface Category {
   color: string
   is_default: boolean
   user_id: string | null
+  household_id: string | null
 }
 
 export interface DashboardSummary {
@@ -65,4 +101,25 @@ export interface CardSummary {
   card: Card
   balance: number
   monthly_expenses: number
+}
+
+export type UserRole = "owner" | "member"
+
+export interface Member {
+  id: string
+  email: string
+  name: string | null
+  avatar_url: string | null
+  role: UserRole
+  created_at: string
+}
+
+export interface HouseholdInvite {
+  id: string
+  household_id: string
+  invited_email: string
+  invited_by: string
+  status: "pending" | "accepted" | "cancelled"
+  accepted_at: string | null
+  created_at: string
 }

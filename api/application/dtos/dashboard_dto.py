@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from api.application.dtos.financial_summary_dto import FinancialSummary
+
 
 class CardBalance(BaseModel):
     card_id: UUID
@@ -19,3 +21,4 @@ class DashboardSummary(BaseModel):
     total_income: Decimal
     total_expenses: Decimal
     total_available: Decimal
+    financial_summary: FinancialSummary | None = None

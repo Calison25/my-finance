@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
 import { useFinanceStore } from "@/stores/finance-store"
+import { useAuthStore } from "@/stores/auth-store"
 
 interface UpcomingItem {
   id: string
@@ -33,6 +34,7 @@ function formatDate(dateStr: string): string {
 export function Header() {
   const navigate = useNavigate()
   const { transactions, cards, banks } = useFinanceStore()
+  const { appUser } = useAuthStore()
   const [notifOpen, setNotifOpen] = useState(false)
 
   const today = new Date()
@@ -56,8 +58,9 @@ export function Header() {
     }
 
     const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth()
+    const refMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    const year = refMonth.getFullYear()
+    const month = refMonth.getMonth()
     const selectedMonth = `${year}-${String(month + 1).padStart(2, "0")}`
     const monthStart = `${selectedMonth}-01`
     const monthEnd = new Date(year, month + 1, 0).toISOString().slice(0, 10)
@@ -109,6 +112,24 @@ export function Header() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate("/settings")}
+            className="p-1 rounded-full hover:ring-2 hover:ring-primary/30 transition-all cursor-pointer"
+            title="Configuracoes"
+          >
+            {appUser?.avatar_url ? (
+              <img
+                src={appUser.avatar_url}
+                alt={appUser.name ?? "Avatar"}
+                className="w-9 h-9 rounded-full"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center">
+                <Icon name="person" className="text-on-primary-container text-sm" />
+              </div>
+            )}
+          </button>
           <div className="relative notif-dropdown">
             <button
               type="button"
