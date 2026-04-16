@@ -121,6 +121,7 @@ export const api = {
       is_recurring?: boolean
       notes?: string
       installments?: number
+      is_bill?: boolean
     }) =>
       request<Record<string, unknown>[]>("/api/transactions", {
         method: "POST",

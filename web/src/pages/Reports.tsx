@@ -47,8 +47,9 @@ function formatCompactValue(v: number): string {
   return v.toFixed(0)
 }
 
-function renderBarLabel(props: { x?: number; y?: number; width?: number; value?: number; fill?: string }) {
-  const { x = 0, y = 0, width = 0, value = 0 } = props
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function renderBarLabel(props: any) {
+  const { x = 0, y = 0, width = 0, value = 0 } = props as { x?: number; y?: number; width?: number; value?: number }
   if (!value || value === 0) return null
   const text = formatCompactValue(value)
   return (
@@ -199,7 +200,6 @@ export function Reports() {
     filteredTransactions
       .filter((t) => t.type === "INCOME" && t.is_realized)
       .forEach((t) => {
-        const key = t.category_id ?? t.description
         const cat = categories.find((c) => c.id === t.category_id)
         const label = cat?.name ?? t.description
         map.set(label, (map.get(label) ?? 0) + t.amount)
