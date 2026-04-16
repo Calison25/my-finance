@@ -17,8 +17,8 @@ interface FinanceState {
   updateCard: (id: string, data: Record<string, unknown>) => void
   deleteCard: (id: string) => void
   addCategory: (name: string) => string
-  addTransaction: (data: { card_id: string; description: string; amount: number; type: TransactionType; category_id?: string; custom_category_name?: string; date: string; is_scheduled?: boolean; scheduled_date?: string; is_recurring?: boolean; notes?: string; installments?: number; is_bill?: boolean }) => void
-  updateTransaction: (id: string, data: { description?: string; amount?: number; type?: TransactionType; category_id?: string | null; notes?: string | null; is_recurring?: boolean }, cascade?: boolean) => void
+  addTransaction: (data: { card_id: string; description: string; amount: number; type: TransactionType; category_id?: string; custom_category_name?: string; date: string; is_scheduled?: boolean; scheduled_date?: string; is_recurring?: boolean; notes?: string; installments?: number; is_bill?: boolean }) => Promise<void>
+  updateTransaction: (id: string, data: { description?: string; amount?: number; type?: TransactionType; category_id?: string | null; notes?: string | null; is_recurring?: boolean }, cascade?: boolean) => Promise<void>
   deleteTransaction: (id: string) => void
   deleteRecurringFuture: (id: string) => void
   realizeTransaction: (id: string) => void

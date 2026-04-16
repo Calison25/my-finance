@@ -62,6 +62,7 @@ export function Transactions() {
   const [filterType, setFilterType] = useState<"ALL" | "EXPENSE" | "INCOME">("ALL")
   const [categorySuggested, setCategorySuggested] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [form, setForm] = useState({
     card_id: "",
     description: "",
@@ -172,8 +173,9 @@ export function Transactions() {
     is_bill: false,
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (isSubmitting) return
     const amountNum = parseBRLToNumber(form.amount)
     const errors: Record<string, boolean> = {}
     if (!amountNum) errors.amount = true
@@ -186,36 +188,41 @@ export function Transactions() {
       return
     }
     setValidationErrors({})
+    setIsSubmitting(true)
 
-    if (editingTx) {
-      updateTransaction(editingTx, {
-        description: form.description,
-        amount: amountNum,
-        type: form.type,
-        category_id: isOtherCategory ? null : (form.category_id || null),
-        notes: form.notes || null,
-        is_recurring: form.is_recurring,
-      }, editCascade)
-    } else {
-      addTransaction({
-        card_id: form.card_id,
-        description: form.description,
-        amount: amountNum,
-        type: form.type,
-        category_id: isOtherCategory ? undefined : (form.category_id || undefined),
-        custom_category_name: isOtherCategory ? form.custom_category_name : undefined,
-        date: form.date,
-        is_scheduled: form.is_scheduled,
-        scheduled_date: form.is_scheduled ? form.scheduled_date : undefined,
-        notes: form.notes || undefined,
-        installments: form.is_installment && form.installments ? Number(form.installments) : undefined,
-        is_recurring: form.is_recurring || undefined,
-        is_bill: form.is_bill || undefined,
-      })
+    try {
+      if (editingTx) {
+        await updateTransaction(editingTx, {
+          description: form.description,
+          amount: amountNum,
+          type: form.type,
+          category_id: isOtherCategory ? null : (form.category_id || null),
+          notes: form.notes || null,
+          is_recurring: form.is_recurring,
+        }, editCascade)
+      } else {
+        await addTransaction({
+          card_id: form.card_id,
+          description: form.description,
+          amount: amountNum,
+          type: form.type,
+          category_id: isOtherCategory ? undefined : (form.category_id || undefined),
+          custom_category_name: isOtherCategory ? form.custom_category_name : undefined,
+          date: form.date,
+          is_scheduled: form.is_scheduled,
+          scheduled_date: form.is_scheduled ? form.scheduled_date : undefined,
+          notes: form.notes || undefined,
+          installments: form.is_installment && form.installments ? Number(form.installments) : undefined,
+          is_recurring: form.is_recurring || undefined,
+          is_bill: form.is_bill || undefined,
+        })
+      }
+
+      setForm(defaultForm)
+      closeDialog()
+    } finally {
+      setIsSubmitting(false)
     }
-
-    setForm(defaultForm)
-    closeDialog()
   }
 
   function getCardName(cardId: string) {
@@ -644,7 +651,7 @@ export function Transactions() {
       )}
 
       {/* Dialog */}
-      <Dialog open={dialogOpen} onClose={closeDialog} title={editingTx ? "Editar Transacao" : "Nova Transacao"}>
+      <Dialog open={dialogOpen} onClose={() => { if (!isSubmitting) closeDialog() }} title={editingTx ? "Editar Transacao" : "Nova Transacao"}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Hero: Type + Amount */}
           <div className="text-center space-y-3">
@@ -1015,7 +1022,9 @@ export function Transactions() {
           {/* Submit */}
           <button
             type="submit"
-            className={`w-full py-3.5 rounded-xl font-headline font-bold text-sm active:scale-[0.98] transition-all relative overflow-hidden group ${
+            disabled={isSubmitting}
+            aria-busy={isSubmitting}
+            className={`w-full py-3.5 rounded-xl font-headline font-bold text-sm active:scale-[0.98] transition-all relative overflow-hidden group disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-80 ${
               editingTx
                 ? "bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-[0_8px_32px_rgba(0,92,186,0.3)]"
                 : form.type === "EXPENSE"
@@ -1025,8 +1034,20 @@ export function Transactions() {
           >
             <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center justify-center gap-2 relative z-10">
-              <Icon name={editingTx ? "save" : "done_all"} />
-              <span>{editingTx ? "Salvar Alteracoes" : form.type === "EXPENSE" ? "Registrar Despesa" : "Registrar Receita"}</span>
+              {isSubmitting ? (
+                <>
+                  <span
+                    className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin"
+                    aria-hidden="true"
+                  />
+                  <span>{editingTx ? "Salvando..." : "Processando..."}</span>
+                </>
+              ) : (
+                <>
+                  <Icon name={editingTx ? "save" : "done_all"} />
+                  <span>{editingTx ? "Salvar Alteracoes" : form.type === "EXPENSE" ? "Registrar Despesa" : "Registrar Receita"}</span>
+                </>
+              )}
             </div>
           </button>
         </form>
