@@ -6,11 +6,13 @@ _pool: Pool | None = None
 
 async def create_pool(database_url: str) -> Pool:
     global _pool
+    is_supabase = "supabase" in database_url
     _pool = await asyncpg.create_pool(
         database_url,
         min_size=1,
         max_size=5,
-        ssl="require" if "supabase" in database_url else None,
+        ssl="require" if is_supabase else None,
+        statement_cache_size=0 if is_supabase else 100,
     )
     return _pool
 
