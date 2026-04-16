@@ -18,7 +18,7 @@
       ]
     }
   ],
-  "buildCommand": "uv pip install asyncpg --system && python scripts/run_migrations.py && cd web && npm run build",
+  "buildCommand": "uv pip install asyncpg --system --python /usr/bin/python3 && /usr/bin/python3 scripts/run_migrations.py && cd web && npm run build",
   "outputDirectory": "web/dist",
   "installCommand": "cd web && npm install",
   "framework": null
