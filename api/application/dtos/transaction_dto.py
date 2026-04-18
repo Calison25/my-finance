@@ -28,6 +28,7 @@ class TransactionUpdate(BaseModel):
     amount: Decimal | None = Field(default=None, gt=0)
     type: TransactionType | None = None
     category_id: UUID | None = None
+    custom_category_name: str | None = Field(default=None, max_length=100)
     date: dt.date | None = None
     is_scheduled: bool | None = None
     scheduled_date: dt.date | None = None

@@ -207,8 +207,9 @@ def get_create_transaction(
 def get_update_transaction(
     repo: PostgresTransactionRepository = Depends(get_transaction_repository),
     card_repo: PostgresCardRepository = Depends(get_card_repository),
+    category_repo: PostgresCategoryRepository = Depends(get_category_repository),
 ) -> UpdateTransactionUseCase:
-    return UpdateTransactionUseCase(repo, card_repo)
+    return UpdateTransactionUseCase(repo, card_repo, category_repo)
 
 
 def get_realize_transaction(

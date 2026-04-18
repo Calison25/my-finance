@@ -154,7 +154,6 @@ class CreateTransactionUseCase:
         transactions: list[Transaction] = []
         for i in range(installments):
             tx_date = self._advance_month(data.date, i)
-            is_first = i == 0
             desc = (
                 f"{data.description} ({i + 1}/{installments})"
                 if installments > 1
@@ -170,9 +169,9 @@ class CreateTransactionUseCase:
                     type=data.type,
                     category_id=category_id,
                     date=tx_date,
-                    is_scheduled=data.is_scheduled if is_first else True,
-                    scheduled_date=data.scheduled_date if is_first else tx_date,
-                    is_realized=not data.is_scheduled if is_first else False,
+                    is_scheduled=data.is_scheduled,
+                    scheduled_date=tx_date if data.is_scheduled else None,
+                    is_realized=not data.is_scheduled,
                     is_bill=data.is_bill,
                     notes=data.notes,
                     created_at=now,
@@ -199,9 +198,15 @@ class CreateTransactionUseCase:
 
 
 class UpdateTransactionUseCase:
-    def __init__(self, repo: TransactionRepository, card_repo: CardRepository):
+    def __init__(
+        self,
+        repo: TransactionRepository,
+        card_repo: CardRepository,
+        category_repo: CategoryRepository,
+    ):
         self._repo = repo
         self._card_repo = card_repo
+        self._category_repo = category_repo
 
     async def execute(
         self, transaction_id: UUID, data: TransactionUpdate, household_id: UUID
@@ -212,7 +217,21 @@ class UpdateTransactionUseCase:
         card = await self._card_repo.get_by_id(transaction.card_id)
         if card is None or card.household_id != household_id:
             raise ForbiddenError("Acesso negado a este recurso")
+
         update_data = data.model_dump(exclude_unset=True)
+        custom_category_name = update_data.pop("custom_category_name", None)
+        if custom_category_name and not update_data.get("category_id"):
+            new_cat = Category(
+                id=uuid4(),
+                name=custom_category_name,
+                color="#6B7280",
+                is_default=False,
+                user_id=None,
+                household_id=household_id,
+            )
+            created_cat = await self._category_repo.create(new_cat)
+            update_data["category_id"] = created_cat.id
+
         updated_txn = transaction.model_copy(update=update_data)
         updated = await self._repo.update(updated_txn)
         return TransactionResponse.model_validate(updated, from_attributes=True)
