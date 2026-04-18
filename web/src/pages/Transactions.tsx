@@ -48,7 +48,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 }
 
 export function Transactions() {
-  const { transactions, cards, categories, banks, addTransaction, updateTransaction, deleteTransaction, deleteTransactionGroup, realizeTransaction, getCardBalance, getCardExpenses, transactionSummary, fetchTransactionSummary } = useFinanceStore()
+  const { transactions, cards, categories, banks, addTransaction, updateTransaction, deleteTransaction, deleteTransactionGroup, realizeTransaction, getCardBalance } = useFinanceStore()
   const [deletePrompt, setDeletePrompt] = useState<{ id: string; kind: "recurring" | "installment" } | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<string | null>(null)
@@ -57,18 +57,24 @@ export function Transactions() {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const filterCardId = searchParams.get("card_id") ?? ""
-  const setFilterCardId = (id: string) => {
-    if (id) {
-      setSearchParams({ card_id: id })
-    } else {
-      setSearchParams({})
-    }
-  }
-  const [selectedMonth, setSelectedMonth] = useState(() => {
+  const filterCategoryId = searchParams.get("category_id") ?? ""
+  const defaultMonth = (() => {
     const next = new Date()
     next.setMonth(next.getMonth() + 1)
     return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
-  })
+  })()
+  const selectedMonth = searchParams.get("month") ?? defaultMonth
+  const updateParams = useCallback((updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams)
+    for (const [k, v] of Object.entries(updates)) {
+      if (v) params.set(k, v)
+      else params.delete(k)
+    }
+    setSearchParams(params)
+  }, [searchParams, setSearchParams])
+  const setFilterCardId = (id: string) => updateParams({ card_id: id || null })
+  const setFilterCategoryId = (id: string) => updateParams({ category_id: id || null })
+  const setSelectedMonth = (m: string) => updateParams({ month: m })
   const [expandedSection, setExpandedSection] = useState<"recurring" | "scheduled" | "installments" | null>(null)
   const [filterType, setFilterType] = useState<"ALL" | "EXPENSE" | "INCOME">("ALL")
   const [categorySuggested, setCategorySuggested] = useState(false)
@@ -90,10 +96,6 @@ export function Transactions() {
     is_recurring: false,
     is_bill: false,
   })
-
-  useEffect(() => {
-    fetchTransactionSummary(selectedMonth, filterCardId || undefined)
-  }, [selectedMonth, filterCardId, transactions.length, fetchTransactionSummary])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -208,6 +210,7 @@ export function Transactions() {
           amount: amountNum,
           type: form.type,
           category_id: isOtherCategory ? null : (form.category_id || null),
+          custom_category_name: isOtherCategory ? form.custom_category_name : undefined,
           notes: form.notes || null,
           is_recurring: form.is_recurring,
         }, editCascade)
@@ -253,6 +256,7 @@ export function Transactions() {
 
   const filtered = transactions
     .filter((t) => !filterCardId || t.card_id === filterCardId)
+    .filter((t) => !filterCategoryId || t.category_id === filterCategoryId)
     .filter((t) => t.date.startsWith(selectedMonth))
     .filter((t) => filterType === "ALL" || t.type === filterType)
 
@@ -264,23 +268,45 @@ export function Transactions() {
     return acc
   }, {})
 
-  // Totais do backend
-  const s = transactionSummary
+  const sumAmount = (arr: typeof sorted) => arr.reduce((acc, t) => acc + Number(t.amount), 0)
+  const isEffectivelyRealized = (t: typeof sorted[0]) => {
+    if (t.is_scheduled && !t.is_realized) return false
+    return t.is_realized || t.is_recurring || t.classification === "installment"
+  }
 
-  // Classificação vem do backend (campo classification)
-  const recurringTxs = sorted.filter((t) => t.classification === "recurring")
+  const recurringTxs = filtered.filter((t) => t.classification === "recurring")
   const recurringIncomeTxs = recurringTxs.filter((t) => t.type === "INCOME")
   const recurringExpenseTxs = recurringTxs.filter((t) => t.type === "EXPENSE")
-  const installmentTxs = sorted.filter((t) => t.classification === "installment")
-  const scheduledTxs = sorted.filter((t) => t.classification === "scheduled")
-  const recurringTotal = s?.recurring.total ?? 0
-  const recurringIncomeTotal = s?.recurring.income_total ?? 0
-  const recurringExpenseTotal = s?.recurring.expense_total ?? 0
-  const installmentTotal = s?.installments.total ?? 0
-  const installmentExpenseTotal = s?.installments.expense_total ?? 0
-  const scheduledTotal = s?.scheduled.total ?? 0
+  const installmentTxs = filtered.filter((t) => t.classification === "installment")
+  const installmentExpenseTxs = installmentTxs.filter((t) => t.type === "EXPENSE")
+  const scheduledTxs = filtered.filter((t) => t.classification === "scheduled")
+
+  const recurringIncomeTotal = sumAmount(recurringIncomeTxs)
+  const recurringExpenseTotal = sumAmount(recurringExpenseTxs)
+  const recurringTotal = recurringIncomeTotal - recurringExpenseTotal
+  const installmentIncomeTotal = sumAmount(installmentTxs.filter((t) => t.type === "INCOME"))
+  const installmentExpenseTotal = sumAmount(installmentExpenseTxs)
+  const installmentTotal = installmentIncomeTotal - installmentExpenseTotal
+  const scheduledIncomeTotal = sumAmount(scheduledTxs.filter((t) => t.type === "INCOME"))
+  const scheduledExpenseTotal = sumAmount(scheduledTxs.filter((t) => t.type === "EXPENSE"))
+  const scheduledTotal = scheduledIncomeTotal - scheduledExpenseTotal
+
+  const totalIncome = sumAmount(filtered.filter((t) => t.type === "INCOME"))
+  const realizedExpenses = sumAmount(filtered.filter((t) => t.type === "EXPENSE" && isEffectivelyRealized(t)))
+  const scheduledExpenses = sumAmount(filtered.filter((t) => t.type === "EXPENSE" && t.is_scheduled && !t.is_realized))
+  const totalExpenses = realizedExpenses + scheduledExpenses
+  const financialSummary = {
+    total_income: totalIncome,
+    realized_expenses: realizedExpenses,
+    scheduled_expenses: scheduledExpenses,
+    total_expenses: totalExpenses,
+    current_balance: totalIncome - realizedExpenses,
+    projected_balance: totalIncome - totalExpenses,
+  }
+
   const filterCard = filterCardId ? cards.find((c) => c.id === filterCardId) : null
   const isCreditCardFilter = filterCard?.type === "CREDIT_CARD"
+  const cardHeaderExpenses = sumAmount(filtered.filter((t) => t.type === "EXPENSE"))
 
   const monthLabel = new Date(selectedMonth + "-15").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
 
@@ -302,7 +328,7 @@ export function Transactions() {
             <p className="text-on-surface-variant text-sm mt-1 flex items-center gap-2">
               <span>{isCreditCardFilter ? "Fatura:" : "Saldo:"}</span>
               <span className={`font-bold ${isCreditCardFilter ? "text-error" : getCardBalance(filterCard.id) >= 0 ? "text-primary" : "text-error"}`}>
-                <MoneyValue value={isCreditCardFilter ? getCardExpenses(filterCard.id) : getCardBalance(filterCard.id)} />
+                <MoneyValue value={isCreditCardFilter ? cardHeaderExpenses : getCardBalance(filterCard.id)} />
               </span>
               {isCreditCardFilter && filterCard.credit_limit && (
                 <>
@@ -366,6 +392,39 @@ export function Transactions() {
           </div>
         )}
 
+        {/* Category filters */}
+        {categories.length > 0 && (
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-1">
+            <button
+              onClick={() => setFilterCategoryId("")}
+              className={`px-3 py-1.5 rounded-full font-medium text-xs whitespace-nowrap transition-colors ${
+                !filterCategoryId
+                  ? "bg-primary-container text-on-primary-container"
+                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+              }`}
+            >
+              Todas categorias
+            </button>
+            {categories.map((c) => {
+              const iconName = CATEGORY_ICONS[c.name] ?? "receipt_long"
+              const active = filterCategoryId === c.id
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setFilterCategoryId(c.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${
+                    active
+                      ? "bg-primary-container text-on-primary-container"
+                      : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                  }`}
+                >
+                  <Icon name={iconName} className="text-[14px]" />
+                  {c.name}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </section>
 
       {/* Month Picker + Type Filter */}
@@ -406,9 +465,7 @@ export function Transactions() {
       {sorted.length > 0 && (
         <section className="space-y-3">
           {/* Resumo Financeiro */}
-          {transactionSummary?.financial_summary && (
-            <FinancialSummaryCards summary={transactionSummary.financial_summary} />
-          )}
+          <FinancialSummaryCards summary={financialSummary} />
 
           {/* Recurring + Installments + Scheduled */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
