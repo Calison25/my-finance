@@ -142,8 +142,8 @@ export const api = {
       ).then(normalizeTransaction),
     delete: (id: string) =>
       request<void>(`/api/transactions/${id}`, { method: "DELETE" }),
-    deleteRecurringFuture: (id: string) =>
-      request<void>(`/api/transactions/${id}/recurring-future`, {
+    deleteGroup: (id: string, scope: "all" | "future") =>
+      request<void>(`/api/transactions/${id}/group?scope=${scope}`, {
         method: "DELETE",
       }),
     summary: (month: string, cardId?: string) => {

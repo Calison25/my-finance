@@ -114,20 +114,17 @@ class CreateTransactionUseCase:
         self, data: TransactionCreate, category_id: UUID | None
     ) -> list[TransactionResponse]:
         recurring_id = uuid4()
-        results: list[TransactionResponse] = []
+        now = datetime.now(UTC)
 
-        for i in range(24):
-            tx_date = self._advance_month(data.date, i)
-            is_first = i == 0
-
-            transaction = Transaction(
+        transactions = [
+            Transaction(
                 id=uuid4(),
                 card_id=data.card_id,
                 description=data.description,
                 amount=data.amount,
                 type=data.type,
                 category_id=category_id,
-                date=tx_date,
+                date=(tx_date := self._advance_month(data.date, i)),
                 is_scheduled=data.is_scheduled,
                 scheduled_date=tx_date if data.is_scheduled else None,
                 is_realized=not data.is_scheduled,
@@ -135,14 +132,15 @@ class CreateTransactionUseCase:
                 is_bill=data.is_bill,
                 recurring_transaction_id=recurring_id,
                 notes=data.notes,
-                created_at=datetime.now(UTC),
+                created_at=now,
             )
-            created = await self._transaction_repo.create(transaction)
-            results.append(
-                TransactionResponse.model_validate(created, from_attributes=True)
-            )
+            for i in range(24)
+        ]
 
-        return results
+        created = await self._transaction_repo.create_many(transactions)
+        return [
+            TransactionResponse.model_validate(t, from_attributes=True) for t in created
+        ]
 
     async def _create_installments(
         self, data: TransactionCreate, category_id: UUID | None
@@ -151,8 +149,9 @@ class CreateTransactionUseCase:
         installment_amount = (data.amount / installments).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
+        now = datetime.now(UTC)
 
-        results: list[TransactionResponse] = []
+        transactions: list[Transaction] = []
         for i in range(installments):
             tx_date = self._advance_month(data.date, i)
             is_first = i == 0
@@ -162,27 +161,28 @@ class CreateTransactionUseCase:
                 else data.description
             )
 
-            transaction = Transaction(
-                id=uuid4(),
-                card_id=data.card_id,
-                description=desc,
-                amount=installment_amount,
-                type=data.type,
-                category_id=category_id,
-                date=tx_date,
-                is_scheduled=data.is_scheduled if is_first else True,
-                scheduled_date=data.scheduled_date if is_first else tx_date,
-                is_realized=not data.is_scheduled if is_first else False,
-                is_bill=data.is_bill,
-                notes=data.notes,
-                created_at=datetime.now(UTC),
-            )
-            created = await self._transaction_repo.create(transaction)
-            results.append(
-                TransactionResponse.model_validate(created, from_attributes=True)
+            transactions.append(
+                Transaction(
+                    id=uuid4(),
+                    card_id=data.card_id,
+                    description=desc,
+                    amount=installment_amount,
+                    type=data.type,
+                    category_id=category_id,
+                    date=tx_date,
+                    is_scheduled=data.is_scheduled if is_first else True,
+                    scheduled_date=data.scheduled_date if is_first else tx_date,
+                    is_realized=not data.is_scheduled if is_first else False,
+                    is_bill=data.is_bill,
+                    notes=data.notes,
+                    created_at=now,
+                )
             )
 
-        return results
+        created = await self._transaction_repo.create_many(transactions)
+        return [
+            TransactionResponse.model_validate(t, from_attributes=True) for t in created
+        ]
 
     @staticmethod
     def _advance_month(base: dt.date, months: int) -> dt.date:
@@ -254,20 +254,39 @@ class DeleteTransactionUseCase:
         await self._repo.delete(transaction_id)
 
 
-class DeleteRecurringTransactionsUseCase:
+class DeleteTransactionGroupUseCase:
     def __init__(self, repo: TransactionRepository, card_repo: CardRepository):
         self._repo = repo
         self._card_repo = card_repo
 
-    async def execute(self, transaction_id: UUID, household_id: UUID) -> None:
+    async def execute(
+        self, transaction_id: UUID, household_id: UUID, scope: str
+    ) -> None:
+        if scope not in ("all", "future"):
+            raise DomainException("Escopo inválido. Use 'all' ou 'future'.")
+
         transaction = await self._repo.get_by_id(transaction_id)
         if transaction is None:
             raise NotFoundError("Transaction", str(transaction_id))
         card = await self._card_repo.get_by_id(transaction.card_id)
         if card is None or card.household_id != household_id:
             raise ForbiddenError("Acesso negado a este recurso")
-        if not transaction.recurring_transaction_id:
-            raise DomainException("Transação não é recorrente")
-        await self._repo.delete_by_recurring_id(
-            transaction.recurring_transaction_id, transaction.date
+
+        from_date = transaction.date if scope == "future" else None
+
+        if transaction.recurring_transaction_id is not None:
+            await self._repo.delete_by_recurring_id(
+                transaction.recurring_transaction_id, from_date
+            )
+            return
+
+        if _INSTALLMENT_RE.search(transaction.description):
+            base_description = _INSTALLMENT_RE.sub("", transaction.description).rstrip()
+            await self._repo.delete_installment_group(
+                transaction.card_id, base_description, from_date
+            )
+            return
+
+        raise DomainException(
+            "Transação não é recorrente nem parcelada"
         )

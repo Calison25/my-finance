@@ -42,7 +42,7 @@ from api.application.use_cases.card_use_cases import (
 )
 from api.application.use_cases.transaction_use_cases import (
     CreateTransactionUseCase,
-    DeleteRecurringTransactionsUseCase,
+    DeleteTransactionGroupUseCase,
     DeleteTransactionUseCase,
     ListTransactionsUseCase,
     RealizeTransactionUseCase,
@@ -225,11 +225,11 @@ def get_delete_transaction(
     return DeleteTransactionUseCase(repo, card_repo)
 
 
-def get_delete_recurring_transactions(
+def get_delete_transaction_group(
     repo: PostgresTransactionRepository = Depends(get_transaction_repository),
     card_repo: PostgresCardRepository = Depends(get_card_repository),
-) -> DeleteRecurringTransactionsUseCase:
-    return DeleteRecurringTransactionsUseCase(repo, card_repo)
+) -> DeleteTransactionGroupUseCase:
+    return DeleteTransactionGroupUseCase(repo, card_repo)
 
 
 def get_transaction_summary(

@@ -20,7 +20,7 @@ interface FinanceState {
   addTransaction: (data: { card_id: string; description: string; amount: number; type: TransactionType; category_id?: string; custom_category_name?: string; date: string; is_scheduled?: boolean; scheduled_date?: string; is_recurring?: boolean; notes?: string; installments?: number; is_bill?: boolean }) => Promise<void>
   updateTransaction: (id: string, data: { description?: string; amount?: number; type?: TransactionType; category_id?: string | null; notes?: string | null; is_recurring?: boolean }, cascade?: boolean) => Promise<void>
   deleteTransaction: (id: string) => void
-  deleteRecurringFuture: (id: string) => void
+  deleteTransactionGroup: (id: string, scope: "all" | "future") => Promise<void>
   realizeTransaction: (id: string) => void
   unrealizeTransaction: (id: string) => void
   getCardBalance: (cardId: string) => number
@@ -138,8 +138,8 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     get().fetchAll()
   },
 
-  deleteRecurringFuture: async (id) => {
-    await api.transactions.deleteRecurringFuture(id)
+  deleteTransactionGroup: async (id, scope) => {
+    await api.transactions.deleteGroup(id, scope)
     get().fetchAll()
   },
 

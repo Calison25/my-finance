@@ -173,6 +173,48 @@ class PostgresTransactionRepository:
             )
         return self._row_to_transaction(row)
 
+    async def create_many(self, transactions: list[Transaction]) -> list[Transaction]:
+        if not transactions:
+            return []
+
+        columns_per_row = 15
+        values_sql_parts: list[str] = []
+        params: list = []
+        for i, tx in enumerate(transactions):
+            base = i * columns_per_row
+            placeholders = ", ".join(f"${base + j + 1}" for j in range(columns_per_row))
+            values_sql_parts.append(f"({placeholders})")
+            params.extend([
+                tx.id,
+                tx.card_id,
+                tx.description,
+                tx.amount,
+                tx.type.value,
+                tx.category_id,
+                tx.date,
+                tx.is_scheduled,
+                tx.scheduled_date,
+                tx.is_realized,
+                tx.is_recurring,
+                tx.is_bill,
+                tx.recurring_transaction_id,
+                tx.notes,
+                tx.created_at,
+            ])
+
+        query = f"""
+            INSERT INTO transactions
+                (id, card_id, description, amount, type, category_id,
+                 date, is_scheduled, scheduled_date, is_realized,
+                 is_recurring, is_bill, recurring_transaction_id, notes, created_at)
+            VALUES {", ".join(values_sql_parts)}
+            RETURNING *
+        """
+
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(query, *params)
+        return [self._row_to_transaction(row) for row in rows]
+
     async def update(self, transaction: Transaction) -> Transaction | None:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -203,16 +245,49 @@ class PostgresTransactionRepository:
             return None
         return self._row_to_transaction(row)
 
-    async def delete_by_recurring_id(self, recurring_transaction_id: UUID, from_date: date) -> None:
+    async def delete_by_recurring_id(
+        self, recurring_transaction_id: UUID, from_date: date | None = None
+    ) -> None:
         async with self._pool.acquire() as conn:
-            await conn.execute(
-                """
-                DELETE FROM transactions
-                WHERE recurring_transaction_id = $1 AND date >= $2
-                """,
-                recurring_transaction_id,
-                from_date,
-            )
+            if from_date is None:
+                await conn.execute(
+                    "DELETE FROM transactions WHERE recurring_transaction_id = $1",
+                    recurring_transaction_id,
+                )
+            else:
+                await conn.execute(
+                    """
+                    DELETE FROM transactions
+                    WHERE recurring_transaction_id = $1 AND date >= $2
+                    """,
+                    recurring_transaction_id,
+                    from_date,
+                )
+
+    async def delete_installment_group(
+        self, card_id: UUID, base_description: str, from_date: date | None = None
+    ) -> None:
+        pattern = f"{base_description} (%/%)"
+        async with self._pool.acquire() as conn:
+            if from_date is None:
+                await conn.execute(
+                    """
+                    DELETE FROM transactions
+                    WHERE card_id = $1 AND description LIKE $2
+                    """,
+                    card_id,
+                    pattern,
+                )
+            else:
+                await conn.execute(
+                    """
+                    DELETE FROM transactions
+                    WHERE card_id = $1 AND description LIKE $2 AND date >= $3
+                    """,
+                    card_id,
+                    pattern,
+                    from_date,
+                )
 
     async def delete(self, transaction_id: UUID) -> None:
         async with self._pool.acquire() as conn:

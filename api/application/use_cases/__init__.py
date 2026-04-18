@@ -18,7 +18,7 @@ from api.application.use_cases.category_use_cases import (
 from api.application.use_cases.dashboard_use_case import GetDashboardSummaryUseCase
 from api.application.use_cases.transaction_use_cases import (
     CreateTransactionUseCase,
-    DeleteRecurringTransactionsUseCase,
+    DeleteTransactionGroupUseCase,
     DeleteTransactionUseCase,
     ListTransactionsUseCase,
     RealizeTransactionUseCase,
@@ -33,7 +33,7 @@ __all__ = [
     "DeleteBankUseCase",
     "DeleteCardUseCase",
     "DeleteCategoryUseCase",
-    "DeleteRecurringTransactionsUseCase",
+    "DeleteTransactionGroupUseCase",
     "DeleteTransactionUseCase",
     "GetCardUseCase",
     "GetDashboardSummaryUseCase",

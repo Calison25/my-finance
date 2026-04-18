@@ -24,6 +24,16 @@ function parseBRLToNumber(formatted: string): number {
   return parseBRLToCents(formatted) / 100
 }
 
+function getDefaultTransactionDate(): string {
+  const today = new Date()
+  const day = today.getDate()
+  const targetYear = today.getMonth() === 11 ? today.getFullYear() + 1 : today.getFullYear()
+  const targetMonth = (today.getMonth() + 1) % 12
+  const lastDayOfTarget = new Date(targetYear, targetMonth + 1, 0).getDate()
+  const finalDay = Math.min(day, lastDayOfTarget)
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-${String(finalDay).padStart(2, "0")}`
+}
+
 const CATEGORY_ICONS: Record<string, string> = {
   "Alimentacao": "restaurant",
   "Transporte": "directions_car",
@@ -38,7 +48,8 @@ const CATEGORY_ICONS: Record<string, string> = {
 }
 
 export function Transactions() {
-  const { transactions, cards, categories, banks, addTransaction, updateTransaction, deleteTransaction, realizeTransaction, getCardBalance, getCardExpenses, transactionSummary, fetchTransactionSummary } = useFinanceStore()
+  const { transactions, cards, categories, banks, addTransaction, updateTransaction, deleteTransaction, deleteTransactionGroup, realizeTransaction, getCardBalance, getCardExpenses, transactionSummary, fetchTransactionSummary } = useFinanceStore()
+  const [deletePrompt, setDeletePrompt] = useState<{ id: string; kind: "recurring" | "installment" } | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<string | null>(null)
   const [editCascade, setEditCascade] = useState(false)
@@ -70,7 +81,7 @@ export function Transactions() {
     type: "EXPENSE" as TransactionType,
     category_id: "",
     custom_category_name: "",
-    date: new Date().toISOString().slice(0, 10),
+    date: getDefaultTransactionDate(),
     is_scheduled: false,
     scheduled_date: "",
     notes: "",
@@ -163,7 +174,7 @@ export function Transactions() {
     type: "EXPENSE" as TransactionType,
     category_id: "",
     custom_category_name: "",
-    date: `${selectedMonth}-01`,
+    date: getDefaultTransactionDate(),
     is_scheduled: false,
     scheduled_date: "",
     notes: "",
@@ -635,7 +646,15 @@ export function Transactions() {
                           <Icon name="edit" className="text-base" />
                         </button>
                         <button
-                          onClick={() => deleteTransaction(tx.id)}
+                          onClick={() => {
+                            if (tx.classification === "recurring") {
+                              setDeletePrompt({ id: tx.id, kind: "recurring" })
+                            } else if (tx.classification === "installment") {
+                              setDeletePrompt({ id: tx.id, kind: "installment" })
+                            } else {
+                              deleteTransaction(tx.id)
+                            }
+                          }}
                           className="rounded-full p-1 opacity-0 group-hover:opacity-100 hover:bg-error-container/20 text-on-surface-variant hover:text-error transition-all"
                         >
                           <Icon name="delete" className="text-base" />
@@ -1051,6 +1070,53 @@ export function Transactions() {
             </div>
           </button>
         </form>
+      </Dialog>
+
+      <Dialog
+        open={deletePrompt !== null}
+        onClose={() => setDeletePrompt(null)}
+        title={deletePrompt?.kind === "recurring" ? "Excluir transação recorrente" : "Excluir parcelamento"}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-on-surface-variant">
+            {deletePrompt?.kind === "recurring"
+              ? "Deseja excluir todas as recorrências ou apenas desta em diante?"
+              : "Deseja excluir todas as parcelas ou apenas desta em diante?"}
+          </p>
+          <div className="grid grid-cols-1 gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                if (!deletePrompt) return
+                const p = deletePrompt
+                setDeletePrompt(null)
+                await deleteTransactionGroup(p.id, "future")
+              }}
+              className="w-full py-3 rounded-xl bg-surface-container-high text-on-surface font-medium text-sm hover:bg-surface-container-highest transition-colors"
+            >
+              Desta em diante
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!deletePrompt) return
+                const p = deletePrompt
+                setDeletePrompt(null)
+                await deleteTransactionGroup(p.id, "all")
+              }}
+              className="w-full py-3 rounded-xl bg-error/10 text-error font-medium text-sm hover:bg-error/20 transition-colors"
+            >
+              Todas
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeletePrompt(null)}
+              className="w-full py-3 rounded-xl text-on-surface-variant text-sm hover:bg-surface-container-high transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       </Dialog>
     </div>
   )

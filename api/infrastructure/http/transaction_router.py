@@ -1,5 +1,6 @@
 from uuid import UUID
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -15,7 +16,7 @@ from api.application.use_cases.transaction_use_cases import (
     UpdateTransactionUseCase,
     RealizeTransactionUseCase,
     DeleteTransactionUseCase,
-    DeleteRecurringTransactionsUseCase,
+    DeleteTransactionGroupUseCase,
 )
 from api.application.use_cases.transaction_summary_use_case import (
     GetTransactionSummaryUseCase,
@@ -28,7 +29,7 @@ from api.infrastructure.http.dependencies import (
     get_update_transaction,
     get_realize_transaction,
     get_delete_transaction,
-    get_delete_recurring_transactions,
+    get_delete_transaction_group,
     get_transaction_summary,
 )
 
@@ -88,15 +89,14 @@ async def update_transaction(
     return await use_case.execute(transaction_id, data, current_user.household_id)
 
 
-@router.delete("/{transaction_id}/recurring-future", status_code=204)
-async def delete_recurring_transactions(
+@router.delete("/{transaction_id}/group", status_code=204)
+async def delete_transaction_group(
     transaction_id: UUID,
+    scope: Literal["all", "future"] = Query(...),
     current_user: User = Depends(get_current_user),
-    use_case: DeleteRecurringTransactionsUseCase = Depends(
-        get_delete_recurring_transactions
-    ),
+    use_case: DeleteTransactionGroupUseCase = Depends(get_delete_transaction_group),
 ):
-    await use_case.execute(transaction_id, current_user.household_id)
+    await use_case.execute(transaction_id, current_user.household_id, scope)
 
 
 @router.delete("/{transaction_id}", status_code=204)
