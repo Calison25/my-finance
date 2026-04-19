@@ -192,8 +192,9 @@ def get_delete_card(
 
 def get_list_transactions(
     repo: PostgresTransactionRepository = Depends(get_transaction_repository),
+    card_repo: PostgresCardRepository = Depends(get_card_repository),
 ) -> ListTransactionsUseCase:
-    return ListTransactionsUseCase(repo)
+    return ListTransactionsUseCase(repo, card_repo)
 
 
 def get_create_transaction(
@@ -235,8 +236,9 @@ def get_delete_transaction_group(
 
 def get_transaction_summary(
     repo: PostgresTransactionRepository = Depends(get_transaction_repository),
+    card_repo: PostgresCardRepository = Depends(get_card_repository),
 ) -> GetTransactionSummaryUseCase:
-    return GetTransactionSummaryUseCase(repo)
+    return GetTransactionSummaryUseCase(repo, card_repo)
 
 
 # --- Use case factories: Dashboard ---

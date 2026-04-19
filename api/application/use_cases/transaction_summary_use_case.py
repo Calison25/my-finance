@@ -10,6 +10,8 @@ from api.application.dtos.transaction_summary_dto import (
     TransactionSummaryResponse,
 )
 from api.domain.entities.transaction import Transaction
+from api.domain.exceptions import ForbiddenError
+from api.domain.repositories.card_repository import CardRepository
 from api.domain.repositories.transaction_repository import TransactionRepository
 
 _INSTALLMENT_RE = re.compile(r"\(\d+/\d+\)$")
@@ -27,8 +29,9 @@ def _is_effectively_realized(tx: Transaction) -> bool:
 
 
 class GetTransactionSummaryUseCase:
-    def __init__(self, repo: TransactionRepository):
+    def __init__(self, repo: TransactionRepository, card_repo: CardRepository):
         self._repo = repo
+        self._card_repo = card_repo
 
     async def execute(
         self,
@@ -44,6 +47,9 @@ class GetTransactionSummaryUseCase:
             date_to = dt.date(year, m + 1, 1) - dt.timedelta(days=1)
 
         if card_id:
+            card = await self._card_repo.get_by_id(card_id)
+            if card is None or card.household_id != household_id:
+                raise ForbiddenError("Acesso negado a este recurso")
             transactions = await self._repo.list_by_card(
                 card_id, date_from=date_from, date_to=date_to
             )

@@ -22,9 +22,9 @@ def _get_jwks_client() -> PyJWKClient:
     return _jwks_client
 
 
-def _extract_bearer(authorization: str) -> str:
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
+def _extract_bearer(authorization: str | None) -> str:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
     return authorization[7:]
 
 
@@ -47,7 +47,7 @@ def decode_jwt(token: str) -> dict:
 
 
 async def get_current_user(
-    authorization: str = Header(..., alias="Authorization"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
     user_repo: PostgresUserRepository = Depends(get_user_repository),
 ) -> User:
     token = _extract_bearer(authorization)

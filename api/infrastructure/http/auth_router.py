@@ -1,6 +1,8 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from api.application.dtos.auth_dto import ProvisionUserOutput
 from api.application.use_cases.provision_user_use_case import ProvisionUserUseCase
@@ -8,16 +10,19 @@ from api.infrastructure.http.auth import decode_jwt
 from api.infrastructure.http.dependencies import get_provision_user
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/me", response_model=ProvisionUserOutput)
+@limiter.limit("10/minute")
 async def provision_me(
-    authorization: str = Header(..., alias="Authorization"),
+    request: Request,
+    authorization: str | None = Header(default=None, alias="Authorization"),
     use_case: ProvisionUserUseCase = Depends(get_provision_user),
 ):
-    token = authorization.replace("Bearer ", "", 1)
-    if not token or token == authorization:
+    if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing Bearer token")
+    token = authorization[7:]
 
     payload = decode_jwt(token)
     user_metadata = payload.get("user_metadata", {})

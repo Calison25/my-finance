@@ -4,6 +4,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from api.infrastructure.config.settings import settings
 from api.domain.exceptions import DomainException, NotFoundError, ForbiddenError
@@ -27,6 +30,8 @@ async def lifespan(app: FastAPI):
     await close_pool(pool)
 
 
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="My Finance API",
     description="API para gestao financeira pessoal",
@@ -36,18 +41,27 @@ app = FastAPI(
     redoc_url=None,
     openapi_url="/openapi.json" if settings.environment == "development" else None,
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-_allowed_origins = ["http://localhost:5173", "http://localhost:3000"]
-if settings.environment == "production":
-    _allowed_origins = [
+def _resolve_cors_origins() -> list[str]:
+    configured = [
         origin.strip()
         for origin in (settings.cors_origins or "").split(",")
         if origin.strip()
     ]
+    if settings.environment == "development":
+        return configured or ["http://localhost:5173", "http://localhost:3000"]
+    if not configured:
+        raise RuntimeError(
+            "CORS_ORIGINS must be configured in non-development environments"
+        )
+    return configured
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allowed_origins,
+    allow_origins=_resolve_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

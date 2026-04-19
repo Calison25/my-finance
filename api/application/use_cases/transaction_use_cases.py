@@ -30,8 +30,9 @@ def classify_transaction(tx: Transaction) -> str:
 
 
 class ListTransactionsUseCase:
-    def __init__(self, repo: TransactionRepository):
+    def __init__(self, repo: TransactionRepository, card_repo: CardRepository):
         self._repo = repo
+        self._card_repo = card_repo
 
     async def execute(
         self,
@@ -43,6 +44,11 @@ class ListTransactionsUseCase:
         is_scheduled: bool | None = None,
     ) -> list[TransactionResponse]:
         if card_id is not None:
+            if household_id is None:
+                raise ForbiddenError("Acesso negado a este recurso")
+            card = await self._card_repo.get_by_id(card_id)
+            if card is None or card.household_id != household_id:
+                raise ForbiddenError("Acesso negado a este recurso")
             transactions = await self._repo.list_by_card(
                 card_id,
                 date_from=date_from,
