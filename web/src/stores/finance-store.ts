@@ -145,13 +145,17 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
 
   realizeTransaction: async (id) => {
-    await api.transactions.realize(id)
-    await get().fetchAll()
+    const updated = await api.transactions.realize(id)
+    set((s) => ({
+      transactions: s.transactions.map((t) => (t.id === id ? { ...t, ...updated } : t)),
+    }))
   },
 
   unrealizeTransaction: async (id) => {
-    await api.transactions.update(id, { is_realized: false } as Record<string, unknown>)
-    await get().fetchAll()
+    const updated = await api.transactions.update(id, { is_realized: false } as Record<string, unknown>)
+    set((s) => ({
+      transactions: s.transactions.map((t) => (t.id === id ? { ...t, ...updated } : t)),
+    }))
   },
 
   getCardBalance: (cardId) => {

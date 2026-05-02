@@ -28,7 +28,7 @@ interface CardSection {
 }
 
 export function Bills() {
-  const { transactions, cards, banks, realizeTransaction, unrealizeTransaction, fetchAll, valuesVisible, toggleValuesVisible } = useFinanceStore()
+  const { transactions, cards, banks, realizeTransaction, unrealizeTransaction, valuesVisible, toggleValuesVisible } = useFinanceStore()
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const next = new Date()
@@ -155,12 +155,13 @@ export function Bills() {
   async function batchToggle(ids: string[], paid: boolean, loadingKey: string) {
     setLoadingId(loadingKey)
     try {
-      if (paid) {
-        await Promise.all(ids.map((id) => api.transactions.update(id, { is_realized: false })))
-      } else {
-        await Promise.all(ids.map((id) => api.transactions.realize(id)))
-      }
-      await fetchAll()
+      const updated = paid
+        ? await Promise.all(ids.map((id) => api.transactions.update(id, { is_realized: false })))
+        : await Promise.all(ids.map((id) => api.transactions.realize(id)))
+      const byId = new Map(updated.map((tx) => [tx.id, tx]))
+      useFinanceStore.setState((s) => ({
+        transactions: s.transactions.map((t) => byId.get(t.id) ?? t),
+      }))
     } catch (err) {
       console.error("Erro ao alterar status:", err)
     } finally {
@@ -287,18 +288,25 @@ export function Bills() {
             <div className="bg-surface-container-low rounded-xl ghost-border divide-y divide-outline-variant/15">
               {plainBills.map((bill) => {
                 const isOverdue = isCurrentMonth && bill.dueDay < todayDay && !bill.isPaid
+                const loading = loadingId === bill.id
                 return (
-                  <div key={bill.id} className="flex items-center gap-4 px-5 py-4">
+                  <div key={bill.id} className={`flex items-center gap-4 px-5 py-4 transition-all ${loading ? "bg-primary-container/10" : ""}`}>
                     <Checkbox id={bill.id} checked={bill.isPaid} onClick={() => toggleSingle(bill.id, bill.isPaid)} />
-                    <div className="flex-1 min-w-0">
+                    <div className={`flex-1 min-w-0 transition-opacity ${loading ? "opacity-50" : ""}`}>
                       <p className={`text-sm font-medium truncate ${bill.isPaid ? "line-through opacity-50" : ""}`}>{bill.description}</p>
                       <p className="text-[10px] text-on-surface-variant">Vence dia {bill.dueDay}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className={`text-sm font-bold ${bill.isPaid ? "text-income" : "text-error"}`}>
-                        <MoneyValue value={bill.amount} />
-                      </p>
-                      {isOverdue && <span className="text-[9px] text-error font-bold">Vencido</span>}
+                      {loading ? (
+                        <p className="text-[11px] text-primary font-medium animate-pulse">Salvando…</p>
+                      ) : (
+                        <>
+                          <p className={`text-sm font-bold ${bill.isPaid ? "text-income" : "text-error"}`}>
+                            <MoneyValue value={bill.amount} />
+                          </p>
+                          {isOverdue && <span className="text-[9px] text-error font-bold">Vencido</span>}
+                        </>
+                      )}
                     </div>
                   </div>
                 )
@@ -312,6 +320,7 @@ export function Bills() {
             const open = isExpanded(section.cardId, hasIndividuals)
             const isOverdue = isCurrentMonth && section.dueDay < todayDay && !section.isPaid
             const headerLoadingKey = `card-${section.cardId}`
+            const headerLoading = loadingId === headerLoadingKey
 
             return (
               <div key={section.cardId} className="bg-surface-container-low rounded-xl ghost-border overflow-hidden">
@@ -319,7 +328,7 @@ export function Bills() {
                 <div
                   role={hasIndividuals ? "button" : undefined}
                   onClick={hasIndividuals ? () => toggleExpanded(section.cardId) : undefined}
-                  className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 ${hasIndividuals ? "cursor-pointer hover:bg-surface-container active:bg-surface-container-high transition-colors" : ""}`}
+                  className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 transition-all ${hasIndividuals ? "cursor-pointer hover:bg-surface-container active:bg-surface-container-high" : ""} ${headerLoading ? "bg-primary-container/10" : ""}`}
                 >
                   <Checkbox
                     id={headerLoadingKey}
@@ -327,12 +336,12 @@ export function Bills() {
                     onClick={() => batchToggle(section.allTxIds, section.isPaid, headerLoadingKey)}
                   />
                   <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold text-white shrink-0 transition-opacity ${headerLoading ? "opacity-50" : ""}`}
                     style={{ backgroundColor: section.bankColor ?? "#6B7280" }}
                   >
                     {section.bankInitials}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className={`flex-1 min-w-0 transition-opacity ${headerLoading ? "opacity-50" : ""}`}>
                     <p className={`text-sm font-bold truncate ${section.isPaid ? "line-through opacity-50" : ""}`}>{section.title}</p>
                     <p className="text-[10px] text-on-surface-variant">
                       Fatura · Vence dia {section.dueDay}
@@ -340,10 +349,16 @@ export function Bills() {
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className={`text-sm sm:text-base font-bold ${section.isPaid ? "text-income" : "text-error"}`}>
-                      <MoneyValue value={section.total} />
-                    </p>
-                    {isOverdue && <span className="text-[9px] text-error font-bold">Vencido</span>}
+                    {headerLoading ? (
+                      <p className="text-[11px] text-primary font-medium animate-pulse">Salvando…</p>
+                    ) : (
+                      <>
+                        <p className={`text-sm sm:text-base font-bold ${section.isPaid ? "text-income" : "text-error"}`}>
+                          <MoneyValue value={section.total} />
+                        </p>
+                        {isOverdue && <span className="text-[9px] text-error font-bold">Vencido</span>}
+                      </>
+                    )}
                   </div>
                   {hasIndividuals && (
                     <Icon
@@ -358,46 +373,61 @@ export function Bills() {
                   <div className="border-t border-outline-variant/15 bg-surface/30 divide-y divide-outline-variant/10">
                     {section.individualBills.map((bill) => {
                       const billOverdue = isCurrentMonth && bill.dueDay < todayDay && !bill.isPaid
+                      const loading = loadingId === bill.id
                       return (
-                        <div key={bill.id} className="flex items-center gap-4 px-5 py-3 pl-12">
+                        <div key={bill.id} className={`flex items-center gap-4 px-5 py-3 pl-12 transition-all ${loading ? "bg-primary-container/10" : ""}`}>
                           <Checkbox id={bill.id} checked={bill.isPaid} onClick={() => toggleSingle(bill.id, bill.isPaid)} />
-                          <div className="flex-1 min-w-0">
+                          <div className={`flex-1 min-w-0 transition-opacity ${loading ? "opacity-50" : ""}`}>
                             <p className={`text-sm font-medium truncate ${bill.isPaid ? "line-through opacity-50" : ""}`}>{bill.description}</p>
                             <p className="text-[10px] text-on-surface-variant">Vence dia {bill.dueDay}</p>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className={`text-sm font-bold ${bill.isPaid ? "text-income" : "text-error"}`}>
-                              <MoneyValue value={bill.amount} />
-                            </p>
-                            {billOverdue && <span className="text-[9px] text-error font-bold">Vencido</span>}
+                            {loading ? (
+                              <p className="text-[11px] text-primary font-medium animate-pulse">Salvando…</p>
+                            ) : (
+                              <>
+                                <p className={`text-sm font-bold ${bill.isPaid ? "text-income" : "text-error"}`}>
+                                  <MoneyValue value={bill.amount} />
+                                </p>
+                                {billOverdue && <span className="text-[9px] text-error font-bold">Vencido</span>}
+                              </>
+                            )}
                           </div>
                         </div>
                       )
                     })}
-                    {section.remainderAmount > 0 && (
-                      <div className="flex items-center gap-4 px-5 py-3 pl-12">
-                        <Checkbox
-                          id={`remainder-${section.cardId}`}
-                          checked={section.remainderPaid}
-                          onClick={() =>
-                            batchToggle(section.remainderTxIds, section.remainderPaid, `remainder-${section.cardId}`)
-                          }
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium italic ${section.remainderPaid ? "line-through opacity-50" : ""}`}>
-                            Remanescente da fatura
-                          </p>
-                          <p className="text-[10px] text-on-surface-variant">
-                            {section.remainderTxIds.length} lançamento(s)
-                          </p>
+                    {section.remainderAmount > 0 && (() => {
+                      const remainderKey = `remainder-${section.cardId}`
+                      const loading = loadingId === remainderKey
+                      return (
+                        <div className={`flex items-center gap-4 px-5 py-3 pl-12 transition-all ${loading ? "bg-primary-container/10" : ""}`}>
+                          <Checkbox
+                            id={remainderKey}
+                            checked={section.remainderPaid}
+                            onClick={() =>
+                              batchToggle(section.remainderTxIds, section.remainderPaid, remainderKey)
+                            }
+                          />
+                          <div className={`flex-1 min-w-0 transition-opacity ${loading ? "opacity-50" : ""}`}>
+                            <p className={`text-sm font-medium italic ${section.remainderPaid ? "line-through opacity-50" : ""}`}>
+                              Remanescente da fatura
+                            </p>
+                            <p className="text-[10px] text-on-surface-variant">
+                              {section.remainderTxIds.length} lançamento(s)
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            {loading ? (
+                              <p className="text-[11px] text-primary font-medium animate-pulse">Salvando…</p>
+                            ) : (
+                              <p className={`text-sm font-bold ${section.remainderPaid ? "text-income" : "text-error"}`}>
+                                <MoneyValue value={section.remainderAmount} />
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className={`text-sm font-bold ${section.remainderPaid ? "text-income" : "text-error"}`}>
-                            <MoneyValue value={section.remainderAmount} />
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                      )
+                    })()}
                   </div>
                 )}
               </div>
