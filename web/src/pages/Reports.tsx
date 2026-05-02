@@ -87,7 +87,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export function Reports() {
-  const { transactions, categories, cards, banks, transactionSummary, fetchTransactionSummary } = useFinanceStore()
+  const { transactions, categories, cards, banks, transactionSummary, fetchTransactionSummary, valuesVisible, toggleValuesVisible } = useFinanceStore()
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month")
   const [customFrom, setCustomFrom] = useState(() => {
     const next = new Date()
@@ -326,7 +326,16 @@ export function Reports() {
       {/* Header + Period Filter */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-headline font-bold text-2xl">Relatorios</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-headline font-bold text-2xl">Relatorios</h1>
+            <button
+              onClick={toggleValuesVisible}
+              className="opacity-40 hover:opacity-100 transition-opacity"
+              title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
+            >
+              <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
+            </button>
+          </div>
           <p className="text-xs text-on-surface-variant">Analise detalhada das suas financas</p>
         </div>
         <div className="flex flex-col items-start sm:items-end gap-3 w-full sm:w-auto">

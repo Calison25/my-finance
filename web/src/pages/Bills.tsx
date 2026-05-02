@@ -28,7 +28,7 @@ interface CardSection {
 }
 
 export function Bills() {
-  const { transactions, cards, banks, realizeTransaction, unrealizeTransaction, fetchAll } = useFinanceStore()
+  const { transactions, cards, banks, realizeTransaction, unrealizeTransaction, fetchAll, valuesVisible, toggleValuesVisible } = useFinanceStore()
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const next = new Date()
@@ -215,7 +215,16 @@ export function Bills() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-extrabold font-headline tracking-tight">Vencimentos</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-3xl font-extrabold font-headline tracking-tight">Vencimentos</h2>
+            <button
+              onClick={toggleValuesVisible}
+              className="opacity-40 hover:opacity-100 transition-opacity"
+              title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
+            >
+              <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
+            </button>
+          </div>
           <p className="text-on-surface-variant text-sm mt-1">Controle de pagamentos do mes</p>
         </div>
       </div>

@@ -59,7 +59,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 }
 
 export function Transactions() {
-  const { transactions, cards, categories, banks, addTransaction, updateTransaction, deleteTransaction, deleteTransactionGroup, realizeTransaction, getCardBalance } = useFinanceStore()
+  const { transactions, cards, categories, banks, addTransaction, updateTransaction, deleteTransaction, deleteTransactionGroup, realizeTransaction, getCardBalance, valuesVisible, toggleValuesVisible } = useFinanceStore()
   const [deletePrompt, setDeletePrompt] = useState<{ id: string; kind: "recurring" | "installment" } | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<string | null>(null)
@@ -345,9 +345,18 @@ export function Transactions() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-extrabold font-headline tracking-tight">
-            {filterCard ? getCardName(filterCard.id) : "Transacoes"}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-3xl font-extrabold font-headline tracking-tight">
+              {filterCard ? getCardName(filterCard.id) : "Transacoes"}
+            </h2>
+            <button
+              onClick={toggleValuesVisible}
+              className="opacity-40 hover:opacity-100 transition-opacity"
+              title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
+            >
+              <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
+            </button>
+          </div>
           {filterCard ? (
             <p className="text-on-surface-variant text-sm mt-1 flex items-center gap-2">
               <span>{isCreditCardFilter ? "Fatura:" : "Saldo:"}</span>
