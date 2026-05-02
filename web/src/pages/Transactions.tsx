@@ -24,14 +24,25 @@ function parseBRLToNumber(formatted: string): number {
   return parseBRLToCents(formatted) / 100
 }
 
-function getDefaultTransactionDate(): string {
+function getDefaultDateForMonth(monthStr: string): string {
   const today = new Date()
-  const day = today.getDate()
-  const targetYear = today.getMonth() === 11 ? today.getFullYear() + 1 : today.getFullYear()
-  const targetMonth = (today.getMonth() + 1) % 12
-  const lastDayOfTarget = new Date(targetYear, targetMonth + 1, 0).getDate()
-  const finalDay = Math.min(day, lastDayOfTarget)
-  return `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-${String(finalDay).padStart(2, "0")}`
+  const [y, m] = monthStr.split("-").map(Number)
+  const lastDay = new Date(y, m, 0).getDate()
+  const day = Math.min(today.getDate(), lastDay)
+  return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+}
+
+function formatDayHeader(dateStr: string): string {
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
+  const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`
+  const d = new Date(dateStr + "T12:00:00")
+  const dayMonth = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })
+  const weekday = d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")
+  if (dateStr === todayStr) return `Hoje · ${dayMonth}`
+  if (dateStr === yesterdayStr) return `Ontem · ${dayMonth}`
+  return `${dayMonth} · ${weekday}`
 }
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -87,7 +98,7 @@ export function Transactions() {
     type: "EXPENSE" as TransactionType,
     category_id: "",
     custom_category_name: "",
-    date: getDefaultTransactionDate(),
+    date: getDefaultDateForMonth(selectedMonth),
     is_scheduled: false,
     scheduled_date: "",
     notes: "",
@@ -176,7 +187,7 @@ export function Transactions() {
     type: "EXPENSE" as TransactionType,
     category_id: "",
     custom_category_name: "",
-    date: getDefaultTransactionDate(),
+    date: getDefaultDateForMonth(selectedMonth),
     is_scheduled: false,
     scheduled_date: "",
     notes: "",
@@ -267,6 +278,19 @@ export function Transactions() {
     acc[tx.date].push(tx)
     return acc
   }, {})
+
+  const todayKey = (() => {
+    const t = new Date()
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`
+  })()
+  const [openDayOverride, setOpenDayOverride] = useState<Record<string, boolean>>({})
+  function isDayOpen(date: string) {
+    if (date in openDayOverride) return openDayOverride[date]
+    return date === todayKey
+  }
+  function toggleDay(date: string) {
+    setOpenDayOverride((s) => ({ ...s, [date]: !isDayOpen(date) }))
+  }
 
   const sumAmount = (arr: typeof sorted) => arr.reduce((acc, t) => acc + Number(t.amount), 0)
   const isEffectivelyRealized = (t: typeof sorted[0]) => {
@@ -646,13 +670,33 @@ export function Transactions() {
         </div>
       ) : (
         <section className="space-y-6">
-          {Object.entries(grouped).map(([date, txs]) => (
+          {Object.entries(grouped).map(([date, txs]) => {
+            const open = isDayOpen(date)
+            const dayIncome = txs.filter((t) => t.type === "INCOME").reduce((a, t) => a + Number(t.amount), 0)
+            const dayExpense = txs.filter((t) => t.type === "EXPENSE").reduce((a, t) => a + Number(t.amount), 0)
+            const dayNet = dayIncome - dayExpense
+            return (
             <div key={date}>
-              <div className="flex items-center justify-between mb-2 sticky top-16 bg-surface/80 backdrop-blur-md py-1.5 z-20">
-                <h3 className="font-headline font-bold text-on-surface-variant text-xs tracking-[0.15em] uppercase">
-                  {new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}
+              <button
+                type="button"
+                onClick={() => toggleDay(date)}
+                className="w-full flex items-center gap-3 mb-2 sticky top-16 bg-surface/85 backdrop-blur-md py-2 px-2 -mx-2 rounded-lg z-20 hover:bg-surface-container-low/60 transition-colors"
+              >
+                <Icon
+                  name="expand_more"
+                  className={`text-on-surface-variant text-base transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
+                />
+                <h3 className="font-headline font-bold text-on-surface text-xs tracking-[0.15em] uppercase flex-1 text-left">
+                  {formatDayHeader(date)}
                 </h3>
-              </div>
+                <span className="text-[10px] text-on-surface-variant font-medium shrink-0">
+                  {txs.length} lanç.
+                </span>
+                <span className={`text-xs font-headline font-bold shrink-0 ${dayNet >= 0 ? "text-income" : "text-error"}`}>
+                  {dayNet >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(dayNet)} />
+                </span>
+              </button>
+              {open && (
               <div className="space-y-0.5">
                 {txs.map((tx) => {
                   const cat = getCategoryInfo(tx.category_id)
@@ -721,8 +765,10 @@ export function Transactions() {
                   )
                 })}
               </div>
+              )}
             </div>
-          ))}
+            )
+          })}
         </section>
       )}
 

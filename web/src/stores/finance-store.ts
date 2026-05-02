@@ -21,8 +21,8 @@ interface FinanceState {
   updateTransaction: (id: string, data: { description?: string; amount?: number; type?: TransactionType; category_id?: string | null; custom_category_name?: string; notes?: string | null; is_recurring?: boolean }, cascade?: boolean) => Promise<void>
   deleteTransaction: (id: string) => void
   deleteTransactionGroup: (id: string, scope: "all" | "future") => Promise<void>
-  realizeTransaction: (id: string) => void
-  unrealizeTransaction: (id: string) => void
+  realizeTransaction: (id: string) => Promise<void>
+  unrealizeTransaction: (id: string) => Promise<void>
   getCardBalance: (cardId: string) => number
   getCardExpenses: (cardId: string) => number
   getCardExpensesByMonth: (cardId: string, month: string) => number
@@ -46,7 +46,8 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   }),
 
   fetchAll: async () => {
-    set({ isLoading: true })
+    const isInitial = get().banks.length === 0 && get().cards.length === 0 && get().transactions.length === 0
+    if (isInitial) set({ isLoading: true })
     const [banks, cards, transactions, categories] = await Promise.all([
       api.banks.list(),
       api.cards.list(),

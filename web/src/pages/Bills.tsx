@@ -2,21 +2,33 @@ import { useState, useMemo } from "react"
 import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
 import { useFinanceStore } from "@/stores/finance-store"
+import { api } from "@/services/api"
 
 interface BillItem {
   id: string
   description: string
   amount: number
   dueDay: number
-  dueDate: string
   isPaid: boolean
-  cardName: string
+}
+
+interface CardSection {
+  cardId: string
+  title: string
   bankColor: string | null
   bankInitials: string
+  dueDay: number
+  total: number
+  isPaid: boolean
+  allTxIds: string[]
+  individualBills: BillItem[]
+  remainderTxIds: string[]
+  remainderAmount: number
+  remainderPaid: boolean
 }
 
 export function Bills() {
-  const { transactions, cards, banks, realizeTransaction, unrealizeTransaction } = useFinanceStore()
+  const { transactions, cards, banks, realizeTransaction, unrealizeTransaction, fetchAll } = useFinanceStore()
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const next = new Date()
@@ -34,42 +46,94 @@ export function Bills() {
     setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
   }
 
-  function getCardInfo(cardId: string) {
+  function getCardLabel(cardId: string) {
     const card = cards.find((c) => c.id === cardId)
-    if (!card) return { name: "--", bankColor: null, bankInitials: "??" }
+    if (!card) return "--"
     const bank = banks.find((b) => b.id === card.bank_id)
-    return {
-      name: bank ? `${bank.name} - ${card.name}` : card.name,
-      bankColor: bank?.color ?? null,
-      bankInitials: bank?.name?.slice(0, 2).toUpperCase() ?? "CC",
-    }
+    return bank ? `${bank.name} - ${card.name}` : card.name
   }
 
-  const bills = useMemo<BillItem[]>(() => {
-    const billTxs = transactions.filter(
-      (t) => t.date >= monthStart && t.date <= monthEnd && t.is_bill
-    )
+  const { plainBills, cardSections } = useMemo(() => {
+    const creditCards = cards.filter((c) => c.type === "CREDIT_CARD")
+    const creditCardIds = new Set(creditCards.map((c) => c.id))
 
-    return billTxs
-      .map((tx) => {
-        const cardInfo = getCardInfo(tx.card_id)
-        return {
-          id: tx.id,
-          description: tx.description,
-          amount: tx.amount,
-          dueDay: Number(tx.date.slice(8, 10)),
-          dueDate: tx.date,
-          isPaid: tx.is_realized,
-          cardName: cardInfo.name,
-          bankColor: cardInfo.bankColor,
-          bankInitials: cardInfo.bankInitials,
-        }
-      })
+    const plain: BillItem[] = transactions
+      .filter(
+        (t) =>
+          t.date >= monthStart &&
+          t.date <= monthEnd &&
+          t.is_bill &&
+          !creditCardIds.has(t.card_id),
+      )
+      .map((tx) => ({
+        id: tx.id,
+        description: `${tx.description} · ${getCardLabel(tx.card_id)}`,
+        amount: tx.amount,
+        dueDay: Number(tx.date.slice(8, 10)),
+        isPaid: tx.is_realized,
+      }))
       .sort((a, b) => a.dueDay - b.dueDay)
+
+    const sections: CardSection[] = creditCards
+      .map((card) => {
+        const cardTxs = transactions.filter(
+          (t) =>
+            t.card_id === card.id &&
+            t.type === "EXPENSE" &&
+            t.date >= monthStart &&
+            t.date <= monthEnd,
+        )
+        if (cardTxs.length === 0) return null
+
+        const individuals = cardTxs.filter((t) => t.is_bill)
+        const remainder = cardTxs.filter((t) => !t.is_bill)
+        const total = cardTxs.reduce((acc, t) => acc + t.amount, 0)
+        const remainderAmount = remainder.reduce((acc, t) => acc + t.amount, 0)
+        const bank = banks.find((b) => b.id === card.bank_id)
+
+        const individualBills: BillItem[] = individuals
+          .map((tx) => ({
+            id: tx.id,
+            description: tx.description,
+            amount: tx.amount,
+            dueDay: Number(tx.date.slice(8, 10)),
+            isPaid: tx.is_realized,
+          }))
+          .sort((a, b) => a.dueDay - b.dueDay)
+
+        return {
+          cardId: card.id,
+          title: bank ? `${bank.name} - ${card.name}` : card.name,
+          bankColor: bank?.color ?? null,
+          bankInitials: bank?.name?.slice(0, 2).toUpperCase() ?? "CC",
+          dueDay: card.due_day ?? 1,
+          total,
+          isPaid: cardTxs.every((t) => t.is_realized),
+          allTxIds: cardTxs.map((t) => t.id),
+          individualBills,
+          remainderTxIds: remainder.map((t) => t.id),
+          remainderAmount,
+          remainderPaid: remainder.length > 0 && remainder.every((t) => t.is_realized),
+        } as CardSection
+      })
+      .filter((s): s is CardSection => s !== null)
+      .sort((a, b) => a.dueDay - b.dueDay)
+
+    return { plainBills: plain, cardSections: sections }
   }, [transactions, cards, banks, selectedMonth, monthStart, monthEnd])
 
-  const totalAmount = bills.reduce((acc, b) => acc + b.amount, 0)
-  const paidAmount = bills.filter((b) => b.isPaid).reduce((acc, b) => acc + b.amount, 0)
+  const totalAmount =
+    plainBills.reduce((acc, b) => acc + b.amount, 0) +
+    cardSections.reduce((acc, s) => acc + s.total, 0)
+  const paidAmount =
+    plainBills.filter((b) => b.isPaid).reduce((acc, b) => acc + b.amount, 0) +
+    cardSections.reduce(
+      (acc, s) =>
+        acc +
+        s.individualBills.filter((b) => b.isPaid).reduce((a, b) => a + b.amount, 0) +
+        (s.remainderPaid ? s.remainderAmount : 0),
+      0,
+    )
   const pendingAmount = totalAmount - paidAmount
 
   const today = new Date()
@@ -77,14 +141,40 @@ export function Bills() {
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month
 
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
-  async function handleTogglePaid(bill: BillItem) {
-    setLoadingId(bill.id)
+  function isExpanded(cardId: string, hasIndividuals: boolean) {
+    if (!hasIndividuals) return false
+    return expanded[cardId] ?? true
+  }
+
+  function toggleExpanded(cardId: string) {
+    setExpanded((s) => ({ ...s, [cardId]: !(s[cardId] ?? true) }))
+  }
+
+  async function batchToggle(ids: string[], paid: boolean, loadingKey: string) {
+    setLoadingId(loadingKey)
     try {
-      if (bill.isPaid) {
-        await unrealizeTransaction(bill.id)
+      if (paid) {
+        await Promise.all(ids.map((id) => api.transactions.update(id, { is_realized: false })))
       } else {
-        await realizeTransaction(bill.id)
+        await Promise.all(ids.map((id) => api.transactions.realize(id)))
+      }
+      await fetchAll()
+    } catch (err) {
+      console.error("Erro ao alterar status:", err)
+    } finally {
+      setLoadingId(null)
+    }
+  }
+
+  async function toggleSingle(id: string, isPaid: boolean) {
+    setLoadingId(id)
+    try {
+      if (isPaid) {
+        await unrealizeTransaction(id)
+      } else {
+        await realizeTransaction(id)
       }
     } catch (err) {
       console.error("Erro ao alterar status:", err)
@@ -92,6 +182,33 @@ export function Bills() {
       setLoadingId(null)
     }
   }
+
+  function Checkbox({ id, checked, onClick }: { id: string; checked: boolean; onClick: () => void }) {
+    const loading = loadingId === id
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          if (!loading) onClick()
+        }}
+        disabled={loading}
+        className="shrink-0 cursor-pointer hover:opacity-80"
+      >
+        {loading ? (
+          <div className="w-7 h-7 rounded-full border-2 border-income border-t-transparent animate-spin" />
+        ) : checked ? (
+          <div className="w-7 h-7 rounded-full bg-income flex items-center justify-center">
+            <Icon name="check" className="text-white text-sm" />
+          </div>
+        ) : (
+          <div className="w-7 h-7 rounded-full border-2 border-outline-variant hover:border-income transition-colors" />
+        )}
+      </button>
+    )
+  }
+
+  const hasContent = plainBills.length > 0 || cardSections.length > 0
 
   return (
     <div className="space-y-8">
@@ -145,8 +262,8 @@ export function Bills() {
         </div>
       </div>
 
-      {/* Checklist */}
-      {bills.length === 0 ? (
+      {/* Lists */}
+      {!hasContent ? (
         <div className="bg-surface-container-low rounded-xl p-10 ghost-border text-center">
           <div className="w-16 h-16 rounded-full bg-primary-container/20 flex items-center justify-center mx-auto mb-4">
             <Icon name="event_available" className="text-3xl text-primary" />
@@ -155,47 +272,125 @@ export function Bills() {
           <p className="text-sm text-on-surface-variant">Nenhuma conta a pagar encontrada para {monthLabel}</p>
         </div>
       ) : (
-        <div className="bg-surface-container-low rounded-xl ghost-border divide-y divide-outline-variant/15">
-          {bills.map((bill) => {
-            const isOverdue = isCurrentMonth && bill.dueDay < todayDay
+        <div className="space-y-3">
+          {/* Plain bills (non credit card) */}
+          {plainBills.length > 0 && (
+            <div className="bg-surface-container-low rounded-xl ghost-border divide-y divide-outline-variant/15">
+              {plainBills.map((bill) => {
+                const isOverdue = isCurrentMonth && bill.dueDay < todayDay && !bill.isPaid
+                return (
+                  <div key={bill.id} className="flex items-center gap-4 px-5 py-4">
+                    <Checkbox id={bill.id} checked={bill.isPaid} onClick={() => toggleSingle(bill.id, bill.isPaid)} />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium truncate ${bill.isPaid ? "line-through opacity-50" : ""}`}>{bill.description}</p>
+                      <p className="text-[10px] text-on-surface-variant">Vence dia {bill.dueDay}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-sm font-bold ${bill.isPaid ? "text-income" : "text-error"}`}>
+                        <MoneyValue value={bill.amount} />
+                      </p>
+                      {isOverdue && <span className="text-[9px] text-error font-bold">Vencido</span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Card sections */}
+          {cardSections.map((section) => {
+            const hasIndividuals = section.individualBills.length > 0
+            const open = isExpanded(section.cardId, hasIndividuals)
+            const isOverdue = isCurrentMonth && section.dueDay < todayDay && !section.isPaid
+            const headerLoadingKey = `card-${section.cardId}`
 
             return (
-              <div key={bill.id} className="flex items-center gap-4 px-5 py-4">
-                {/* Checkbox circle */}
-                <button
-                  type="button"
-                  onClick={() => handleTogglePaid(bill)}
-                  disabled={loadingId === bill.id}
-                  className="shrink-0 cursor-pointer hover:opacity-80"
+              <div key={section.cardId} className="bg-surface-container-low rounded-xl ghost-border overflow-hidden">
+                {/* Header */}
+                <div
+                  role={hasIndividuals ? "button" : undefined}
+                  onClick={hasIndividuals ? () => toggleExpanded(section.cardId) : undefined}
+                  className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 ${hasIndividuals ? "cursor-pointer hover:bg-surface-container active:bg-surface-container-high transition-colors" : ""}`}
                 >
-                  {loadingId === bill.id ? (
-                    <div className="w-7 h-7 rounded-full border-2 border-income border-t-transparent animate-spin" />
-                  ) : bill.isPaid ? (
-                    <div className="w-7 h-7 rounded-full bg-income flex items-center justify-center">
-                      <Icon name="check" className="text-white text-sm" />
-                    </div>
-                  ) : (
-                    <div className="w-7 h-7 rounded-full border-2 border-outline-variant hover:border-income transition-colors cursor-pointer" />
+                  <Checkbox
+                    id={headerLoadingKey}
+                    checked={section.isPaid}
+                    onClick={() => batchToggle(section.allTxIds, section.isPaid, headerLoadingKey)}
+                  />
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                    style={{ backgroundColor: section.bankColor ?? "#6B7280" }}
+                  >
+                    {section.bankInitials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-bold truncate ${section.isPaid ? "line-through opacity-50" : ""}`}>{section.title}</p>
+                    <p className="text-[10px] text-on-surface-variant">
+                      Fatura · Vence dia {section.dueDay}
+                      {hasIndividuals && ` · ${section.individualBills.length} marcado(s)`}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`text-sm sm:text-base font-bold ${section.isPaid ? "text-income" : "text-error"}`}>
+                      <MoneyValue value={section.total} />
+                    </p>
+                    {isOverdue && <span className="text-[9px] text-error font-bold">Vencido</span>}
+                  </div>
+                  {hasIndividuals && (
+                    <Icon
+                      name="expand_more"
+                      className={`text-on-surface-variant transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
+                    />
                   )}
-                </button>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${bill.isPaid ? "line-through opacity-50" : ""}`}>{bill.description}</p>
-                  <p className="text-[10px] text-on-surface-variant">
-                    {bill.cardName} · Vence dia {bill.dueDay}
-                  </p>
                 </div>
 
-                {/* Amount + badge */}
-                <div className="text-right shrink-0">
-                  <p className={`text-sm font-bold ${bill.isPaid ? "text-income" : "text-error"}`}>
-                    <MoneyValue value={bill.amount} />
-                  </p>
-                  {isOverdue && !bill.isPaid && (
-                    <span className="text-[9px] text-error font-bold">Vencido</span>
-                  )}
-                </div>
+                {/* Children */}
+                {hasIndividuals && open && (
+                  <div className="border-t border-outline-variant/15 bg-surface/30 divide-y divide-outline-variant/10">
+                    {section.individualBills.map((bill) => {
+                      const billOverdue = isCurrentMonth && bill.dueDay < todayDay && !bill.isPaid
+                      return (
+                        <div key={bill.id} className="flex items-center gap-4 px-5 py-3 pl-12">
+                          <Checkbox id={bill.id} checked={bill.isPaid} onClick={() => toggleSingle(bill.id, bill.isPaid)} />
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${bill.isPaid ? "line-through opacity-50" : ""}`}>{bill.description}</p>
+                            <p className="text-[10px] text-on-surface-variant">Vence dia {bill.dueDay}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className={`text-sm font-bold ${bill.isPaid ? "text-income" : "text-error"}`}>
+                              <MoneyValue value={bill.amount} />
+                            </p>
+                            {billOverdue && <span className="text-[9px] text-error font-bold">Vencido</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {section.remainderAmount > 0 && (
+                      <div className="flex items-center gap-4 px-5 py-3 pl-12">
+                        <Checkbox
+                          id={`remainder-${section.cardId}`}
+                          checked={section.remainderPaid}
+                          onClick={() =>
+                            batchToggle(section.remainderTxIds, section.remainderPaid, `remainder-${section.cardId}`)
+                          }
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium italic ${section.remainderPaid ? "line-through opacity-50" : ""}`}>
+                            Remanescente da fatura
+                          </p>
+                          <p className="text-[10px] text-on-surface-variant">
+                            {section.remainderTxIds.length} lançamento(s)
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className={`text-sm font-bold ${section.remainderPaid ? "text-income" : "text-error"}`}>
+                            <MoneyValue value={section.remainderAmount} />
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}
