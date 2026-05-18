@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
+import { toast } from "@/components/ui/Toast"
 import type { CardType } from "@/types"
 
 const EMPTY_FORM = {
@@ -17,53 +18,53 @@ const EMPTY_FORM = {
   due_day: "",
 }
 
+function fmtMonth(d: Date) {
+  return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+}
+
 export function Cards() {
   const navigate = useNavigate()
-  const { cards: allCards, banks, addCard, updateCard, deleteCard, getCardBalance, getCardExpensesByMonth, valuesVisible, toggleValuesVisible } = useFinanceStore()
+  const { cards: allCards, banks, addCard, updateCard, deleteCard, getCardExpensesByMonth, valuesVisible, toggleValuesVisible } = useFinanceStore()
   const cards = allCards.filter((c) => c.type === "CREDIT_CARD")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState({ ...EMPTY_FORM })
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const next = new Date()
     next.setMonth(next.getMonth() + 1)
     return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
   })
-  const [editingCardId, setEditingCardId] = useState<string | null>(null)
-  const [form, setForm] = useState({ ...EMPTY_FORM })
+  const [y, m] = selectedMonth.split("-").map(Number)
+  const monthDate = new Date(y, m - 1, 1)
 
   const isOtherBank = form.bank_id === "__other__"
 
-  function openCreateDialog() {
-    setEditingCardId(null)
+  function openCreate() {
+    setEditingId(null)
     setForm({ ...EMPTY_FORM })
     setDialogOpen(true)
   }
 
-  function openEditDialog(cardId: string) {
-    const card = cards.find((c) => c.id === cardId)
-    if (!card) return
-    setEditingCardId(cardId)
+  function openEdit(id: string) {
+    const c = cards.find((x) => x.id === id)
+    if (!c) return
+    setEditingId(id)
     setForm({
-      bank_id: card.bank_id ?? "",
+      bank_id: c.bank_id ?? "",
       custom_bank_name: "",
-      name: card.name,
-      type: card.type,
-      last_digits: card.last_digits ?? "",
-      credit_limit: card.credit_limit != null ? String(card.credit_limit) : "",
-      billing_day: card.billing_day != null ? String(card.billing_day) : "",
-      due_day: card.due_day != null ? String(card.due_day) : "",
+      name: c.name,
+      type: c.type,
+      last_digits: c.last_digits ?? "",
+      credit_limit: c.credit_limit != null ? String(c.credit_limit) : "",
+      billing_day: c.billing_day != null ? String(c.billing_day) : "",
+      due_day: c.due_day != null ? String(c.due_day) : "",
     })
     setDialogOpen(true)
   }
 
-  function closeDialog() {
-    setDialogOpen(false)
-    setEditingCardId(null)
-  }
-
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if ((!form.bank_id || isOtherBank && !form.custom_bank_name) || !form.name) return
-
+    if ((!form.bank_id || (isOtherBank && !form.custom_bank_name)) || !form.name) return
     const payload = {
       bank_id: isOtherBank ? undefined : form.bank_id,
       custom_bank_name: isOtherBank ? form.custom_bank_name : undefined,
@@ -74,190 +75,133 @@ export function Cards() {
       billing_day: form.billing_day ? Number(form.billing_day) : undefined,
       due_day: form.due_day ? Number(form.due_day) : undefined,
     }
-
-    if (editingCardId) {
-      updateCard(editingCardId, payload)
-    } else {
-      addCard(payload)
-    }
-
-    setForm({ ...EMPTY_FORM })
-    closeDialog()
+    try {
+      await toast.run(editingId ? "Salvando..." : "Criando cartão...", async () => {
+        if (editingId) await Promise.resolve(updateCard(editingId, payload))
+        else await Promise.resolve(addCard(payload))
+      }, editingId ? "Cartão atualizado" : "Cartão criado")
+      setForm({ ...EMPTY_FORM })
+      setDialogOpen(false)
+      setEditingId(null)
+    } catch {}
   }
 
+  async function handleDelete(id: string) {
+    if (!confirm("Excluir este cartão?")) return
+    try {
+      await toast.run("Excluindo cartão...", () => Promise.resolve(deleteCard(id)), "Cartão excluído")
+    } catch {}
+  }
+
+  const totalFatura = cards.reduce((acc, c) => acc + getCardExpensesByMonth(c.id, selectedMonth), 0)
+
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-extrabold font-headline tracking-tight">Cartoes</h2>
-          <p className="text-on-surface-variant text-sm mt-1">Gerencie seus cartoes de credito e debito</p>
+    <div className="content">
+      <div className="page-head">
+        <div><h1>Cartões</h1></div>
+        <div className="actions">
+          <button className="btn btn-primary" onClick={openCreate}>
+            <Icon name="add" className="text-[14px]" /> Novo cartão
+          </button>
         </div>
-        <button
-          onClick={openCreateDialog}
-          className="flex items-center gap-2 p-3 sm:px-6 sm:py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all atmos-shadow"
-        >
-          <Icon name="add_circle" className="text-lg" />
-          <span className="hidden sm:inline">Novo Cartao</span>
-        </button>
       </div>
 
-      {/* Total Card */}
-      {cards.length > 0 && (
-        <div className="glass-card ghost-border rounded-xl p-8 relative overflow-hidden group">
-          <div className="absolute -top-12 -right-12 w-32 h-32 bg-error/10 rounded-full blur-3xl group-hover:bg-error/20 transition-all duration-700 pointer-events-none" />
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2">
-              <p className="text-on-surface-variant font-label text-sm">Fatura Total dos Cartoes</p>
-              <button
-                onClick={toggleValuesVisible}
-                className="opacity-40 hover:opacity-100 transition-opacity"
-                title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
-              >
-                <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
+      <div className="panel" style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div className="hero-label" style={{ marginBottom: 6 }}>
+              Fatura total dos cartões
+              <button className="icon-btn" onClick={toggleValuesVisible} style={{ width: 28, height: 28 }}>
+                <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-[14px]" />
               </button>
             </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => {
-                  const [y, m] = selectedMonth.split("-").map(Number)
-                  const prev = new Date(y, m - 2, 1)
-                  setSelectedMonth(`${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`)
-                }}
-                className="p-1.5 rounded-lg hover:bg-surface-container-highest transition-colors"
-              >
-                <Icon name="chevron_left" className="text-lg text-on-surface-variant" />
-              </button>
-              <span className="text-sm font-medium text-on-surface min-w-[100px] text-center capitalize">
-                {new Date(Number(selectedMonth.split("-")[0]), Number(selectedMonth.split("-")[1]) - 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
-              </span>
-              <button
-                onClick={() => {
-                  const [y, m] = selectedMonth.split("-").map(Number)
-                  const next = new Date(y, m, 1)
-                  setSelectedMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`)
-                }}
-                className="p-1.5 rounded-lg hover:bg-surface-container-highest transition-colors"
-              >
-                <Icon name="chevron_right" className="text-lg text-on-surface-variant" />
-              </button>
+            <div className="hero-value" style={{ fontSize: 36, color: "var(--negative)" }}>
+              <MoneyValue value={totalFatura} />
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-3)", display: "flex", alignItems: "center", gap: 6 }}>
+              <Icon name="credit_card" className="text-[12px]" />
+              {cards.length} cartão(es) cadastrado(s)
             </div>
           </div>
-          <p className="font-headline font-bold text-4xl text-error"><MoneyValue value={cards.reduce((acc, c) => acc + getCardExpensesByMonth(c.id, selectedMonth), 0)} /></p>
-          <div className="flex items-center gap-6 mt-4 flex-wrap">
-            <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm">
-              <Icon name="credit_card" className="text-base" />
-              <span>{cards.length} cartao(es) cadastrado(s)</span>
-            </div>
-            {(() => {
-              const totalLimit = cards.reduce((acc, c) => acc + (c.credit_limit ?? 0), 0)
-              return totalLimit > 0 ? (
-                <div className="flex items-center gap-2 text-on-surface-variant font-medium text-sm">
-                  <Icon name="account_balance_wallet" className="text-base" />
-                  <span>Limite total: <MoneyValue value={totalLimit} /></span>
-                </div>
-              ) : null
-            })()}
+          <div className="month-nav">
+            <button onClick={() => {
+              const d = new Date(y, m - 2, 1)
+              setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+            }}>
+              <Icon name="chevron_left" className="text-[14px]" />
+            </button>
+            <span className="month-label">{fmtMonth(monthDate)}</span>
+            <button onClick={() => {
+              const d = new Date(y, m, 1)
+              setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+            }}>
+              <Icon name="chevron_right" className="text-[14px]" />
+            </button>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Empty State */}
       {cards.length === 0 ? (
-        <div className="bg-surface-container-low rounded-xl p-12 ghost-border flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 rounded-full bg-surface-container-highest flex items-center justify-center mb-4">
-            <Icon name="credit_card" className="text-3xl text-on-surface-variant" />
-          </div>
-          <p className="font-headline font-bold text-lg">Nenhum cartao cadastrado</p>
-          <p className="text-sm text-on-surface-variant mt-2">Adicione seu primeiro cartao para comecar</p>
-          <button
-            onClick={openCreateDialog}
-            className="mt-6 flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all"
-          >
-            <Icon name="add_circle" className="text-lg" />
-            Novo Cartao
+        <div className="panel empty">
+          <div className="empty-title">Nenhum cartão cadastrado</div>
+          <p>Adicione seu primeiro cartão para começar.</p>
+          <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={openCreate}>
+            <Icon name="add" className="text-[14px]" /> Novo cartão
           </button>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {cards.map((card) => {
-            const bank = banks.find((b) => b.id === card.bank_id)
-            const balance = getCardBalance(card.id)
-            const expenses = getCardExpensesByMonth(card.id, selectedMonth)
-
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
+          {cards.map((c) => {
+            const bank = banks.find((b) => b.id === c.bank_id)
+            const fatura = getCardExpensesByMonth(c.id, selectedMonth)
             return (
               <div
-                key={card.id}
-                onClick={() => navigate(`/transactions?card_id=${card.id}`)}
-                className="group relative bg-surface-container-high rounded-xl p-6 ghost-border hover:bg-surface-container-highest transition-all duration-300 min-h-[200px] flex flex-col justify-between cursor-pointer"
+                key={c.id}
+                className="card-row"
+                style={{ padding: 18, alignItems: "flex-start", display: "block" }}
+                onClick={() => navigate(`/transactions?card_id=${c.id}`)}
               >
-                <div className="absolute top-4 right-4 flex items-center gap-1">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openEditDialog(card.id) }}
-                    className="rounded-full p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-primary-container/20 text-on-surface-variant hover:text-primary"
-                  >
-                    <Icon name="edit" className="text-lg" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteCard(card.id) }}
-                    className="rounded-full p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-error-container/20 text-on-surface-variant hover:text-error"
-                  >
-                    <Icon name="delete" className="text-lg" />
-                  </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div className="bi lg" style={{ background: bank?.color ?? "var(--c-porto)" }}>
+                    {bank?.name?.slice(0, 2).toUpperCase() ?? "??"}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="card-name">{c.name}</div>
+                    <div className="card-sub">{bank?.name ?? "Banco custom"}{c.last_digits ? ` · **** ${c.last_digits}` : ""}</div>
+                  </div>
+                  <div className="row-actions">
+                    <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={(e) => { e.stopPropagation(); openEdit(c.id) }}>
+                      <Icon name="edit" className="text-[13px]" />
+                    </button>
+                    <button className="icon-btn" style={{ width: 28, height: 28, color: "var(--negative)" }} onClick={(e) => { e.stopPropagation(); handleDelete(c.id) }}>
+                      <Icon name="delete" className="text-[13px]" />
+                    </button>
+                  </div>
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-bold"
-                        style={{ backgroundColor: bank?.color ?? "#0066cc" }}
-                      >
-                        {bank?.name?.slice(0, 2).toUpperCase() ?? "??"}
-                      </div>
-                      <div>
-                        <p className="text-xs text-on-surface-variant font-label">{bank?.name ?? "Custom"}</p>
-                        <p className="font-bold">{card.name}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] bg-surface-container-highest rounded-full px-2.5 py-1 text-on-surface-variant font-label uppercase tracking-wider">
-                      {card.type === "CREDIT_CARD" ? "Credito" : "Conta Corrente"}
+                <div style={{ marginTop: 14, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <span className="badge credit">Crédito</span>
+                  {c.due_day && (
+                    <span className="badge member">
+                      <Icon name="event" className="text-[9px]" style={{ marginRight: 3 }} /> Vence dia {c.due_day}
                     </span>
-                    {card.type === "CREDIT_CARD" && card.billing_day && (
-                      <span className="text-[10px] bg-surface-container-highest rounded-full px-2.5 py-1 text-on-surface-variant font-label tracking-wider">
-                        Fechamento: dia {card.billing_day}
-                      </span>
-                    )}
-                    {card.type === "CREDIT_CARD" && card.due_day && (
-                      <span className="text-[10px] bg-surface-container-highest rounded-full px-2.5 py-1 text-on-surface-variant font-label tracking-wider">
-                        Vencimento: dia {card.due_day}
-                      </span>
-                    )}
-                  </div>
-
-                  {card.last_digits && (
-                    <p className="text-base font-bold mt-4 tracking-wider text-on-surface-variant">
-                      **** **** **** {card.last_digits}
-                    </p>
+                  )}
+                  {c.billing_day && (
+                    <span className="badge member">Fecha dia {c.billing_day}</span>
                   )}
                 </div>
-
-                <div className="flex items-center justify-between mt-4 pt-4">
+                <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
                   <div>
-                    <p className="text-[10px] uppercase text-on-surface-variant font-label tracking-wider">
-                      {card.type === "CREDIT_CARD" ? "Fatura" : "Saldo"}
-                    </p>
-                    <p className={`text-lg font-headline font-bold ${card.type === "CREDIT_CARD" ? "text-error" : balance >= 0 ? "text-primary" : "text-error"}`}>
-                      <MoneyValue value={card.type === "CREDIT_CARD" ? expenses : balance} />
-                    </p>
+                    <div style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Fatura</div>
+                    <div style={{ marginTop: 4, fontFamily: "var(--font-mono)", fontSize: 22, fontWeight: 500, color: "var(--negative)" }}>
+                      <MoneyValue value={fatura} />
+                    </div>
                   </div>
-                  {card.type === "CREDIT_CARD" && card.credit_limit && (
-                    <div className="text-right">
-                      <p className="text-[10px] uppercase text-on-surface-variant font-label tracking-wider">Limite</p>
-                      <p className="text-sm font-semibold"><MoneyValue value={card.credit_limit} /></p>
+                  {c.credit_limit && (
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Limite</div>
+                      <div className="num" style={{ marginTop: 4, fontSize: 13, color: "var(--text-2)" }}>
+                        <MoneyValue value={c.credit_limit} />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -267,124 +211,80 @@ export function Cards() {
         </div>
       )}
 
-      {/* Dialog */}
-      <Dialog open={dialogOpen} onClose={closeDialog} title={editingCardId ? "Editar Cartao" : "Adicionar Cartao"}>
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Banco</label>
-            <select
-              value={form.bank_id}
-              onChange={(e) => setForm({ ...form, bank_id: e.target.value, custom_bank_name: "" })}
-              className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
-              required
-            >
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={editingId ? "Editar cartão" : "Novo cartão"}>
+        <form onSubmit={handleSubmit}>
+          <div className="field">
+            <label className="label">Banco <span className="req">*</span></label>
+            <select className="select" value={form.bank_id} onChange={(e) => setForm({ ...form, bank_id: e.target.value, custom_bank_name: "" })} required>
               <option value="">Selecione o banco</option>
-              {banks.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
+              {banks.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               <option value="__other__">Outro</option>
             </select>
             {isOtherBank && (
-              <input
-                value={form.custom_bank_name}
-                onChange={(e) => setForm({ ...form, custom_bank_name: e.target.value })}
-                placeholder="Nome do banco"
-                className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50 mt-2"
-                required
-              />
+              <input className="input" style={{ marginTop: 8 }} placeholder="Nome do banco" value={form.custom_bank_name} onChange={(e) => setForm({ ...form, custom_bank_name: e.target.value })} required />
             )}
           </div>
 
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Nome do cartao</label>
-            <input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Ex: Nubank Credito"
-              className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-              required
-            />
+          <div className="field">
+            <label className="label">Nome do cartão <span className="req">*</span></label>
+            <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Nubank Crédito" required />
           </div>
 
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo</label>
-            <div className="grid grid-cols-2 gap-2">
+          <div className="field">
+            <label className="label">Tipo</label>
+            <div className="stepper-type">
               {(["CREDIT_CARD", "CHECKING_ACCOUNT"] as CardType[]).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setForm({ ...form, type: t })}
-                  className={`rounded-xl px-3 py-3 text-sm font-medium transition-all ${
-                    form.type === t
-                      ? "bg-primary-container/20 text-primary border border-primary/20 shadow-[0_0_15px_rgba(0,102,204,0.1)]"
-                      : "bg-surface-container-highest text-on-surface-variant hover:bg-surface-bright"
-                  }`}
+                  className={`type-card ${form.type === t ? "active" : ""}`}
                 >
-                  {t === "CREDIT_CARD" ? "Credito" : "Conta Corrente"}
+                  <div className="type-icon">
+                    <Icon name={t === "CREDIT_CARD" ? "credit_card" : "account_balance"} className="text-[16px]" />
+                  </div>
+                  <div>
+                    <div className="type-name">{t === "CREDIT_CARD" ? "Crédito" : "Conta Corrente"}</div>
+                  </div>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Ultimos 4 digitos (opcional)</label>
+          <div className="field">
+            <label className="label">Últimos 4 dígitos (opcional)</label>
             <input
+              className="input"
               value={form.last_digits}
               onChange={(e) => setForm({ ...form, last_digits: e.target.value.replace(/\D/g, "").slice(0, 4) })}
               placeholder="1234"
               maxLength={4}
-              className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
             />
           </div>
 
           {form.type === "CREDIT_CARD" && (
             <>
-              <div className="space-y-2">
-                <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Limite de credito</label>
-                <input
-                  value={form.credit_limit}
-                  onChange={(e) => setForm({ ...form, credit_limit: e.target.value })}
-                  placeholder="8000"
-                  type="number"
-                  step="0.01"
-                  className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-                />
+              <div className="field">
+                <label className="label">Limite de crédito</label>
+                <input className="input" type="number" step="0.01" value={form.credit_limit} onChange={(e) => setForm({ ...form, credit_limit: e.target.value })} placeholder="8000" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Dia do fechamento</label>
-                  <input
-                    value={form.billing_day}
-                    onChange={(e) => setForm({ ...form, billing_day: e.target.value })}
-                    placeholder="15"
-                    type="number"
-                    min="1"
-                    max="31"
-                    className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-                  />
+              <div className="field-row">
+                <div className="field">
+                  <label className="label">Dia fechamento</label>
+                  <input className="input" type="number" min={1} max={31} value={form.billing_day} onChange={(e) => setForm({ ...form, billing_day: e.target.value })} placeholder="15" />
                 </div>
-                <div className="space-y-2">
-                  <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">Dia do vencimento</label>
-                  <input
-                    value={form.due_day}
-                    onChange={(e) => setForm({ ...form, due_day: e.target.value })}
-                    placeholder="25"
-                    type="number"
-                    min="1"
-                    max="31"
-                    className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-                  />
+                <div className="field">
+                  <label className="label">Dia vencimento</label>
+                  <input className="input" type="number" min={1} max={31} value={form.due_day} onChange={(e) => setForm({ ...form, due_day: e.target.value })} placeholder="25" />
                 </div>
               </div>
             </>
           )}
 
-          <button
-            type="submit"
-            className="w-full py-4 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-headline font-bold text-sm active:scale-[0.98] transition-all shadow-[0_8px_32px_rgba(0,102,204,0.3)]"
-          >
-            {editingCardId ? "Salvar" : "Adicionar"}
-          </button>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setDialogOpen(false)}>Cancelar</button>
+            <button type="submit" className="btn btn-primary">{editingId ? "Salvar" : "Criar cartão"}</button>
+          </div>
         </form>
       </Dialog>
     </div>

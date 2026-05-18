@@ -36,6 +36,7 @@ export interface Transaction {
   type: TransactionType
   category_id: string | null
   date: string
+  transaction_date: string | null
   is_scheduled: boolean
   scheduled_date: string | null
   is_realized: boolean

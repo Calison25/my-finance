@@ -1,5 +1,4 @@
 import { create } from "zustand"
-import { persist } from "zustand/middleware"
 
 type Theme = "light" | "dark"
 
@@ -9,30 +8,43 @@ interface ThemeState {
   setTheme: (theme: Theme) => void
 }
 
-export const useThemeStore = create<ThemeState>()(
-  persist(
-    (set) => ({
-      theme: "dark",
-      toggleTheme: () =>
-        set((state) => {
-          const newTheme = state.theme === "light" ? "dark" : "light"
-          document.documentElement.classList.toggle("dark", newTheme === "dark")
-          return { theme: newTheme }
-        }),
-      setTheme: (theme) => {
-        document.documentElement.classList.toggle("dark", theme === "dark")
-        set({ theme })
-      },
+const STORAGE_KEY = "mf-theme"
+
+function applyTheme(theme: Theme) {
+  if (theme === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark")
+  } else {
+    document.documentElement.removeAttribute("data-theme")
+  }
+}
+
+function readInitial(): Theme {
+  try {
+    const t = localStorage.getItem(STORAGE_KEY)
+    if (t === "dark" || t === "light") return t
+  } catch {}
+  return "dark"
+}
+
+const initial: Theme = readInitial()
+applyTheme(initial)
+
+export const useThemeStore = create<ThemeState>((set) => ({
+  theme: initial,
+  toggleTheme: () =>
+    set((state) => {
+      const next: Theme = state.theme === "light" ? "dark" : "light"
+      try {
+        localStorage.setItem(STORAGE_KEY, next)
+      } catch {}
+      applyTheme(next)
+      return { theme: next }
     }),
-    {
-      name: "my-finance-theme",
-      onRehydrateStorage: () => (state) => {
-        if (state?.theme === "dark") {
-          document.documentElement.classList.add("dark")
-        } else {
-          document.documentElement.classList.remove("dark")
-        }
-      },
-    }
-  )
-)
+  setTheme: (theme) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, theme)
+    } catch {}
+    applyTheme(theme)
+    set({ theme })
+  },
+}))

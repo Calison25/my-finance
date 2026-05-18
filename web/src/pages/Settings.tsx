@@ -74,8 +74,12 @@ export function Settings() {
   }
 
   return (
-    <div className="space-y-8 max-w-2xl">
-      <h1 className="font-headline text-2xl font-bold">Configuracoes</h1>
+    <div className="content">
+      <div className="page-head">
+        <div>
+          <h1>Configurações</h1>
+        </div>
+      </div>
 
       {/* Profile Section */}
       <section className="glass-card ghost-border rounded-2xl p-6 space-y-4">

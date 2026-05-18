@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
 import { Icon } from "./Icon"
 
 interface DialogProps {
@@ -6,17 +6,13 @@ interface DialogProps {
   onClose: () => void
   title: string
   children: ReactNode
+  footer?: ReactNode
 }
 
-export function Dialog({ open, onClose, title, children }: DialogProps) {
-  const contentRef = useRef<HTMLDivElement>(null)
-
+export function Dialog({ open, onClose, title, children, footer }: DialogProps) {
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden"
-    } else {
-      document.body.style.overflow = ""
-    }
+    if (open) document.body.style.overflow = "hidden"
+    else document.body.style.overflow = ""
     return () => {
       document.body.style.overflow = ""
     }
@@ -33,22 +29,16 @@ export function Dialog({ open, onClose, title, children }: DialogProps) {
   if (!open) return null
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div
-        ref={contentRef}
-        className="dialog-content"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-bold font-headline text-on-surface">{title}</h3>
-          <button
-            onClick={onClose}
-            className="rounded-full p-1.5 hover:bg-surface-container-highest transition-colors text-on-surface-variant"
-          >
-            <Icon name="close" className="text-xl" />
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div className="modal-title">{title}</div>
+          <button className="icon-btn" onClick={onClose} title="Fechar">
+            <Icon name="close" className="text-[16px]" />
           </button>
         </div>
-        {children}
+        <div className="modal-body">{children}</div>
+        {footer && <div className="modal-foot">{footer}</div>}
       </div>
     </div>
   )

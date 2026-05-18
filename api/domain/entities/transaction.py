@@ -15,6 +15,7 @@ class Transaction(BaseModel):
     type: TransactionType
     category_id: UUID | None = None
     date: date
+    transaction_date: date | None = None
     is_scheduled: bool = False
     scheduled_date: date | None = None
     is_realized: bool = False

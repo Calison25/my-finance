@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Sidebar } from "@/components/layout/Sidebar"
 import { Header } from "@/components/layout/Header"
 import { MobileNav } from "@/components/layout/MobileNav"
+import { ToastHost } from "@/components/ui/Toast"
 import { Dashboard } from "@/pages/Dashboard"
 import { Accounts } from "@/pages/Accounts"
 import { Cards } from "@/pages/Cards"
@@ -27,19 +28,19 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-surface text-on-surface font-body flex items-center justify-center">
-        <p className="text-muted text-lg">Carregando...</p>
+      <div className="app" style={{ alignItems: "center", justifyContent: "center" }}>
+        <p style={{ color: "var(--text-3)", fontSize: 14 }}>Carregando...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-dvh bg-surface text-on-surface font-body">
-      <Header />
+    <div className="app">
       <Sidebar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pb-32 pt-4 md:ml-24">
+      <div className="app-main">
+        <Header />
         {children}
-      </main>
+      </div>
       <MobileNav />
     </div>
   )
@@ -71,6 +72,7 @@ function App() {
             <Route path="/reports" element={<ProtectedRoute><AppLayout><Reports /></AppLayout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><AppLayout><Settings /></AppLayout></ProtectedRoute>} />
           </Routes>
+          <ToastHost />
         </AuthInitializer>
       </BrowserRouter>
     </QueryClientProvider>

@@ -1,35 +1,39 @@
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { useSearchParams } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
-import { FinancialSummaryCards } from "@/components/ui/FinancialSummaryCards"
+import { toast } from "@/components/ui/Toast"
 import type { TransactionType } from "@/types"
+
+const CATEGORY_ICONS: Record<string, string> = {
+  Alimentação: "restaurant",
+  Transporte: "directions_car",
+  Moradia: "home",
+  Saúde: "health_and_safety",
+  Educação: "school",
+  Lazer: "movie",
+  Compras: "shopping_bag",
+  Serviços: "build",
+  Investimentos: "trending_up",
+  Outros: "receipt_long",
+}
 
 function formatCentsToBRL(cents: number): string {
   if (cents === 0) return ""
   const reais = Math.floor(cents / 100)
-  const centavos = cents % 100
-  const reaisStr = reais.toLocaleString("pt-BR")
-  return `${reaisStr},${String(centavos).padStart(2, "0")}`
+  const cv = cents % 100
+  return `${reais.toLocaleString("pt-BR")},${String(cv).padStart(2, "0")}`
 }
 
-function parseBRLToCents(formatted: string): number {
-  const digits = formatted.replace(/\D/g, "")
-  return digits ? parseInt(digits, 10) : 0
+function parseBRLToNumber(s: string): number {
+  const d = s.replace(/\D/g, "")
+  return d ? parseInt(d, 10) / 100 : 0
 }
 
-function parseBRLToNumber(formatted: string): number {
-  return parseBRLToCents(formatted) / 100
-}
-
-function getDefaultDateForMonth(monthStr: string): string {
-  const today = new Date()
-  const [y, m] = monthStr.split("-").map(Number)
-  const lastDay = new Date(y, m, 0).getDate()
-  const day = Math.min(today.getDate(), lastDay)
-  return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+function fmtMonth(d: Date) {
+  return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
 }
 
 function formatDayHeader(dateStr: string): string {
@@ -39,1197 +43,948 @@ function formatDayHeader(dateStr: string): string {
   const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`
   const d = new Date(dateStr + "T12:00:00")
   const dayMonth = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })
-  const weekday = d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")
   if (dateStr === todayStr) return `Hoje · ${dayMonth}`
   if (dateStr === yesterdayStr) return `Ontem · ${dayMonth}`
-  return `${dayMonth} · ${weekday}`
+  return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "long" }).replace(".", "")
 }
 
-const CATEGORY_ICONS: Record<string, string> = {
-  "Alimentacao": "restaurant",
-  "Transporte": "directions_car",
-  "Moradia": "home",
-  "Saude": "health_and_safety",
-  "Educacao": "school",
-  "Lazer": "movie",
-  "Compras": "shopping_bag",
-  "Servicos": "build",
-  "Investimentos": "trending_up",
-  "Outros": "receipt_long",
+function defaultCompetenceMonth(): string {
+  const next = new Date()
+  next.setMonth(next.getMonth() + 1)
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
 }
+
+function competenceDateFor(monthStr: string): string {
+  return `${monthStr}-01`
+}
+
+type SrcKind = "all" | "account" | "card"
 
 export function Transactions() {
-  const { transactions, cards, categories, banks, addTransaction, updateTransaction, deleteTransaction, deleteTransactionGroup, realizeTransaction, getCardBalance, valuesVisible, toggleValuesVisible } = useFinanceStore()
-  const [deletePrompt, setDeletePrompt] = useState<{ id: string; kind: "recurring" | "installment" } | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingTx, setEditingTx] = useState<string | null>(null)
-  const [editCascade, setEditCascade] = useState(false)
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const {
+    transactions,
+    cards,
+    categories,
+    banks,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+    deleteTransactionGroup,
+    realizeTransaction,
+  } = useFinanceStore()
+
   const [searchParams, setSearchParams] = useSearchParams()
   const filterCardId = searchParams.get("card_id") ?? ""
-  const filterCategoryId = searchParams.get("category_id") ?? ""
-  const defaultMonth = (() => {
-    const next = new Date()
-    next.setMonth(next.getMonth() + 1)
-    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
-  })()
+  const defaultMonth = defaultCompetenceMonth()
   const selectedMonth = searchParams.get("month") ?? defaultMonth
-  const updateParams = useCallback((updates: Record<string, string | null>) => {
-    const params = new URLSearchParams(searchParams)
-    for (const [k, v] of Object.entries(updates)) {
-      if (v) params.set(k, v)
-      else params.delete(k)
-    }
-    setSearchParams(params)
-  }, [searchParams, setSearchParams])
-  const setFilterCardId = (id: string) => updateParams({ card_id: id || null })
-  const setFilterCategoryId = (id: string) => updateParams({ category_id: id || null })
+  const updateParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      const params = new URLSearchParams(searchParams)
+      for (const [k, v] of Object.entries(updates)) {
+        if (v) params.set(k, v)
+        else params.delete(k)
+      }
+      setSearchParams(params)
+    },
+    [searchParams, setSearchParams],
+  )
   const setSelectedMonth = (m: string) => updateParams({ month: m })
-  const [expandedSection, setExpandedSection] = useState<"recurring" | "scheduled" | "installments" | null>(null)
+  const setFilterCardId = (id: string) => updateParams({ card_id: id || null })
+
   const [filterType, setFilterType] = useState<"ALL" | "EXPENSE" | "INCOME">("ALL")
-  const [categorySuggested, setCategorySuggested] = useState(false)
-  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({})
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [form, setForm] = useState({
-    card_id: "",
-    description: "",
-    amount: "",
-    type: "EXPENSE" as TransactionType,
-    category_id: "",
-    custom_category_name: "",
-    date: getDefaultDateForMonth(selectedMonth),
-    is_scheduled: false,
-    scheduled_date: "",
-    notes: "",
-    is_installment: false,
-    installments: "",
-    is_recurring: false,
-    is_bill: false,
-  })
+  const [srcKind, setSrcKind] = useState<SrcKind>("all")
+  const [filterCategoryIds, setFilterCategoryIds] = useState<Set<string>>(new Set())
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchText, setSearchText] = useState("")
+  const searchRef = useRef<HTMLInputElement>(null)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const filtersRef = useRef<HTMLDivElement>(null)
+
+  // Modal state
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [modalKey, setModalKey] = useState(0) // remount on each open
+  const [deletePrompt, setDeletePrompt] = useState<{ id: string; kind: "recurring" | "installment" } | null>(null)
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false)
+    function onClick(e: MouseEvent) {
+      if (filtersOpen && filtersRef.current && !filtersRef.current.contains(e.target as Node)) {
+        setFiltersOpen(false)
       }
     }
-    if (dropdownOpen) document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [dropdownOpen])
+    document.addEventListener("mousedown", onClick)
+    return () => document.removeEventListener("mousedown", onClick)
+  }, [filtersOpen])
 
-  const isOtherCategory = form.category_id === "__other__"
+  useEffect(() => {
+    if (searchOpen) searchRef.current?.focus()
+  }, [searchOpen])
 
-  const suggestCategoryFromDescription = useCallback((description: string) => {
-    if (!description.trim()) {
-      setCategorySuggested(false)
-      return
+  const [y, m] = selectedMonth.split("-").map(Number)
+  const monthDate = new Date(y, m - 1, 1)
+  function changeMonth(delta: number) {
+    const d = new Date(y, m - 1 + delta, 1)
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+  }
+
+  function categoryOf(id: string | null) {
+    if (!id) return null
+    return categories.find((c) => c.id === id) ?? null
+  }
+  function cardOf(id: string) {
+    return cards.find((c) => c.id === id) ?? null
+  }
+  function bankOfCard(cardId: string) {
+    const card = cardOf(cardId)
+    return card ? (banks.find((b) => b.id === card.bank_id) ?? null) : null
+  }
+  function categoryIcon(catId: string | null) {
+    const c = categoryOf(catId)
+    if (!c) return "receipt_long"
+    return CATEGORY_ICONS[c.name] ?? c.icon ?? "receipt_long"
+  }
+
+  const filtered = useMemo(() => {
+    const needle = searchText.trim().toLowerCase()
+    return transactions
+      .filter((t) => t.date.startsWith(selectedMonth))
+      .filter((t) => filterType === "ALL" || t.type === filterType)
+      .filter((t) => {
+        if (srcKind === "all") return true
+        const c = cardOf(t.card_id)
+        if (!c) return true
+        return srcKind === "card" ? c.type === "CREDIT_CARD" : c.type === "CHECKING_ACCOUNT"
+      })
+      .filter((t) => !filterCardId || t.card_id === filterCardId)
+      .filter((t) => filterCategoryIds.size === 0 || (t.category_id && filterCategoryIds.has(t.category_id)))
+      .filter((t) => !needle || t.description.toLowerCase().includes(needle))
+  }, [transactions, selectedMonth, filterType, srcKind, filterCardId, filterCategoryIds, searchText, cards])
+
+  const sorted = useMemo(() => [...filtered].sort((a, b) => b.date.localeCompare(a.date)), [filtered])
+
+  const summary = useMemo(() => {
+    const sum = (arr: typeof filtered) => arr.reduce((s, t) => s + Number(t.amount), 0)
+    const isEffectivelyRealized = (t: typeof filtered[number]) => {
+      if (t.is_scheduled && !t.is_realized) return false
+      return t.is_realized || t.is_recurring || t.classification === "installment"
     }
-    const needle = description.trim().toLowerCase()
-    const match = transactions.find(
-      (t) => t.category_id && t.description.toLowerCase().includes(needle),
-    )
-    if (!match) {
-      const reverseMatch = transactions.find(
-        (t) => t.category_id && needle.includes(t.description.toLowerCase()),
-      )
-      if (reverseMatch?.category_id) {
-        setForm((prev) => ({ ...prev, category_id: reverseMatch.category_id! }))
-        setCategorySuggested(true)
-        return
-      }
-      setCategorySuggested(false)
-      return
+    const receita = sum(filtered.filter((t) => t.type === "INCOME"))
+    const despesasRealizadas = sum(filtered.filter((t) => t.type === "EXPENSE" && isEffectivelyRealized(t)))
+    const despesasPrevistas = sum(filtered.filter((t) => t.type === "EXPENSE" && t.is_scheduled && !t.is_realized))
+    const despesasTotal = despesasRealizadas + despesasPrevistas
+    const saldoAtual = receita - despesasRealizadas
+    const saldoProjetado = receita - despesasTotal
+
+    const recurring = filtered.filter((t) => t.classification === "recurring")
+    const recurringIncome = sum(recurring.filter((t) => t.type === "INCOME"))
+    const recurringExpense = sum(recurring.filter((t) => t.type === "EXPENSE"))
+    const installments = filtered.filter((t) => t.classification === "installment")
+    const installmentTotal = sum(installments.filter((t) => t.type === "INCOME")) - sum(installments.filter((t) => t.type === "EXPENSE"))
+    const scheduled = filtered.filter((t) => t.classification === "scheduled")
+    const scheduledTotal = sum(scheduled.filter((t) => t.type === "INCOME")) - sum(scheduled.filter((t) => t.type === "EXPENSE"))
+
+    return {
+      receita,
+      despesasTotal,
+      despesasPrevistas,
+      saldoAtual,
+      saldoProjetado,
+      recurringCount: recurring.length,
+      recurringIncome,
+      recurringExpense,
+      recurringNet: recurringIncome - recurringExpense,
+      installmentCount: installments.length,
+      installmentTotal,
+      scheduledCount: scheduled.length,
+      scheduledTotal,
     }
-    setForm((prev) => ({ ...prev, category_id: match.category_id! }))
-    setCategorySuggested(true)
-  }, [transactions])
+  }, [filtered])
 
-  function getBaseDescription(desc: string) {
-    return desc.replace(/\s\(\d+\/\d+\)$/, "")
-  }
-
-  function openEdit(tx: typeof transactions[0]) {
-    setEditingTx(tx.id)
-    setEditCascade(false)
-    setForm({
-      card_id: tx.card_id,
-      description: getBaseDescription(tx.description),
-      amount: formatCentsToBRL(Math.round(tx.amount * 100)),
-      type: tx.type,
-      category_id: tx.category_id ?? "",
-      custom_category_name: "",
-      date: tx.date,
-      is_scheduled: tx.is_scheduled,
-      scheduled_date: tx.scheduled_date ?? "",
-      notes: tx.notes ?? "",
-      is_installment: false,
-      installments: "",
-      is_recurring: tx.is_recurring,
-      is_bill: tx.is_bill,
-    })
-    setDialogOpen(true)
-  }
-
-  function closeDialog() {
-    setDialogOpen(false)
-    setDropdownOpen(false)
-    setEditingTx(null)
-    setEditCascade(false)
-    setCategorySuggested(false)
-    setValidationErrors({})
-  }
-
-  const defaultForm = {
-    card_id: "",
-    description: "",
-    amount: "",
-    type: "EXPENSE" as TransactionType,
-    category_id: "",
-    custom_category_name: "",
-    date: getDefaultDateForMonth(selectedMonth),
-    is_scheduled: false,
-    scheduled_date: "",
-    notes: "",
-    is_installment: false,
-    installments: "",
-    is_recurring: false,
-    is_bill: false,
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (isSubmitting) return
-    const amountNum = parseBRLToNumber(form.amount)
-    const errors: Record<string, boolean> = {}
-    if (!amountNum) errors.amount = true
-    if (!form.description) errors.description = true
-    if (!form.card_id) errors.card_id = true
-    if (!form.category_id) errors.category = true
-    if (isOtherCategory && !form.custom_category_name) errors.custom_category_name = true
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors)
-      return
+  const grouped = useMemo(() => {
+    const acc: Record<string, typeof sorted> = {}
+    for (const tx of sorted) {
+      if (!acc[tx.date]) acc[tx.date] = []
+      acc[tx.date].push(tx)
     }
-    setValidationErrors({})
-    setIsSubmitting(true)
-
-    try {
-      if (editingTx) {
-        await updateTransaction(editingTx, {
-          description: form.description,
-          amount: amountNum,
-          type: form.type,
-          category_id: isOtherCategory ? null : (form.category_id || null),
-          custom_category_name: isOtherCategory ? form.custom_category_name : undefined,
-          notes: form.notes || null,
-          is_recurring: form.is_recurring,
-        }, editCascade)
-      } else {
-        await addTransaction({
-          card_id: form.card_id,
-          description: form.description,
-          amount: amountNum,
-          type: form.type,
-          category_id: isOtherCategory ? undefined : (form.category_id || undefined),
-          custom_category_name: isOtherCategory ? form.custom_category_name : undefined,
-          date: form.date,
-          is_scheduled: form.is_scheduled,
-          scheduled_date: form.is_scheduled ? form.scheduled_date : undefined,
-          notes: form.notes || undefined,
-          installments: form.is_installment && form.installments ? Number(form.installments) : undefined,
-          is_recurring: form.is_recurring || undefined,
-          is_bill: form.is_bill || undefined,
-        })
-      }
-
-      setForm(defaultForm)
-      closeDialog()
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  function getCardName(cardId: string) {
-    const card = cards.find((c) => c.id === cardId)
-    if (!card) return "--"
-    const bank = banks.find((b) => b.id === card.bank_id)
-    return `${bank?.name ?? ""} ${card.name}`
-  }
-
-  function getCategoryInfo(catId: string | null) {
-    if (!catId) return { icon: "receipt_long", name: "Sem categoria" }
-    const cat = categories.find((c) => c.id === catId)
-    if (!cat) return { icon: "receipt_long", name: "--" }
-    const iconName = CATEGORY_ICONS[cat.name] ?? "receipt_long"
-    return { icon: iconName, name: cat.name }
-  }
-
-  const filtered = transactions
-    .filter((t) => !filterCardId || t.card_id === filterCardId)
-    .filter((t) => !filterCategoryId || t.category_id === filterCategoryId)
-    .filter((t) => t.date.startsWith(selectedMonth))
-    .filter((t) => filterType === "ALL" || t.type === filterType)
-
-  const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date))
-
-  const grouped = sorted.reduce<Record<string, typeof sorted>>((acc, tx) => {
-    if (!acc[tx.date]) acc[tx.date] = []
-    acc[tx.date].push(tx)
     return acc
-  }, {})
+  }, [sorted])
 
   const todayKey = (() => {
     const t = new Date()
     return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`
   })()
-  const [openDayOverride, setOpenDayOverride] = useState<Record<string, boolean>>({})
+  const [openDay, setOpenDay] = useState<Record<string, boolean>>({})
   function isDayOpen(date: string) {
-    if (date in openDayOverride) return openDayOverride[date]
+    if (searchText.trim()) return true // auto-expand when searching
+    if (date in openDay) return openDay[date]
     return date === todayKey
   }
   function toggleDay(date: string) {
-    setOpenDayOverride((s) => ({ ...s, [date]: !isDayOpen(date) }))
+    setOpenDay((s) => ({ ...s, [date]: !isDayOpen(date) }))
   }
 
-  const sumAmount = (arr: typeof sorted) => arr.reduce((acc, t) => acc + Number(t.amount), 0)
-  const isEffectivelyRealized = (t: typeof sorted[0]) => {
-    if (t.is_scheduled && !t.is_realized) return false
-    return t.is_realized || t.is_recurring || t.classification === "installment"
+  const activeFilterCount =
+    (filterType !== "ALL" ? 1 : 0) +
+    (srcKind !== "all" ? 1 : 0) +
+    (filterCardId ? 1 : 0) +
+    filterCategoryIds.size
+
+  function clearAllFilters() {
+    setFilterType("ALL")
+    setSrcKind("all")
+    setFilterCardId("")
+    setFilterCategoryIds(new Set())
   }
 
-  const recurringTxs = filtered.filter((t) => t.classification === "recurring")
-  const recurringIncomeTxs = recurringTxs.filter((t) => t.type === "INCOME")
-  const recurringExpenseTxs = recurringTxs.filter((t) => t.type === "EXPENSE")
-  const installmentTxs = filtered.filter((t) => t.classification === "installment")
-  const installmentExpenseTxs = installmentTxs.filter((t) => t.type === "EXPENSE")
-  const scheduledTxs = filtered.filter((t) => t.classification === "scheduled")
-
-  const recurringIncomeTotal = sumAmount(recurringIncomeTxs)
-  const recurringExpenseTotal = sumAmount(recurringExpenseTxs)
-  const recurringTotal = recurringIncomeTotal - recurringExpenseTotal
-  const installmentIncomeTotal = sumAmount(installmentTxs.filter((t) => t.type === "INCOME"))
-  const installmentExpenseTotal = sumAmount(installmentExpenseTxs)
-  const installmentTotal = installmentIncomeTotal - installmentExpenseTotal
-  const scheduledIncomeTotal = sumAmount(scheduledTxs.filter((t) => t.type === "INCOME"))
-  const scheduledExpenseTotal = sumAmount(scheduledTxs.filter((t) => t.type === "EXPENSE"))
-  const scheduledTotal = scheduledIncomeTotal - scheduledExpenseTotal
-
-  const totalIncome = sumAmount(filtered.filter((t) => t.type === "INCOME"))
-  const realizedExpenses = sumAmount(filtered.filter((t) => t.type === "EXPENSE" && isEffectivelyRealized(t)))
-  const scheduledExpenses = sumAmount(filtered.filter((t) => t.type === "EXPENSE" && t.is_scheduled && !t.is_realized))
-  const totalExpenses = realizedExpenses + scheduledExpenses
-  const financialSummary = {
-    total_income: totalIncome,
-    realized_expenses: realizedExpenses,
-    scheduled_expenses: scheduledExpenses,
-    total_expenses: totalExpenses,
-    current_balance: totalIncome - realizedExpenses,
-    projected_balance: totalIncome - totalExpenses,
+  function toggleCategoryFilter(id: string) {
+    setFilterCategoryIds((s) => {
+      const next = new Set(s)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
-  const filterCard = filterCardId ? cards.find((c) => c.id === filterCardId) : null
-  const isCreditCardFilter = filterCard?.type === "CREDIT_CARD"
-  const cardHeaderExpenses = sumAmount(filtered.filter((t) => t.type === "EXPENSE"))
-
-  const monthLabel = new Date(selectedMonth + "-15").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
-
-  function changeMonth(delta: number) {
-    const [y, m] = selectedMonth.split("-").map(Number)
-    const d = new Date(y, m - 1 + delta, 1)
-    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+  function openCreate() {
+    setEditingId(null)
+    setModalKey((k) => k + 1)
+    setDialogOpen(true)
+  }
+  function openEdit(id: string) {
+    setEditingId(id)
+    setModalKey((k) => k + 1)
+    setDialogOpen(true)
   }
 
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-3xl font-extrabold font-headline tracking-tight">
-              {filterCard ? getCardName(filterCard.id) : "Transacoes"}
-            </h2>
-            <button
-              onClick={toggleValuesVisible}
-              className="opacity-40 hover:opacity-100 transition-opacity"
-              title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
-            >
-              <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
-            </button>
-          </div>
-          {filterCard ? (
-            <p className="text-on-surface-variant text-sm mt-1 flex items-center gap-2">
-              <span>{isCreditCardFilter ? "Fatura:" : "Saldo:"}</span>
-              <span className={`font-bold ${isCreditCardFilter ? "text-error" : getCardBalance(filterCard.id) >= 0 ? "text-primary" : "text-error"}`}>
-                <MoneyValue value={isCreditCardFilter ? cardHeaderExpenses : getCardBalance(filterCard.id)} />
-              </span>
-              {isCreditCardFilter && filterCard.credit_limit && (
-                <>
-                  <span className="text-on-surface-variant/50">|</span>
-                  <span>Limite: <MoneyValue value={filterCard.credit_limit} /></span>
-                </>
-              )}
-            </p>
-          ) : (
-            <p className="text-on-surface-variant text-sm mt-1">Gerencie seus gastos e receitas</p>
-          )}
-        </div>
-        <button
-          onClick={() => { setEditingTx(null); setForm(defaultForm); setDialogOpen(true) }}
-          className="flex items-center gap-2 p-3 sm:px-6 sm:py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all atmos-shadow"
-        >
-          <Icon name="add_circle" className="text-lg" />
-          <span className="hidden sm:inline">Nova Transacao</span>
-        </button>
-      </div>
-
-      {/* Filters */}
-      <section className="bg-surface-container-low rounded-xl p-4 ghost-border space-y-3">
-        {/* Account filters */}
-        {cards.length > 0 && (
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-1">
-            <button
-              onClick={() => setFilterCardId("")}
-              className={`px-3 py-1.5 rounded-full font-medium text-xs whitespace-nowrap transition-colors ${
-                !filterCardId
-                  ? "bg-primary-container text-on-primary-container"
-                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-              }`}
-            >
-              Todas
-            </button>
-            {cards.map((c) => {
-              const bank = banks.find((b) => b.id === c.bank_id)
-              const initials = (bank?.name ?? "--").slice(0, 2).toUpperCase()
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setFilterCardId(c.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${
-                    filterCardId === c.id
-                      ? "bg-primary-container text-on-primary-container"
-                      : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-                  }`}
-                >
-                  <span
-                    className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white shrink-0"
-                    style={{ backgroundColor: bank?.color ?? "#666" }}
-                  >
-                    {initials}
-                  </span>
-                  {c.name}
-                  <Icon name={c.type === "CREDIT_CARD" ? "credit_card" : "account_balance"} className="text-[14px] opacity-60" />
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Category filters */}
-        {categories.length > 0 && (
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-1">
-            <button
-              onClick={() => setFilterCategoryId("")}
-              className={`px-3 py-1.5 rounded-full font-medium text-xs whitespace-nowrap transition-colors ${
-                !filterCategoryId
-                  ? "bg-primary-container text-on-primary-container"
-                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-              }`}
-            >
-              Todas categorias
-            </button>
-            {categories.map((c) => {
-              const iconName = CATEGORY_ICONS[c.name] ?? "receipt_long"
-              const active = filterCategoryId === c.id
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setFilterCategoryId(c.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${
-                    active
-                      ? "bg-primary-container text-on-primary-container"
-                      : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-                  }`}
-                >
-                  <Icon name={iconName} className="text-[14px]" />
-                  {c.name}
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* Month Picker + Type Filter */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <button onClick={() => changeMonth(-1)} className="justify-self-start p-2 rounded-xl hover:bg-surface-container-high transition-colors">
-          <Icon name="chevron_left" className="text-on-surface-variant" />
-        </button>
-        <h3 className="font-headline font-bold text-lg text-on-surface capitalize">{monthLabel}</h3>
-        <button onClick={() => changeMonth(1)} className="justify-self-end p-2 rounded-xl hover:bg-surface-container-high transition-colors">
-          <Icon name="chevron_right" className="text-on-surface-variant" />
-        </button>
-      </div>
-
-      <div className="flex justify-center">
-        <div className="flex gap-1 bg-surface-container-high rounded-full p-0.5">
-          {([
-            { value: "ALL", label: "Todas", icon: "swap_horiz" },
-            { value: "EXPENSE", label: "Despesas", icon: "trending_down" },
-            { value: "INCOME", label: "Receitas", icon: "trending_up" },
-          ] as const).map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setFilterType(opt.value)}
-              className={`flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold transition-all ${
-                filterType === opt.value
-                  ? opt.value === "EXPENSE" ? "bg-error text-white" : opt.value === "INCOME" ? "bg-income text-white" : "bg-primary text-on-primary"
-                  : "text-on-surface-variant hover:bg-surface-container-highest"
-              }`}
-            >
-              <Icon name={opt.icon} className="text-[12px]" />
-              {opt.label}
-            </button>
-          ))}
+    <div className="content">
+      <div className="page-head">
+        <div><h1>Transações</h1></div>
+        <div className="actions">
+          <button className="btn btn-primary" onClick={openCreate}>
+            <Icon name="add" className="text-[14px]" /> Nova transação
+          </button>
         </div>
       </div>
 
-      {/* Insights */}
-      {sorted.length > 0 && (
-        <section className="space-y-3">
-          {/* Resumo Financeiro */}
-          <FinancialSummaryCards summary={financialSummary} />
-
-          {/* Recurring + Installments + Scheduled */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <button
-              onClick={() => setExpandedSection(expandedSection === "recurring" ? null : "recurring")}
-              className={`p-4 rounded-2xl ghost-border text-left transition-colors ${expandedSection === "recurring" ? "bg-primary-container/10" : "bg-surface-container-low"}`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Icon name="repeat" className="text-base text-primary" />
-                <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">Recorrentes</span>
-                <span className="text-xs text-on-surface-variant ml-auto">{recurringTxs.length}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <p className={`text-lg font-headline font-bold ${recurringTotal >= 0 ? "text-income" : "text-error"}`}>
-                  <MoneyValue value={recurringTotal} />
-                </p>
-                <div className="flex items-center gap-3">
-                  {recurringIncomeTotal > 0 && (
-                    <span className="text-[11px] text-income font-medium whitespace-nowrap">+<MoneyValue value={recurringIncomeTotal} /></span>
-                  )}
-                  {recurringExpenseTotal > 0 && (
-                    <span className="text-[11px] text-error font-medium whitespace-nowrap">-<MoneyValue value={recurringExpenseTotal} /></span>
-                  )}
-                </div>
-              </div>
-            </button>
-            <button
-              onClick={() => setExpandedSection(expandedSection === "installments" ? null : "installments")}
-              className={`p-4 rounded-2xl ghost-border text-left transition-colors ${expandedSection === "installments" ? "bg-secondary-container/10" : "bg-surface-container-low"}`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Icon name="payments" className="text-base text-secondary" />
-                <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">Parcelados</span>
-                <span className="text-xs text-on-surface-variant ml-auto">{installmentTxs.length}</span>
-              </div>
-              <p className={`text-lg font-headline font-bold ${installmentTotal >= 0 ? "text-income" : "text-error"}`}>
-                <MoneyValue value={installmentTotal} />
-              </p>
-            </button>
-            <button
-              onClick={() => setExpandedSection(expandedSection === "scheduled" ? null : "scheduled")}
-              className={`p-4 rounded-2xl ghost-border text-left transition-colors ${expandedSection === "scheduled" ? "bg-tertiary-container/10" : "bg-surface-container-low"}`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Icon name="schedule" className="text-base text-tertiary" />
-                <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wider">Agendados</span>
-                <span className="text-xs text-on-surface-variant ml-auto">{scheduledTxs.length}</span>
-              </div>
-              <p className={`text-lg font-headline font-bold ${scheduledTotal >= 0 ? "text-income" : "text-error"}`}>
-                <MoneyValue value={scheduledTotal} />
-              </p>
-            </button>
-          </div>
-
-          {/* Expanded: Recurring list */}
-          {expandedSection === "recurring" && recurringTxs.length > 0 && (
-            <div className="space-y-3">
-              {recurringIncomeTxs.length > 0 && (
-                <div className="bg-surface-container-low rounded-2xl ghost-border overflow-hidden">
-                  <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 bg-income/5 border-b border-outline-variant/10">
-                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                      <Icon name="trending_up" className="text-sm text-income shrink-0" />
-                      <span className="text-[10px] sm:text-xs font-bold text-income uppercase tracking-wider truncate">Receitas recorrentes</span>
-                    </div>
-                    <span className="text-[10px] sm:text-xs font-bold text-income whitespace-nowrap ml-2">+<MoneyValue value={recurringIncomeTotal} /></span>
-                  </div>
-                  {recurringIncomeTxs.map((tx) => {
-                    const cat = getCategoryInfo(tx.category_id)
-                    return (
-                      <div key={tx.id} className="flex items-center justify-between px-3 sm:px-4 py-2.5 border-b border-outline-variant/10 last:border-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Icon name={cat.icon} className="text-sm text-income shrink-0" />
-                          <span className="text-sm text-on-surface truncate">{tx.description}</span>
-                        </div>
-                        <span className="text-sm font-bold text-income whitespace-nowrap ml-2">+<MoneyValue value={tx.amount} /></span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-              {recurringExpenseTxs.length > 0 && (
-                <div className="bg-surface-container-low rounded-2xl ghost-border overflow-hidden">
-                  <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 bg-error/5 border-b border-outline-variant/10">
-                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                      <Icon name="trending_down" className="text-sm text-error shrink-0" />
-                      <span className="text-[10px] sm:text-xs font-bold text-error uppercase tracking-wider truncate">Despesas recorrentes</span>
-                    </div>
-                    <span className="text-[10px] sm:text-xs font-bold text-error whitespace-nowrap ml-2">-<MoneyValue value={recurringExpenseTotal} /></span>
-                  </div>
-                  {recurringExpenseTxs.map((tx) => {
-                    const cat = getCategoryInfo(tx.category_id)
-                    return (
-                      <div key={tx.id} className="flex items-center justify-between px-3 sm:px-4 py-2.5 border-b border-outline-variant/10 last:border-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Icon name={cat.icon} className="text-sm text-error shrink-0" />
-                          <span className="text-sm text-on-surface truncate">{tx.description}</span>
-                        </div>
-                        <span className="text-sm font-bold text-error whitespace-nowrap ml-2">-<MoneyValue value={tx.amount} /></span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Expanded: Installments list */}
-          {expandedSection === "installments" && installmentTxs.length > 0 && (
-            <div className="bg-surface-container-low rounded-2xl ghost-border overflow-hidden">
-              <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 bg-secondary/5 border-b border-outline-variant/10">
-                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                  <Icon name="payments" className="text-sm text-secondary shrink-0" />
-                  <span className="text-[10px] sm:text-xs font-bold text-secondary uppercase tracking-wider truncate">Parcelados do mes</span>
-                </div>
-                <span className="text-[10px] sm:text-xs font-bold text-error whitespace-nowrap ml-2">-<MoneyValue value={installmentExpenseTotal} /></span>
-              </div>
-              {installmentTxs.map((tx) => {
-                const cat = getCategoryInfo(tx.category_id)
-                return (
-                  <div key={tx.id} className="flex items-center justify-between px-3 sm:px-4 py-2.5 border-b border-outline-variant/10 last:border-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Icon name={cat.icon} className="text-sm text-secondary shrink-0" />
-                      <span className="text-sm text-on-surface truncate">{tx.description}</span>
-                    </div>
-                    <span className={`text-sm font-bold whitespace-nowrap ml-2 ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
-                      {tx.type === "INCOME" ? "+" : "-"}<MoneyValue value={tx.amount} />
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Expanded: Scheduled list */}
-          {expandedSection === "scheduled" && scheduledTxs.length > 0 && (
-            <div className="bg-surface-container-low rounded-2xl ghost-border overflow-hidden">
-              {scheduledTxs.map((tx) => {
-                const cat = getCategoryInfo(tx.category_id)
-                return (
-                  <div key={tx.id} className="flex items-center justify-between px-4 py-2.5 border-b border-outline-variant/10 last:border-0">
-                    <div className="flex items-center gap-2.5">
-                      <Icon name={cat.icon} className="text-sm text-tertiary" />
-                      <div>
-                        <span className="text-sm text-on-surface">{tx.description}</span>
-                        {tx.scheduled_date && <span className="text-[10px] text-on-surface-variant ml-2">{tx.scheduled_date}</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-bold ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
-                        {tx.type === "INCOME" ? "+" : "-"}<MoneyValue value={tx.amount} />
-                      </span>
-                      <button
-                        onClick={() => realizeTransaction(tx.id)}
-                        title="Marcar como realizado"
-                        className="rounded-full p-1 hover:bg-income-container/20 text-income transition-colors"
-                      >
-                        <Icon name="check_circle" className="text-base" />
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Transaction List */}
-      {sorted.length === 0 ? (
-        <div className="bg-surface-container-low rounded-xl p-12 ghost-border flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 rounded-full bg-surface-container-highest flex items-center justify-center mb-4">
-            <Icon name="receipt_long" className="text-3xl text-on-surface-variant" />
-          </div>
-          <p className="font-headline font-bold text-lg">Nenhuma transacao registrada</p>
-          <p className="text-sm text-on-surface-variant mt-2">
-            {cards.length === 0 ? "Primeiro adicione um cartao, depois crie transacoes" : "Adicione sua primeira transacao"}
-          </p>
+      {/* Toolbar: [month-nav]  [search] [filtros] */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+        <div className="month-nav">
+          <button onClick={() => changeMonth(-1)}>
+            <Icon name="chevron_left" className="text-[14px]" />
+          </button>
+          <span className="month-label">{fmtMonth(monthDate)}</span>
+          <button onClick={() => changeMonth(1)}>
+            <Icon name="chevron_right" className="text-[14px]" />
+          </button>
         </div>
-      ) : (
-        <section className="space-y-6">
-          {Object.entries(grouped).map(([date, txs]) => {
-            const open = isDayOpen(date)
-            const dayIncome = txs.filter((t) => t.type === "INCOME").reduce((a, t) => a + Number(t.amount), 0)
-            const dayExpense = txs.filter((t) => t.type === "EXPENSE").reduce((a, t) => a + Number(t.amount), 0)
-            const dayNet = dayIncome - dayExpense
-            return (
-            <div key={date}>
-              <button
-                type="button"
-                onClick={() => toggleDay(date)}
-                className="w-full flex items-center gap-3 mb-2 sticky top-16 bg-surface/85 backdrop-blur-md py-2 px-2 -mx-2 rounded-lg z-20 hover:bg-surface-container-low/60 transition-colors"
-              >
-                <Icon
-                  name="expand_more"
-                  className={`text-on-surface-variant text-base transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
-                />
-                <h3 className="font-headline font-bold text-on-surface text-xs tracking-[0.15em] uppercase flex-1 text-left">
-                  {formatDayHeader(date)}
-                </h3>
-                <span className="text-[10px] text-on-surface-variant font-medium shrink-0">
-                  {txs.length} lanç.
-                </span>
-                <span className={`text-xs font-headline font-bold shrink-0 ${dayNet >= 0 ? "text-income" : "text-error"}`}>
-                  {dayNet >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(dayNet)} />
-                </span>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className={`search ${searchOpen || searchText ? "expanded" : "collapsed"} ${searchText ? "has-query" : ""}`}
+               onClick={() => !searchOpen && setSearchOpen(true)}>
+            <Icon name="search" className="search-icon" />
+            <input
+              ref={searchRef}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              onBlur={() => { if (!searchText) setSearchOpen(false) }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") { setSearchText(""); setSearchOpen(false); searchRef.current?.blur() }
+              }}
+              placeholder="Buscar transação..."
+            />
+            {searchText && (
+              <button className="search-clear" onClick={(e) => { e.stopPropagation(); setSearchText("") }}>
+                <Icon name="close" className="text-[12px]" />
               </button>
-              {open && (
-              <div className="space-y-0.5">
-                {txs.map((tx) => {
-                  const cat = getCategoryInfo(tx.category_id)
-                  return (
-                    <div
-                      key={tx.id}
-                      className="group flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-low transition-all duration-200"
-                    >
-                      <div className="w-9 h-9 rounded-lg bg-surface-container-high flex items-center justify-center shrink-0">
-                        <Icon
-                          name={cat.icon}
-                          className={`text-lg ${tx.type === "INCOME" ? "text-income" : "text-primary"}`}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-semibold text-on-surface truncate">{tx.description}</p>
-                          {tx.is_scheduled && !tx.is_realized && (
-                            <span className="text-[9px] bg-tertiary-container/20 text-tertiary rounded-full px-1.5 py-px font-medium shrink-0">
-                              Futuro
-                            </span>
-                          )}
-                          {tx.is_recurring && (
-                            <Icon name="repeat" className="text-xs text-primary shrink-0" />
-                          )}
-                        </div>
-                        <p className="text-[11px] text-on-surface-variant truncate">
-                          {cat.name} · {getCardName(tx.card_id)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <p className={`text-sm font-headline font-bold ${tx.type === "INCOME" ? "text-income" : "text-error"}`}>
-                          {tx.type === "INCOME" ? "+" : "-"}<MoneyValue value={tx.amount} />
-                        </p>
-                        {tx.is_scheduled && !tx.is_realized && (
+            )}
+          </div>
+
+          <div ref={filtersRef} style={{ position: "relative" }}>
+            <button
+              className={`btn btn-secondary ${activeFilterCount > 0 ? "active" : ""}`}
+              onClick={() => setFiltersOpen((s) => !s)}
+            >
+              <Icon name="tune" className="text-[14px]" /> Filtros
+              {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
+            </button>
+            {filtersOpen && (
+              <div className="filter-popover" style={{ padding: 12 }}>
+                <div className="modal-section">
+                  <div className="modal-section-head">Tipo</div>
+                  <div className="seg-control">
+                    {([
+                      { v: "ALL", l: "Todas" },
+                      { v: "EXPENSE", l: "Despesas" },
+                      { v: "INCOME", l: "Receitas" },
+                    ] as const).map((o) => (
+                      <button key={o.v} className={filterType === o.v ? "active" : ""} onClick={() => setFilterType(o.v)}>
+                        {o.l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="modal-section">
+                  <div className="modal-section-head">Origem</div>
+                  <div className="seg-control" style={{ marginBottom: 8 }}>
+                    {([
+                      { v: "all", l: "Todas" },
+                      { v: "account", l: "Conta" },
+                      { v: "card", l: "Cartão" },
+                    ] as const).map((o) => (
+                      <button key={o.v} className={srcKind === o.v ? "active" : ""}
+                              onClick={() => { setSrcKind(o.v); setFilterCardId("") }}>
+                        {o.l}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="popover-list" style={{ maxHeight: 160, overflowY: "auto" }}>
+                    <button className={`popover-item ${!filterCardId ? "active" : ""}`} onClick={() => setFilterCardId("")}>
+                      <span className="popover-item-label">Todas as origens</span>
+                    </button>
+                    {cards
+                      .filter((c) => srcKind === "all" || (srcKind === "card" ? c.type === "CREDIT_CARD" : c.type === "CHECKING_ACCOUNT"))
+                      .map((c) => {
+                        const bank = banks.find((b) => b.id === c.bank_id)
+                        return (
                           <button
-                            onClick={() => realizeTransaction(tx.id)}
-                            title="Marcar como realizado"
-                            className="rounded-full p-1 hover:bg-income-container/20 text-income transition-colors"
+                            key={c.id}
+                            className={`popover-item ${filterCardId === c.id ? "active" : ""}`}
+                            onClick={() => setFilterCardId(c.id)}
                           >
-                            <Icon name="check_circle" className="text-base" />
+                            <div className="bi sm" style={{ background: bank?.color ?? "var(--c-porto)" }}>
+                              {bank?.name?.slice(0, 2).toUpperCase() ?? "?"}
+                            </div>
+                            <span className="popover-item-label">{c.name}</span>
                           </button>
-                        )}
-                        <button
-                          onClick={() => openEdit(tx)}
-                          className="rounded-full p-1 opacity-0 group-hover:opacity-100 hover:bg-primary-container/20 text-on-surface-variant hover:text-primary transition-all"
-                        >
-                          <Icon name="edit" className="text-base" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (tx.classification === "recurring") {
-                              setDeletePrompt({ id: tx.id, kind: "recurring" })
-                            } else if (tx.classification === "installment") {
-                              setDeletePrompt({ id: tx.id, kind: "installment" })
-                            } else {
-                              deleteTransaction(tx.id)
-                            }
-                          }}
-                          className="rounded-full p-1 opacity-0 group-hover:opacity-100 hover:bg-error-container/20 text-on-surface-variant hover:text-error transition-all"
-                        >
-                          <Icon name="delete" className="text-base" />
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
+                        )
+                      })}
+                  </div>
+                </div>
+
+                <div className="modal-section">
+                  <div className="modal-section-head">Categorias</div>
+                  <div className="popover-list" style={{ maxHeight: 160, overflowY: "auto" }}>
+                    {categories.map((c) => (
+                      <button
+                        key={c.id}
+                        className={`popover-item ${filterCategoryIds.has(c.id) ? "active" : ""}`}
+                        onClick={() => toggleCategoryFilter(c.id)}
+                      >
+                        <Icon name={CATEGORY_ICONS[c.name] ?? c.icon ?? "receipt_long"} className="text-[14px]" />
+                        <span className="popover-item-label">{c.name}</span>
+                        {filterCategoryIds.has(c.id) && <Icon name="check" className="text-[14px]" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={clearAllFilters}>Limpar</button>
+                  <button className="btn btn-primary btn-sm" onClick={() => setFiltersOpen(false)}>Aplicar</button>
+                </div>
               </div>
-              )}
-            </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Active filter tokens */}
+      {activeFilterCount > 0 && (
+        <div className="chip-row" style={{ marginBottom: 14 }}>
+          {filterType !== "ALL" && (
+            <span className="filter-token">
+              {filterType === "EXPENSE" ? "Despesas" : "Receitas"}
+              <button onClick={() => setFilterType("ALL")}><Icon name="close" className="text-[12px]" /></button>
+            </span>
+          )}
+          {srcKind !== "all" && (
+            <span className="filter-token">
+              {srcKind === "card" ? "Só cartões" : "Só contas"}
+              <button onClick={() => setSrcKind("all")}><Icon name="close" className="text-[12px]" /></button>
+            </span>
+          )}
+          {filterCardId && (
+            <span className="filter-token">
+              {cardOf(filterCardId)?.name}
+              <button onClick={() => setFilterCardId("")}><Icon name="close" className="text-[12px]" /></button>
+            </span>
+          )}
+          {[...filterCategoryIds].map((id) => {
+            const cat = categoryOf(id)
+            return (
+              <span key={id} className="filter-token">
+                {cat?.name ?? "Categoria"}
+                <button onClick={() => toggleCategoryFilter(id)}><Icon name="close" className="text-[12px]" /></button>
+              </span>
             )
           })}
-        </section>
+          <button className="btn btn-ghost btn-sm" onClick={clearAllFilters}>Limpar tudo</button>
+        </div>
       )}
 
-      {/* Dialog */}
-      <Dialog open={dialogOpen} onClose={() => { if (!isSubmitting) closeDialog() }} title={editingTx ? "Editar Transacao" : "Nova Transacao"}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Hero: Type + Amount */}
-          <div className="text-center space-y-3">
-            <div className="inline-flex bg-surface-container-highest rounded-full p-1 gap-1">
-              {(["EXPENSE", "INCOME"] as TransactionType[]).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setForm({ ...form, type: t })}
-                  className={`rounded-full px-5 py-1.5 text-xs font-bold uppercase tracking-wider transition-all ${
-                    form.type === t
-                      ? t === "EXPENSE"
-                        ? "bg-error-container/30 text-error"
-                        : "bg-income-container/30 text-income"
-                      : "text-on-surface-variant hover:text-on-surface"
-                  }`}
-                >
-                  {t === "EXPENSE" ? "Despesa" : "Receita"}
-                </button>
-              ))}
+      {sorted.length > 0 && (
+        <>
+          <div className="kpi-grid" style={{ marginBottom: 16 }}>
+            <div className="kpi">
+              <div className="kpi-label"><Icon name="trending_up" className="text-[12px]" />Receita</div>
+              <div className="kpi-value positive"><MoneyValue value={summary.receita} /></div>
             </div>
-            <div className="flex flex-col items-center gap-1 w-fit mx-auto">
-              <div className={`flex items-baseline justify-center gap-1 rounded-xl px-3 py-1 transition-all ${validationErrors.amount ? "ring-2 ring-error/60 bg-error/5" : ""}`}>
-                <span className={`text-3xl font-headline font-extrabold ${form.type === "EXPENSE" ? "text-error/60" : "text-income/60"}`}>R$</span>
-                <input
-                  value={form.amount}
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, "")
-                    const cents = raw ? parseInt(raw, 10) : 0
-                    setForm({ ...form, amount: formatCentsToBRL(cents) })
-                    if (validationErrors.amount) setValidationErrors((v) => ({ ...v, amount: false }))
-                  }}
-                  placeholder="0,00"
-                  inputMode="numeric"
-                  className="bg-transparent border-none text-left text-4xl font-headline font-extrabold text-on-surface placeholder:text-on-surface/20 focus:ring-0 focus:outline-none p-0"
-                  style={{ width: `${Math.max(3.5, (form.amount?.length || 0) + 1.5)}ch` }}
-                  required
-                />
+            <div className="kpi">
+              <div className="kpi-label"><Icon name="trending_down" className="text-[12px]" />Despesas</div>
+              <div className="kpi-value negative"><MoneyValue value={summary.despesasTotal} /></div>
+              {summary.despesasPrevistas > 0 && (
+                <div className="kpi-meta">
+                  Previstas: <span className="num" style={{ color: "var(--negative)" }}><MoneyValue value={summary.despesasPrevistas} /></span>
+                </div>
+              )}
+            </div>
+            <div className="kpi">
+              <div className="kpi-label"><Icon name="account_balance" className="text-[12px]" />Saldo Atual</div>
+              <div className={`kpi-value ${summary.saldoAtual >= 0 ? "positive" : "negative"}`}>
+                <MoneyValue value={summary.saldoAtual} />
               </div>
-              {validationErrors.amount && <span className="text-[11px] text-error font-medium">Informe o valor</span>}
+              <div className="kpi-meta">Receita - despesas realizadas</div>
             </div>
-          </div>
-
-          {/* Description */}
-          <div className="space-y-1">
-            <input
-              value={form.description}
-              onChange={(e) => {
-                setForm({ ...form, description: e.target.value })
-                setCategorySuggested(false)
-                if (validationErrors.description) setValidationErrors((v) => ({ ...v, description: false }))
-              }}
-              onBlur={(e) => {
-                if (!editingTx) suggestCategoryFromDescription(e.target.value)
-              }}
-              placeholder="Descricao (ex: Supermercado)"
-              className={`w-full bg-surface-container-highest border-none rounded-xl px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 ${validationErrors.description ? "ring-1 ring-error/60 bg-error/5" : "focus:ring-primary/50"}`}
-              required
-            />
-            {validationErrors.description && <span className="text-[11px] text-error font-medium px-1">Informe a descricao</span>}
-          </div>
-
-          {/* Category chips (obrigatório) */}
-          <div className={`space-y-1.5 rounded-xl p-2 -mx-2 transition-all ${validationErrors.category ? "ring-2 ring-error/60 bg-error/5" : ""}`}>
-            <label className="font-label text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-1">
-              Categoria <span className="text-error">*</span>
-            </label>
-            {!form.category_id && !validationErrors.category && (
-              <p className="text-[10px] text-on-surface-variant/60 px-1">Selecione uma categoria</p>
-            )}
-            {validationErrors.category && (
-              <p className="text-[11px] text-error font-medium px-1">Selecione uma categoria</p>
-            )}
-            {categorySuggested && form.category_id && !isOtherCategory && (
-              <p className="text-[10px] text-primary/70 px-1 flex items-center gap-1">
-                <Icon name="auto_awesome" className="text-xs" />
-                Sugerido com base em transacoes anteriores
-              </p>
-            )}
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
-              <button
-                type="button"
-                onClick={() => { setForm({ ...form, category_id: "__other__", custom_category_name: "" }); setCategorySuggested(false); if (validationErrors.category) setValidationErrors((v) => ({ ...v, category: false })) }}
-                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  isOtherCategory
-                    ? "bg-primary-container/20 text-primary border border-primary/20"
-                    : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-                }`}
-              >
-                <Icon name="add" className="text-sm" />
-                Outra
-              </button>
-              {categories.map((c) => {
-                const iconName = CATEGORY_ICONS[c.name] ?? "receipt_long"
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => { setForm({ ...form, category_id: c.id, custom_category_name: "" }); setCategorySuggested(false); if (validationErrors.category) setValidationErrors((v) => ({ ...v, category: false })) }}
-                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      form.category_id === c.id
-                        ? "bg-primary-container/20 text-primary border border-primary/20"
-                        : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-                    }`}
-                  >
-                    <Icon name={iconName} className="text-sm" />
-                    {c.name}
-                  </button>
-                )
-              })}
-            </div>
-            {isOtherCategory && (
-              <div className="space-y-1">
-                <input
-                  value={form.custom_category_name}
-                  onChange={(e) => {
-                    setForm({ ...form, custom_category_name: e.target.value })
-                    if (validationErrors.custom_category_name) setValidationErrors((v) => ({ ...v, custom_category_name: false }))
-                  }}
-                  placeholder="Nome da categoria"
-                  className={`w-full bg-surface-container-highest border-none rounded-xl px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 ${validationErrors.custom_category_name ? "ring-1 ring-error/60 bg-error/5" : "focus:ring-primary/50"}`}
-                  required
-                  autoFocus
-                />
-                {validationErrors.custom_category_name && <span className="text-[11px] text-error font-medium px-1">Informe o nome da categoria</span>}
+            <div className="kpi">
+              <div className="kpi-label"><Icon name="savings" className="text-[12px]" />Saldo Projetado</div>
+              <div className={`kpi-value ${summary.saldoProjetado >= 0 ? "positive" : "negative"}`}>
+                <MoneyValue value={summary.saldoProjetado} />
               </div>
-            )}
+              <div className="kpi-meta">Quanto ainda posso gastar</div>
+            </div>
           </div>
 
-          {/* Bento: Account + Date (create only) */}
-          {!editingTx && <div className="grid grid-cols-2 gap-3">
-            {/* Account Selector */}
-            <div className="relative">
-              <label className={`font-label text-[10px] font-bold uppercase tracking-wider px-1 mb-1 block ${validationErrors.card_id ? "text-error" : "text-on-surface-variant"}`}>Conta {validationErrors.card_id && <span className="text-error">*</span>}</label>
-              <input type="hidden" name="card_id" value={form.card_id} required />
-              <button
-                type="button"
-                onClick={() => { setDropdownOpen(!dropdownOpen); if (validationErrors.card_id) setValidationErrors((v) => ({ ...v, card_id: false })) }}
-                className={`w-full flex items-center justify-between bg-surface-container-highest rounded-xl px-3 py-2.5 text-sm text-on-surface ${validationErrors.card_id ? "ring-2 ring-error/60 bg-error/5" : ""}`}
-              >
-                {form.card_id ? (
-                  (() => {
-                    const selected = cards.find((c) => c.id === form.card_id)
-                    const bank = banks.find((b) => b.id === selected?.bank_id)
-                    return (
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Icon
-                          name={selected?.type === "CREDIT_CARD" ? "credit_card" : "account_balance"}
-                          className="text-base shrink-0"
-                          style={{ color: bank?.color || undefined }}
-                        />
-                        <span className="text-xs font-medium truncate">{bank?.name} {selected?.last_digits ? `*${selected.last_digits}` : ""}</span>
-                      </div>
-                    )
-                  })()
-                ) : (
-                  <span className="text-xs text-on-surface-variant/40">Selecione</span>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: 20 }}>
+            <div className="kpi">
+              <div className="kpi-label">
+                <Icon name="repeat" className="text-[12px]" />Recorrentes
+                <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.recurringCount}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                <div className={`kpi-value ${summary.recurringNet >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+                  {summary.recurringNet >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.recurringNet)} />
+                </div>
+                <div style={{ display: "flex", gap: 8, fontSize: 11, fontFamily: "var(--font-mono)" }}>
+                  {summary.recurringIncome > 0 && (
+                    <span style={{ color: "var(--positive)" }}>+<MoneyValue value={summary.recurringIncome} /></span>
+                  )}
+                  {summary.recurringExpense > 0 && (
+                    <span style={{ color: "var(--negative)" }}>-<MoneyValue value={summary.recurringExpense} /></span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="kpi">
+              <div className="kpi-label">
+                <Icon name="payments" className="text-[12px]" />Parcelados
+                <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.installmentCount}</span>
+              </div>
+              <div className={`kpi-value ${summary.installmentTotal >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+                {summary.installmentTotal >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.installmentTotal)} />
+              </div>
+            </div>
+            <div className="kpi">
+              <div className="kpi-label">
+                <Icon name="schedule" className="text-[12px]" />Agendados
+                <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.scheduledCount}</span>
+              </div>
+              <div className={`kpi-value ${summary.scheduledTotal >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+                {summary.scheduledTotal >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.scheduledTotal)} />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {sorted.length === 0 ? (
+        <div className="panel empty">
+          <div className="empty-title">Nenhuma transação encontrada</div>
+          <p>Ajuste os filtros ou adicione uma transação.</p>
+        </div>
+      ) : (
+        <div className="panel" style={{ padding: "0 8px" }}>
+          {Object.entries(grouped).map(([date, txs]) => {
+            const open = isDayOpen(date)
+            const dayIncome = txs.filter((t) => t.type === "INCOME").reduce((s, t) => s + Number(t.amount), 0)
+            const dayExpense = txs.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + Number(t.amount), 0)
+            const net = dayIncome - dayExpense
+            return (
+              <div key={date} className={`day-group ${open ? "" : "collapsed"}`}>
+                <div className="day-header" onClick={() => toggleDay(date)}>
+                  <div className="day-date">
+                    <Icon name="expand_more" className="day-caret text-[14px]" />
+                    {formatDayHeader(date)}
+                  </div>
+                  <div className="day-meta">
+                    <span>{txs.length} lanç.</span>
+                    <span className="num" style={{ color: net >= 0 ? "var(--positive)" : "var(--negative)" }}>
+                      {net >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(net)} />
+                    </span>
+                  </div>
+                </div>
+                {open && (
+                  <div>
+                    {txs.map((tx) => {
+                      const cat = categoryOf(tx.category_id)
+                      const bank = bankOfCard(tx.card_id)
+                      const card = cardOf(tx.card_id)
+                      return (
+                        <div
+                          key={tx.id}
+                          className="tx-row"
+                          onClick={() => openEdit(tx.id)}
+                          style={{ gridTemplateColumns: "28px 1fr auto auto" }}
+                        >
+                          <div className="tx-icon" style={cat ? { background: cat.color, color: "#fff" } : undefined}>
+                            <Icon name={categoryIcon(tx.category_id)} className="text-[13px]" />
+                          </div>
+                          <div className="tx-main">
+                            <div className="tx-title">
+                              {tx.description}
+                              {tx.is_recurring && <Icon name="repeat" className="text-[10px]" style={{ marginLeft: 4, color: "var(--accent)" }} />}
+                              {tx.is_scheduled && !tx.is_realized && <Icon name="schedule" className="text-[10px]" style={{ marginLeft: 4, color: "var(--warning)" }} />}
+                            </div>
+                            <div className="tx-sub">
+                              <span>{cat?.name ?? "Outros"}</span>
+                              <span className="dot" />
+                              <span>{bank?.name ?? ""} {card?.name ?? ""}</span>
+                              {tx.transaction_date && tx.transaction_date !== tx.date && (
+                                <>
+                                  <span className="dot" />
+                                  <span>Ocorreu {new Date(tx.transaction_date + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`tx-amount ${tx.type === "INCOME" ? "positive" : "negative"} ${tx.is_scheduled && !tx.is_realized ? "scheduled" : ""}`}>
+                            {tx.type === "INCOME" ? "+" : "-"}<MoneyValue value={tx.amount} />
+                          </div>
+                          <div style={{ display: "flex", gap: 2 }}>
+                            {tx.is_scheduled && !tx.is_realized && (
+                              <button
+                                className="icon-btn"
+                                style={{ width: 28, height: 28, color: "var(--positive)" }}
+                                onClick={(e) => { e.stopPropagation(); realizeTransaction(tx.id) }}
+                                title="Marcar como realizado"
+                              >
+                                <Icon name="check_circle" className="text-[14px]" />
+                              </button>
+                            )}
+                            <button
+                              className="icon-btn"
+                              style={{ width: 28, height: 28, color: "var(--negative)" }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (tx.classification === "recurring") setDeletePrompt({ id: tx.id, kind: "recurring" })
+                                else if (tx.classification === "installment") setDeletePrompt({ id: tx.id, kind: "installment" })
+                                else if (confirm("Excluir esta transação?")) deleteTransaction(tx.id)
+                              }}
+                            >
+                              <Icon name="delete" className="text-[13px]" />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
-                <Icon name="expand_more" className="text-on-surface-variant text-base shrink-0" />
-              </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
-              {dropdownOpen && (
-                <div ref={dropdownRef} className="absolute z-50 w-[calc(200%+0.75rem)] left-0 mt-1 bg-surface-container-high rounded-xl border border-outline-variant/15 shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                  {cards.filter((c) => c.type === "CHECKING_ACCOUNT").length > 0 && (
-                    <>
-                      <div className="px-3 py-1.5 bg-surface-container text-[10px] font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
-                        <Icon name="account_balance" className="text-xs text-primary" />
-                        Contas Correntes
-                      </div>
-                      {cards.filter((c) => c.type === "CHECKING_ACCOUNT").map((c) => {
-                        const bank = banks.find((b) => b.id === c.bank_id)
-                        return (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => { setForm({ ...form, card_id: c.id }); setDropdownOpen(false); if (validationErrors.card_id) setValidationErrors((v) => ({ ...v, card_id: false })) }}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-container-highest transition-colors ${form.card_id === c.id ? "bg-primary/10" : ""}`}
-                          >
-                            <div
-                              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                              style={{ backgroundColor: bank?.color ? `${bank.color}20` : undefined }}
-                            >
-                              <Icon name="account_balance" className="text-base" style={{ color: bank?.color || undefined }} />
-                            </div>
-                            <div className="flex flex-col items-start min-w-0">
-                              <span className="text-sm font-medium text-on-surface truncate w-full">{bank?.name} - {c.name}</span>
-                              <span className="text-[10px] text-on-surface-variant">
-                                Conta Corrente{c.last_digits ? ` • *${c.last_digits}` : ""}
-                              </span>
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </>
-                  )}
-                  {cards.filter((c) => c.type === "CREDIT_CARD").length > 0 && (
-                    <>
-                      <div className="px-3 py-1.5 bg-surface-container text-[10px] font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
-                        <Icon name="credit_card" className="text-xs text-tertiary" />
-                        Cartoes de Credito
-                      </div>
-                      {cards.filter((c) => c.type === "CREDIT_CARD").map((c) => {
-                        const bank = banks.find((b) => b.id === c.bank_id)
-                        return (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => { setForm({ ...form, card_id: c.id }); setDropdownOpen(false); if (validationErrors.card_id) setValidationErrors((v) => ({ ...v, card_id: false })) }}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-container-highest transition-colors ${form.card_id === c.id ? "bg-primary/10" : ""}`}
-                          >
-                            <div
-                              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                              style={{ backgroundColor: bank?.color ? `${bank.color}20` : undefined }}
-                            >
-                              <Icon name="credit_card" className="text-base" style={{ color: bank?.color || undefined }} />
-                            </div>
-                            <div className="flex flex-col items-start min-w-0">
-                              <span className="text-sm font-medium text-on-surface truncate w-full">{bank?.name} - {c.name}</span>
-                              <span className="text-[10px] text-on-surface-variant">
-                                Cartao de Credito{c.last_digits ? ` • *${c.last_digits}` : ""}
-                              </span>
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Date */}
-            <div>
-              <label className="font-label text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-1 mb-1 block">Data</label>
-              <input
-                value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-                type="date"
-                className="w-full bg-surface-container-highest border-none rounded-xl px-3 py-2.5 text-xs text-on-surface focus:ring-1 focus:ring-primary/50"
-                required
-              />
-            </div>
-          </div>}
-
-          {/* Toggle chips: Parcelado | Agendado | Recorrente */}
-          {!editingTx && <div className="flex gap-2">
-            {([
-              { key: "is_installment" as const, icon: "payments", label: "Parcelado", disabledBy: "is_recurring" as const },
-              { key: "is_scheduled" as const, icon: "schedule", label: "Agendado", disabledBy: null },
-              { key: "is_recurring" as const, icon: "repeat", label: "Recorrente", disabledBy: "is_installment" as const },
-            ]).map(({ key, icon, label, disabledBy }) => {
-              const isDisabled = disabledBy ? form[disabledBy] : false
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  disabled={isDisabled}
-                  onClick={() => {
-                    const toggled = !form[key]
-                    const updates: Record<string, unknown> = { [key]: toggled }
-                    if (key === "is_installment" && !toggled) updates.installments = ""
-                    if (key === "is_installment" && toggled) { updates.is_recurring = false }
-                    if (key === "is_recurring" && toggled) { updates.is_installment = false; updates.installments = ""; updates.is_bill = true }
-                    if (key === "is_recurring" && !toggled) { updates.is_bill = false }
-                    setForm({ ...form, ...updates })
-                  }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all ${
-                    isDisabled
-                      ? "opacity-50 cursor-not-allowed bg-surface-container-high text-on-surface-variant"
-                      : form[key]
-                        ? "bg-primary-container/20 text-primary border border-primary/20"
-                        : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-                  }`}
-                >
-                  <Icon name={icon} className="text-sm" />
-                  {label}
-                </button>
-              )
-            })}
-          </div>}
-
-          {/* Conditional: Installments */}
-          {!editingTx && form.is_installment && (
-            <div className="flex items-center gap-3 bg-surface-container-high/50 rounded-xl px-4 py-2.5">
-              <label className="text-xs text-on-surface-variant whitespace-nowrap">Parcelas:</label>
-              <input
-                value={form.installments}
-                onChange={(e) => setForm({ ...form, installments: e.target.value })}
-                placeholder="Ex: 10"
-                type="number"
-                min="2"
-                max="48"
-                className="flex-1 bg-transparent border-none text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-0 p-0"
-                required
-              />
-              {form.amount && form.installments && Number(form.installments) >= 2 && (
-                <span className="text-xs text-on-surface-variant whitespace-nowrap">
-                  {Number(form.installments)}x {(parseBRLToNumber(form.amount) / Number(form.installments)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Conditional: Scheduled date */}
-          {!editingTx && form.is_scheduled && (
-            <div className="flex items-center gap-3 bg-surface-container-high/50 rounded-xl px-4 py-2.5">
-              <Icon name="event" className="text-sm text-on-surface-variant" />
-              <label className="text-xs text-on-surface-variant whitespace-nowrap">Data prevista:</label>
-              <input
-                value={form.scheduled_date}
-                onChange={(e) => setForm({ ...form, scheduled_date: e.target.value })}
-                type="date"
-                className="flex-1 bg-transparent border-none text-sm text-on-surface focus:ring-0 p-0"
-              />
-            </div>
-          )}
-
-          {/* Recurring info */}
-          {!editingTx && form.is_recurring && (
-            <div className="flex items-center gap-2 bg-primary-container/10 rounded-xl px-4 py-2.5">
-              <Icon name="info" className="text-sm text-primary" />
-              <span className="text-xs text-primary">Gera lancamentos para os proximos 24 meses</span>
-            </div>
-          )}
-
-          {/* Notes */}
-          <textarea
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            placeholder="Observacoes (opcional)"
-            rows={1}
-            className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50 resize-none"
-          />
-
-          {/* Bill checkbox */}
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.is_bill}
-              onChange={(e) => setForm({ ...form, is_bill: e.target.checked })}
-              className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary/50"
-            />
-            <div>
-              <p className="text-sm font-medium">Aparece nos vencimentos</p>
-              <p className="text-[10px] text-on-surface-variant">Essa conta aparecera na tela de Vencimentos para controle de pagamento</p>
-            </div>
-          </label>
-
-          {/* Cascade option for installment edit */}
-          {editingTx && (() => {
-            const tx = transactions.find((t) => t.id === editingTx)
-            return tx && tx.classification === "installment" ? (
-              <label className="flex items-center gap-2.5 bg-tertiary-container/10 rounded-xl px-4 py-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={editCascade}
-                  onChange={(e) => setEditCascade(e.target.checked)}
-                  className="w-4 h-4 rounded border-none bg-surface-container-highest text-tertiary focus:ring-tertiary/30 focus:ring-offset-0"
-                />
-                <div>
-                  <span className="text-sm font-medium text-on-surface">Aplicar a todas as parcelas</span>
-                  <p className="text-[10px] text-on-surface-variant">Altera valor, descricao e categoria em todas as parcelas</p>
-                </div>
-              </label>
-            ) : null
-          })()}
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            aria-busy={isSubmitting}
-            className={`w-full py-3.5 rounded-xl font-headline font-bold text-sm active:scale-[0.98] transition-all relative overflow-hidden group disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-80 ${
-              editingTx
-                ? "bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-[0_8px_32px_rgba(0,92,186,0.3)]"
-                : form.type === "EXPENSE"
-                  ? "bg-gradient-to-br from-error to-error-container text-on-error shadow-[0_8px_32px_rgba(147,0,10,0.3)]"
-                  : "bg-gradient-to-br from-income to-income-container text-on-income shadow-[0_8px_32px_rgba(0,94,42,0.3)]"
-            }`}
-          >
-            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="flex items-center justify-center gap-2 relative z-10">
-              {isSubmitting ? (
-                <>
-                  <span
-                    className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin"
-                    aria-hidden="true"
-                  />
-                  <span>{editingTx ? "Salvando..." : "Processando..."}</span>
-                </>
-              ) : (
-                <>
-                  <Icon name={editingTx ? "save" : "done_all"} />
-                  <span>{editingTx ? "Salvar Alteracoes" : form.type === "EXPENSE" ? "Registrar Despesa" : "Registrar Receita"}</span>
-                </>
-              )}
-            </div>
-          </button>
-        </form>
-      </Dialog>
+      {dialogOpen && (
+        <TransactionModal
+          key={modalKey}
+          editingId={editingId}
+          defaultMonth={selectedMonth}
+          onClose={() => { setDialogOpen(false); setEditingId(null) }}
+          onSaved={() => { setDialogOpen(false); setEditingId(null) }}
+          transactions={transactions}
+          cards={cards}
+          categories={categories}
+          banks={banks}
+          addTransaction={addTransaction}
+          updateTransaction={updateTransaction}
+        />
+      )}
 
       <Dialog
         open={deletePrompt !== null}
         onClose={() => setDeletePrompt(null)}
-        title={deletePrompt?.kind === "recurring" ? "Excluir transação recorrente" : "Excluir parcelamento"}
+        title={deletePrompt?.kind === "recurring" ? "Excluir recorrente" : "Excluir parcelamento"}
       >
-        <div className="space-y-4">
-          <p className="text-sm text-on-surface-variant">
-            {deletePrompt?.kind === "recurring"
-              ? "Deseja excluir todas as recorrências ou apenas desta em diante?"
-              : "Deseja excluir todas as parcelas ou apenas desta em diante?"}
-          </p>
-          <div className="grid grid-cols-1 gap-2">
-            <button
-              type="button"
-              onClick={async () => {
-                if (!deletePrompt) return
-                const p = deletePrompt
-                setDeletePrompt(null)
-                await deleteTransactionGroup(p.id, "future")
-              }}
-              className="w-full py-3 rounded-xl bg-surface-container-high text-on-surface font-medium text-sm hover:bg-surface-container-highest transition-colors"
-            >
-              Desta em diante
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                if (!deletePrompt) return
-                const p = deletePrompt
-                setDeletePrompt(null)
-                await deleteTransactionGroup(p.id, "all")
-              }}
-              className="w-full py-3 rounded-xl bg-error/10 text-error font-medium text-sm hover:bg-error/20 transition-colors"
-            >
-              Todas
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeletePrompt(null)}
-              className="w-full py-3 rounded-xl text-on-surface-variant text-sm hover:bg-surface-container-high transition-colors"
-            >
-              Cancelar
-            </button>
-          </div>
+        <p style={{ marginBottom: 16 }}>
+          {deletePrompt?.kind === "recurring"
+            ? "Deseja excluir todas as recorrências ou apenas desta em diante?"
+            : "Deseja excluir todas as parcelas ou apenas desta em diante?"}
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button className="btn btn-secondary" onClick={async () => {
+            if (!deletePrompt) return
+            const p = deletePrompt
+            setDeletePrompt(null)
+            await toast.run("Excluindo...", () => deleteTransactionGroup(p.id, "future"), "Excluídas a partir desta")
+          }}>Desta em diante</button>
+          <button className="btn btn-danger" onClick={async () => {
+            if (!deletePrompt) return
+            const p = deletePrompt
+            setDeletePrompt(null)
+            await toast.run("Excluindo todas...", () => deleteTransactionGroup(p.id, "all"), "Todas excluídas")
+          }}>Todas</button>
+          <button className="btn btn-ghost" onClick={() => setDeletePrompt(null)}>Cancelar</button>
         </div>
       </Dialog>
     </div>
+  )
+}
+
+import type { Transaction, Card, Category, Bank } from "@/types"
+
+interface TxModalProps {
+  editingId: string | null
+  defaultMonth: string
+  onClose: () => void
+  onSaved: () => void
+  transactions: Transaction[]
+  cards: Card[]
+  categories: Category[]
+  banks: Bank[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  addTransaction: (data: any) => Promise<void>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  updateTransaction: (id: string, data: any, cascade?: boolean) => Promise<void>
+}
+
+function TransactionModal(props: TxModalProps) {
+  const { editingId, defaultMonth, onClose, onSaved, transactions, cards, categories, banks, addTransaction, updateTransaction } = props
+  const existing = editingId ? transactions.find((t) => t.id === editingId) ?? null : null
+
+  function baseDesc(d: string) { return d.replace(/\s\(\d+\/\d+\)$/, "") }
+
+  const [type, setType] = useState<TransactionType>(existing?.type ?? "EXPENSE")
+  const [amount, setAmount] = useState(existing ? formatCentsToBRL(Math.round(existing.amount * 100)) : "")
+  const [description, setDescription] = useState(existing ? baseDesc(existing.description) : "")
+  const [srcKind, setSrcKind] = useState<"account" | "card">(() => {
+    if (existing) {
+      const c = cards.find((x) => x.id === existing.card_id)
+      return c?.type === "CREDIT_CARD" ? "card" : "account"
+    }
+    return "account"
+  })
+  const [cardId, setCardId] = useState(existing?.card_id ?? "")
+  const [categoryId, setCategoryId] = useState(existing?.category_id ?? "")
+  const [customCategoryName, setCustomCategoryName] = useState("")
+  const [competence, setCompetence] = useState(() => {
+    if (existing) return existing.date.slice(0, 7)
+    return defaultMonth
+  })
+  const [hasTxDate, setHasTxDate] = useState(!!existing?.transaction_date)
+  const [transactionDate, setTransactionDate] = useState(existing?.transaction_date ?? "")
+  const [isScheduled, setIsScheduled] = useState(existing?.is_scheduled ?? false)
+  const [scheduledDate, setScheduledDate] = useState(existing?.scheduled_date ?? "")
+  const [isInstallment, setIsInstallment] = useState(false)
+  const [installments, setInstallments] = useState("")
+  const [isRecurring, setIsRecurring] = useState(existing?.is_recurring ?? false)
+  const [isBill, setIsBill] = useState(existing?.is_bill ?? false)
+  const [notes, setNotes] = useState(existing?.notes ?? "")
+  const [editCascade, setEditCascade] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  const filteredSrcCards = cards.filter((c) => srcKind === "card" ? c.type === "CREDIT_CARD" : c.type === "CHECKING_ACCOUNT")
+  const isOtherCategory = categoryId === "__other__"
+
+  const competenceLabel = (() => {
+    const [y, m] = competence.split("-").map(Number)
+    return new Date(y, m - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+  })()
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (submitting) return
+    const amountNum = parseBRLToNumber(amount)
+    if (!amountNum || !description || (!editingId && !cardId) || !categoryId || (isOtherCategory && !customCategoryName)) {
+      toast.error("Preencha os campos obrigatórios")
+      return
+    }
+    setSubmitting(true)
+    try {
+      if (editingId) {
+        await toast.run("Salvando...", () => updateTransaction(editingId, {
+          description,
+          amount: amountNum,
+          type,
+          category_id: isOtherCategory ? null : (categoryId || null),
+          custom_category_name: isOtherCategory ? customCategoryName : undefined,
+          notes: notes || null,
+          is_recurring: isRecurring,
+        }, editCascade), "Transação atualizada")
+      } else {
+        await toast.run("Criando transação...", () => addTransaction({
+          card_id: cardId,
+          description,
+          amount: amountNum,
+          type,
+          category_id: isOtherCategory ? undefined : (categoryId || undefined),
+          custom_category_name: isOtherCategory ? customCategoryName : undefined,
+          date: competenceDateFor(competence),
+          transaction_date: hasTxDate && transactionDate ? transactionDate : undefined,
+          is_scheduled: isScheduled,
+          scheduled_date: isScheduled ? (scheduledDate || competenceDateFor(competence)) : undefined,
+          notes: notes || undefined,
+          installments: isInstallment && installments ? Number(installments) : undefined,
+          is_recurring: isRecurring || undefined,
+          is_bill: isBill || undefined,
+        }), "Transação criada")
+      }
+      onSaved()
+    } catch {} finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={true} onClose={onClose} title={editingId ? "Editar transação" : "Nova transação"}>
+      <form onSubmit={handleSubmit}>
+        {/* Type toggle */}
+        <div className="type-toggle">
+          {(["EXPENSE", "INCOME"] as TransactionType[]).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setType(t)}
+              className={`${type === t ? "active" : ""} ${t === "EXPENSE" ? "despesa" : "receita"}`}
+            >
+              {t === "EXPENSE" ? "Despesa" : "Receita"}
+            </button>
+          ))}
+        </div>
+
+        {/* Amount */}
+        <div className="field">
+          <input
+            className={`input input-amount ${type === "EXPENSE" ? "despesa" : "receita"}`}
+            value={amount}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/\D/g, "")
+              const cents = raw ? parseInt(raw, 10) : 0
+              setAmount(formatCentsToBRL(cents))
+            }}
+            placeholder="0,00"
+            inputMode="numeric"
+          />
+        </div>
+
+        {/* Description */}
+        <div className="field">
+          <label className="label">Descrição <span className="req">*</span></label>
+          <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Supermercado" required />
+        </div>
+
+        {/* Source: tabs + list */}
+        {!editingId && (
+          <div className="modal-section">
+            <div className="modal-section-head">Pagar com <span style={{ color: "var(--negative)" }}>*</span></div>
+            <div className="src-block">
+              <div className="src-tabs">
+                <button type="button" className={`src-tab ${srcKind === "account" ? "active" : ""}`}
+                        onClick={() => { setSrcKind("account"); setCardId("") }} disabled={type === "INCOME" ? false : false}>
+                  <Icon name="account_balance" className="text-[14px]" /> Conta
+                </button>
+                <button type="button" className={`src-tab ${srcKind === "card" ? "active" : ""}`}
+                        onClick={() => { setSrcKind("card"); setCardId("") }} disabled={type === "INCOME"}>
+                  <Icon name="credit_card" className="text-[14px]" /> Cartão
+                </button>
+              </div>
+              <div className="src-list-inner">
+                {filteredSrcCards.length === 0 ? (
+                  <div style={{ padding: 16, textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>
+                    Nenhuma {srcKind === "card" ? "cartão" : "conta"} cadastrada
+                  </div>
+                ) : (
+                  filteredSrcCards.map((c) => {
+                    const bank = banks.find((b) => b.id === c.bank_id)
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className={`src-item ${cardId === c.id ? "active" : ""}`}
+                        onClick={() => setCardId(c.id)}
+                      >
+                        <div className="bi sm" style={{ background: bank?.color ?? "var(--c-porto)" }}>
+                          {bank?.name?.slice(0, 2).toUpperCase() ?? "?"}
+                        </div>
+                        <span className="src-name">{c.name}</span>
+                        <span className="src-trailing" style={{ color: "var(--text-3)" }}>{bank?.name}</span>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Category */}
+        <div className="field">
+          <label className="label">Categoria <span className="req">*</span></label>
+          <div className="cat-pills">
+            <button
+              type="button"
+              className={`cat-pill ${isOtherCategory ? "active" : ""}`}
+              onClick={() => setCategoryId("__other__")}
+            >
+              <Icon name="add" className="text-[12px]" /> Outra
+            </button>
+            {categories.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={`cat-pill ${categoryId === c.id ? "active" : ""}`}
+                onClick={() => setCategoryId(c.id)}
+              >
+                <Icon name={CATEGORY_ICONS[c.name] ?? c.icon ?? "receipt_long"} className="text-[12px]" />
+                {c.name}
+              </button>
+            ))}
+          </div>
+          {isOtherCategory && (
+            <input
+              className="input"
+              style={{ marginTop: 8 }}
+              placeholder="Nome da nova categoria"
+              value={customCategoryName}
+              onChange={(e) => setCustomCategoryName(e.target.value)}
+              autoFocus
+              required
+            />
+          )}
+        </div>
+
+        {/* Competence + transaction date */}
+        <div className="field">
+          <label className="label">Mês de competência <span className="req">*</span></label>
+          <input
+            type="month"
+            className="input"
+            value={competence}
+            onChange={(e) => setCompetence(e.target.value)}
+            required
+          />
+          <span className="help">A transação aparecerá em <strong>{competenceLabel}</strong></span>
+        </div>
+        <div className="field">
+          <label className="label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={hasTxDate}
+              onChange={(e) => setHasTxDate(e.target.checked)}
+              style={{ accentColor: "var(--accent)" }}
+            />
+            Data real da transação (opcional)
+          </label>
+          {hasTxDate && (
+            <>
+              <input
+                type="date"
+                className="input"
+                value={transactionDate}
+                onChange={(e) => setTransactionDate(e.target.value)}
+                style={{ marginTop: 6 }}
+              />
+              <span className="help">Use quando o evento ocorreu fora do mês de competência (ex: compra antiga cobrada agora)</span>
+            </>
+          )}
+        </div>
+
+        {/* Option pills */}
+        {!editingId && (
+          <div className="field">
+            <div className="opt-pills">
+              <button
+                type="button"
+                className={`opt-pill ${isInstallment ? "active" : ""}`}
+                disabled={isRecurring}
+                onClick={() => setIsInstallment((s) => !s)}
+              >
+                <Icon name="payments" className="text-[12px]" /> Parcelado
+              </button>
+              <button
+                type="button"
+                className={`opt-pill ${isScheduled ? "active" : ""}`}
+                onClick={() => setIsScheduled((s) => !s)}
+              >
+                <Icon name="schedule" className="text-[12px]" /> Agendado
+              </button>
+              <button
+                type="button"
+                className={`opt-pill ${isRecurring ? "active" : ""}`}
+                disabled={isInstallment}
+                onClick={() => setIsRecurring((s) => !s)}
+              >
+                <Icon name="repeat" className="text-[12px]" /> Recorrente
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!editingId && isInstallment && (
+          <div className="field">
+            <label className="label">Parcelas (2–48)</label>
+            <input className="input" type="number" min={2} max={48} value={installments} onChange={(e) => setInstallments(e.target.value)} placeholder="Ex: 10" />
+          </div>
+        )}
+
+        {!editingId && isScheduled && (
+          <div className="field">
+            <label className="label">Data prevista</label>
+            <input className="input" type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} />
+          </div>
+        )}
+
+        {/* More options */}
+        <div className="collapsible">
+          <button type="button" className="collapsible-head" onClick={() => setMoreOpen((s) => !s)}>
+            <Icon name={moreOpen ? "expand_less" : "expand_more"} className="text-[14px]" /> Mais opções
+          </button>
+          {moreOpen && (
+            <div className="collapsible-body">
+              <div className="field">
+                <label className="label">Observações</label>
+                <textarea className="textarea" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+              </div>
+              <div className="check-row" onClick={() => setIsBill((s) => !s)}>
+                <div className={`cb ${isBill ? "checked" : ""}`}>{isBill && <Icon name="check" className="text-[12px]" />}</div>
+                <div>
+                  <div className="cb-label">Aparece nos vencimentos</div>
+                  <div className="cb-help">Mostra na tela de Vencimentos para controle de pagamento</div>
+                </div>
+              </div>
+              {editingId && existing?.classification === "installment" && (
+                <div className="check-row" style={{ marginTop: 8 }} onClick={() => setEditCascade((s) => !s)}>
+                  <div className={`cb ${editCascade ? "checked" : ""}`}>{editCascade && <Icon name="check" className="text-[12px]" />}</div>
+                  <div>
+                    <div className="cb-label">Aplicar a todas as parcelas</div>
+                    <div className="cb-help">Altera valor, descrição e categoria em todas</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting && <span className="spinner" />}
+            {editingId ? "Salvar" : "Criar transação"}
+          </button>
+        </div>
+      </form>
+    </Dialog>
   )
 }

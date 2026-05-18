@@ -212,74 +212,42 @@ export function Bills() {
   const hasContent = plainBills.length > 0 || cardSections.length > 0
 
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+    <div className="content">
+      <div className="page-head">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-3xl font-extrabold font-headline tracking-tight">Vencimentos</h2>
-            <button
-              onClick={toggleValuesVisible}
-              className="opacity-40 hover:opacity-100 transition-opacity"
-              title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
-            >
-              <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
-            </button>
+          <h1>Vencimentos</h1>
+        </div>
+        <div className="actions">
+          <button className="icon-btn" onClick={toggleValuesVisible} title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}>
+            <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-[16px]" />
+          </button>
+          <div className="month-nav">
+            <button onClick={() => changeMonth(-1)}><Icon name="chevron_left" className="text-[14px]" /></button>
+            <span className="month-label">{monthLabel}</span>
+            <button onClick={() => changeMonth(1)}><Icon name="chevron_right" className="text-[14px]" /></button>
           </div>
-          <p className="text-on-surface-variant text-sm mt-1">Controle de pagamentos do mes</p>
         </div>
       </div>
 
-      {/* Month Picker */}
-      <div className="flex items-center justify-between">
-        <button onClick={() => changeMonth(-1)} className="p-2 rounded-xl hover:bg-surface-container-high transition-colors">
-          <Icon name="chevron_left" className="text-on-surface-variant" />
-        </button>
-        <h3 className="font-headline font-bold text-lg text-on-surface capitalize">{monthLabel}</h3>
-        <button onClick={() => changeMonth(1)} className="p-2 rounded-xl hover:bg-surface-container-high transition-colors">
-          <Icon name="chevron_right" className="text-on-surface-variant" />
-        </button>
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <div className="bg-surface-container-low rounded-xl p-3 sm:p-5 ghost-border">
-          <div className="flex flex-col items-center sm:flex-row sm:items-center gap-1.5 sm:gap-2.5 mb-2">
-            <div className="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0">
-              <Icon name="payments" className="text-on-surface text-sm" />
-            </div>
-            <p className="text-[10px] sm:text-xs text-on-surface-variant">Total</p>
-          </div>
-          <p className="text-sm sm:text-xl font-headline font-bold text-center sm:text-left"><MoneyValue value={totalAmount} /></p>
+      <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: 20 }}>
+        <div className="kpi">
+          <div className="kpi-label"><Icon name="payments" className="text-[12px]" />Total</div>
+          <div className="kpi-value"><MoneyValue value={totalAmount} /></div>
         </div>
-        <div className="bg-surface-container-low rounded-xl p-3 sm:p-5 ghost-border">
-          <div className="flex flex-col items-center sm:flex-row sm:items-center gap-1.5 sm:gap-2.5 mb-2">
-            <div className="w-8 h-8 rounded-full bg-income-container/20 flex items-center justify-center shrink-0">
-              <Icon name="check_circle" className="text-income text-sm" />
-            </div>
-            <p className="text-[10px] sm:text-xs text-on-surface-variant">Pago</p>
-          </div>
-          <p className="text-sm sm:text-xl font-headline font-bold text-income text-center sm:text-left"><MoneyValue value={paidAmount} /></p>
+        <div className="kpi">
+          <div className="kpi-label"><Icon name="check_circle" className="text-[12px]" />Pago</div>
+          <div className="kpi-value positive"><MoneyValue value={paidAmount} /></div>
         </div>
-        <div className="bg-surface-container-low rounded-xl p-3 sm:p-5 ghost-border">
-          <div className="flex flex-col items-center sm:flex-row sm:items-center gap-1.5 sm:gap-2.5 mb-2">
-            <div className="w-8 h-8 rounded-full bg-error-container/20 flex items-center justify-center shrink-0">
-              <Icon name="schedule" className="text-error text-sm" />
-            </div>
-            <p className="text-[10px] sm:text-xs text-on-surface-variant">Pendente</p>
-          </div>
-          <p className="text-sm sm:text-xl font-headline font-bold text-error text-center sm:text-left"><MoneyValue value={pendingAmount} /></p>
+        <div className="kpi">
+          <div className="kpi-label"><Icon name="schedule" className="text-[12px]" />Pendente</div>
+          <div className="kpi-value negative"><MoneyValue value={pendingAmount} /></div>
         </div>
       </div>
 
-      {/* Lists */}
       {!hasContent ? (
-        <div className="bg-surface-container-low rounded-xl p-10 ghost-border text-center">
-          <div className="w-16 h-16 rounded-full bg-primary-container/20 flex items-center justify-center mx-auto mb-4">
-            <Icon name="event_available" className="text-3xl text-primary" />
-          </div>
-          <p className="text-lg font-headline font-bold mb-2">Nenhum vencimento</p>
-          <p className="text-sm text-on-surface-variant">Nenhuma conta a pagar encontrada para {monthLabel}</p>
+        <div className="panel empty">
+          <div className="empty-title">Nenhum vencimento</div>
+          <p>Nenhuma conta a pagar encontrada para {monthLabel}.</p>
         </div>
       ) : (
         <div className="space-y-3">

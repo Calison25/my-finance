@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
+import { toast } from "@/components/ui/Toast"
 
 const EMPTY_FORM = {
   bank_id: "",
@@ -12,11 +13,15 @@ const EMPTY_FORM = {
   last_digits: "",
 }
 
+function fmtMonth(d: Date) {
+  return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+}
+
 export function Accounts() {
   const navigate = useNavigate()
   const { cards, banks, addCard, updateCard, deleteCard, getCardBalanceByMonth, valuesVisible, toggleValuesVisible } = useFinanceStore()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingCardId, setEditingCardId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const next = new Date()
@@ -26,34 +31,26 @@ export function Accounts() {
 
   const isOtherBank = form.bank_id === "__other__"
   const checkingAccounts = cards.filter((c) => c.type === "CHECKING_ACCOUNT")
+  const [y, m] = selectedMonth.split("-").map(Number)
+  const monthDate = new Date(y, m - 1, 1)
 
-  function openCreateDialog() {
-    setEditingCardId(null)
+  function openCreate() {
+    setEditingId(null)
     setForm({ ...EMPTY_FORM })
     setDialogOpen(true)
   }
 
-  function openEditDialog(accountId: string) {
-    const account = checkingAccounts.find((c) => c.id === accountId)
-    if (!account) return
-    setEditingCardId(accountId)
-    setForm({
-      bank_id: account.bank_id ?? "",
-      custom_bank_name: "",
-      name: account.name,
-      last_digits: account.last_digits ?? "",
-    })
+  function openEdit(id: string) {
+    const a = checkingAccounts.find((c) => c.id === id)
+    if (!a) return
+    setEditingId(id)
+    setForm({ bank_id: a.bank_id ?? "", custom_bank_name: "", name: a.name, last_digits: a.last_digits ?? "" })
     setDialogOpen(true)
   }
 
-  function closeDialog() {
-    setDialogOpen(false)
-    setEditingCardId(null)
-  }
-
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if ((!form.bank_id || isOtherBank && !form.custom_bank_name) || !form.name) return
+    if ((!form.bank_id || (isOtherBank && !form.custom_bank_name)) || !form.name) return
 
     const payload = {
       bank_id: isOtherBank ? undefined : form.bank_id,
@@ -63,155 +60,116 @@ export function Accounts() {
       last_digits: form.last_digits || undefined,
     }
 
-    if (editingCardId) {
-      updateCard(editingCardId, payload)
-    } else {
-      addCard(payload)
-    }
-
-    setForm({ ...EMPTY_FORM })
-    closeDialog()
+    try {
+      await toast.run(editingId ? "Salvando..." : "Criando conta...", async () => {
+        if (editingId) await Promise.resolve(updateCard(editingId, payload))
+        else await Promise.resolve(addCard(payload))
+      }, editingId ? "Conta atualizada" : "Conta criada")
+      setForm({ ...EMPTY_FORM })
+      setDialogOpen(false)
+      setEditingId(null)
+    } catch {}
   }
 
-  function getBankForCard(bankId: string) {
-    return banks.find((b) => b.id === bankId)
+  async function handleDelete(id: string) {
+    if (!confirm("Excluir esta conta?")) return
+    try {
+      await toast.run("Excluindo conta...", () => Promise.resolve(deleteCard(id)), "Conta excluída")
+    } catch {}
   }
 
   const totalBalance = checkingAccounts.reduce((acc, c) => acc + getCardBalanceByMonth(c.id, selectedMonth), 0)
 
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+    <div className="content">
+      <div className="page-head">
         <div>
-          <h2 className="text-3xl font-extrabold font-headline tracking-tight">Contas Bancarias</h2>
-          <p className="text-on-surface-variant text-sm mt-1">Gerencie suas contas correntes</p>
+          <h1>Contas bancárias</h1>
         </div>
-        <button
-          onClick={openCreateDialog}
-          className="flex items-center gap-2 p-3 sm:px-6 sm:py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all atmos-shadow"
-        >
-          <Icon name="add_circle" className="text-lg" />
-          <span className="hidden sm:inline">Nova Conta</span>
-        </button>
+        <div className="actions">
+          <button className="btn btn-primary" onClick={openCreate}>
+            <Icon name="add" className="text-[14px]" /> Nova conta
+          </button>
+        </div>
       </div>
 
-      {/* Total Balance Card */}
-      {checkingAccounts.length > 0 && (
-        <div className="glass-card ghost-border rounded-xl p-8 relative overflow-hidden group">
-          <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all duration-700 pointer-events-none" />
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2">
-              <p className="text-on-surface-variant font-label text-sm">Saldo Total em Contas</p>
-              <button
-                onClick={toggleValuesVisible}
-                className="opacity-40 hover:opacity-100 transition-opacity"
-                title={valuesVisible ? "Ocultar valores" : "Mostrar valores"}
-              >
-                <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-base text-on-surface-variant" />
+      <div className="panel" style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div className="hero-label" style={{ marginBottom: 6 }}>
+              Saldo total em contas
+              <button className="icon-btn" onClick={toggleValuesVisible} style={{ width: 28, height: 28 }}>
+                <Icon name={valuesVisible ? "visibility" : "visibility_off"} className="text-[14px]" />
               </button>
             </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => {
-                  const [y, m] = selectedMonth.split("-").map(Number)
-                  const prev = new Date(y, m - 2, 1)
-                  setSelectedMonth(`${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`)
-                }}
-                className="p-1.5 rounded-lg hover:bg-surface-container-highest transition-colors"
-              >
-                <Icon name="chevron_left" className="text-lg text-on-surface-variant" />
-              </button>
-              <span className="text-sm font-medium text-on-surface min-w-[100px] text-center capitalize">
-                {new Date(Number(selectedMonth.split("-")[0]), Number(selectedMonth.split("-")[1]) - 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
-              </span>
-              <button
-                onClick={() => {
-                  const [y, m] = selectedMonth.split("-").map(Number)
-                  const next = new Date(y, m, 1)
-                  setSelectedMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`)
-                }}
-                className="p-1.5 rounded-lg hover:bg-surface-container-highest transition-colors"
-              >
-                <Icon name="chevron_right" className="text-lg text-on-surface-variant" />
-              </button>
+            <div className="hero-value" style={{ fontSize: 36, color: totalBalance >= 0 ? "var(--text)" : "var(--negative)" }}>
+              <MoneyValue value={totalBalance} />
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-3)", display: "flex", alignItems: "center", gap: 6 }}>
+              <Icon name="account_balance" className="text-[12px]" />
+              {checkingAccounts.length} conta(s) cadastrada(s)
             </div>
           </div>
-          <p className={`font-headline font-bold text-4xl ${totalBalance >= 0 ? "text-on-surface" : "text-error"}`}><MoneyValue value={totalBalance} /></p>
-          <div className="mt-4 flex items-center gap-2 text-primary font-medium text-sm">
-            <Icon name="account_balance" className="text-base" />
-            <span>{checkingAccounts.length} conta(s) cadastrada(s)</span>
+          <div className="month-nav">
+            <button onClick={() => {
+              const d = new Date(y, m - 2, 1)
+              setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+            }}>
+              <Icon name="chevron_left" className="text-[14px]" />
+            </button>
+            <span className="month-label">{fmtMonth(monthDate)}</span>
+            <button onClick={() => {
+              const d = new Date(y, m, 1)
+              setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+            }}>
+              <Icon name="chevron_right" className="text-[14px]" />
+            </button>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Empty State */}
       {checkingAccounts.length === 0 ? (
-        <div className="bg-surface-container-low rounded-xl p-12 ghost-border flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 rounded-full bg-surface-container-highest flex items-center justify-center mb-4">
-            <Icon name="account_balance" className="text-3xl text-on-surface-variant" />
-          </div>
-          <p className="font-headline font-bold text-lg">Nenhuma conta bancaria cadastrada</p>
-          <p className="text-sm text-on-surface-variant mt-2 max-w-sm">
-            Adicione sua conta corrente para registrar seu salario e controlar gastos
-          </p>
-          <button
-            onClick={openCreateDialog}
-            className="mt-6 flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-sm active:scale-95 transition-all"
-          >
-            <Icon name="add_circle" className="text-lg" />
-            Nova Conta
+        <div className="panel empty">
+          <div className="empty-title">Nenhuma conta cadastrada</div>
+          <p>Adicione sua conta corrente para começar.</p>
+          <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={openCreate}>
+            <Icon name="add" className="text-[14px]" /> Nova conta
           </button>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {checkingAccounts.map((account) => {
-            const bank = getBankForCard(account.bank_id)
-            const balance = getCardBalanceByMonth(account.id, selectedMonth)
-
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+          {checkingAccounts.map((a) => {
+            const bank = banks.find((b) => b.id === a.bank_id)
+            const balance = getCardBalanceByMonth(a.id, selectedMonth)
             return (
               <div
-                key={account.id}
-                onClick={() => navigate(`/transactions?card_id=${account.id}`)}
-                className="group relative bg-surface-container-high rounded-xl p-6 ghost-border hover:bg-surface-container-highest transition-all duration-300 cursor-pointer"
+                key={a.id}
+                className="acct-row"
+                style={{ padding: 18, alignItems: "flex-start", display: "block" }}
+                onClick={() => navigate(`/transactions?card_id=${a.id}`)}
               >
-                <div className="absolute top-4 right-4 flex items-center gap-1">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openEditDialog(account.id) }}
-                    className="rounded-full p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-primary-container/20 text-on-surface-variant hover:text-primary"
-                  >
-                    <Icon name="edit" className="text-lg" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteCard(account.id) }}
-                    className="rounded-full p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-error-container/20 text-on-surface-variant hover:text-error"
-                  >
-                    <Icon name="delete" className="text-lg" />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-3 mb-6">
-                  <div
-                    className="flex h-12 w-12 items-center justify-center rounded-lg text-white font-bold text-sm"
-                    style={{ backgroundColor: bank?.color ?? "#0066cc" }}
-                  >
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div className="bi lg" style={{ background: bank?.color ?? "var(--c-porto)" }}>
                     {bank?.name?.slice(0, 2).toUpperCase() ?? "??"}
                   </div>
-                  <div>
-                    <p className="font-bold">{account.name}</p>
-                    <p className="text-xs text-on-surface-variant">{bank?.name ?? "Custom"}</p>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="acct-name">{a.name}</div>
+                    <div className="acct-sub">{bank?.name ?? "Banco custom"}{a.last_digits ? ` · **** ${a.last_digits}` : ""}</div>
+                  </div>
+                  <div className="row-actions">
+                    <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={(e) => { e.stopPropagation(); openEdit(a.id) }}>
+                      <Icon name="edit" className="text-[13px]" />
+                    </button>
+                    <button className="icon-btn" style={{ width: 28, height: 28, color: "var(--negative)" }} onClick={(e) => { e.stopPropagation(); handleDelete(a.id) }}>
+                      <Icon name="delete" className="text-[13px]" />
+                    </button>
                   </div>
                 </div>
-
-                {account.last_digits && (
-                  <p className="text-xs text-on-surface-variant mb-4">Conta **** {account.last_digits}</p>
-                )}
-
-                <div>
-                  <p className="text-xs text-on-surface-variant font-label uppercase tracking-wider">Saldo atual</p>
-                  <p className={`text-2xl font-headline font-bold mt-1 ${balance >= 0 ? "text-primary" : "text-error"}`}>
+                <div style={{ marginTop: 18 }}>
+                  <div style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Saldo atual</div>
+                  <div style={{ marginTop: 4, fontFamily: "var(--font-mono)", fontSize: 22, fontWeight: 500, color: balance >= 0 ? "var(--text)" : "var(--negative)" }}>
                     <MoneyValue value={balance} />
-                  </p>
+                  </div>
                 </div>
               </div>
             )
@@ -219,74 +177,44 @@ export function Accounts() {
         </div>
       )}
 
-      {/* Dialog */}
-      <Dialog open={dialogOpen} onClose={closeDialog} title={editingCardId ? "Editar Conta" : "Nova Conta Bancaria"}>
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-              Banco
-            </label>
-            <select
-              value={form.bank_id}
-              onChange={(e) => setForm({ ...form, bank_id: e.target.value, custom_bank_name: "" })}
-              className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
-              required
-            >
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={editingId ? "Editar conta" : "Nova conta bancária"}>
+        <form onSubmit={handleSubmit}>
+          <div className="field">
+            <label className="label">Banco <span className="req">*</span></label>
+            <select className="select" value={form.bank_id} onChange={(e) => setForm({ ...form, bank_id: e.target.value, custom_bank_name: "" })} required>
               <option value="">Selecione o banco</option>
-              {banks.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
+              {banks.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               <option value="__other__">Outro</option>
             </select>
             {isOtherBank && (
               <input
+                className="input"
+                style={{ marginTop: 8 }}
+                placeholder="Nome do banco"
                 value={form.custom_bank_name}
                 onChange={(e) => setForm({ ...form, custom_bank_name: e.target.value })}
-                placeholder="Nome do banco"
-                className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50 mt-2"
                 required
               />
             )}
           </div>
-
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-              Nome da conta
-            </label>
-            <input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Ex: Conta Salario Inter"
-              className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
-              required
-            />
+          <div className="field">
+            <label className="label">Nome da conta <span className="req">*</span></label>
+            <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Conta Salário" required />
           </div>
-
-          <div className="space-y-2">
-            <label className="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-              Ultimos 4 digitos (opcional)
-            </label>
+          <div className="field">
+            <label className="label">Últimos 4 dígitos (opcional)</label>
             <input
+              className="input"
               value={form.last_digits}
               onChange={(e) => setForm({ ...form, last_digits: e.target.value.replace(/\D/g, "").slice(0, 4) })}
               placeholder="1290"
               maxLength={4}
-              className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-3.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-1 focus:ring-primary/50"
             />
           </div>
-
-          <div className="bg-surface-container-high/50 rounded-xl p-4 ghost-border">
-            <p className="text-xs text-on-surface-variant">
-              Apos criar a conta, adicione uma transacao do tipo "Receita" para registrar seu salario.
-            </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setDialogOpen(false)}>Cancelar</button>
+            <button type="submit" className="btn btn-primary">{editingId ? "Salvar" : "Criar conta"}</button>
           </div>
-
-          <button
-            type="submit"
-            className="w-full py-4 rounded-xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-headline font-bold text-sm active:scale-[0.98] transition-all shadow-[0_8px_32px_rgba(0,102,204,0.3)]"
-          >
-            {editingCardId ? "Salvar" : "Criar Conta"}
-          </button>
         </form>
       </Dialog>
     </div>

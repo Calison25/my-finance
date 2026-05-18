@@ -32,9 +32,11 @@ const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Se
 
 function getChartColors() {
   const style = getComputedStyle(document.documentElement)
+  const positive = style.getPropertyValue("--positive").trim() || "#15803D"
+  const negative = style.getPropertyValue("--negative").trim() || "#B91C1C"
   return {
-    income: style.getPropertyValue("--color-income").trim(),
-    error: style.getPropertyValue("--color-error").trim(),
+    income: positive,
+    error: negative,
   }
 }
 
@@ -59,7 +61,7 @@ function renderBarLabel(props: any) {
       textAnchor="middle"
       fontSize={10}
       fontWeight={600}
-      fill="var(--color-on-surface)"
+      fill="var(--text-2)"
     >
       {text}
     </text>
@@ -322,12 +324,16 @@ export function Reports() {
   const hasData = filteredTransactions.length > 0
 
   return (
-    <div className="space-y-8">
-      {/* Header + Period Filter */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="content">
+      <div className="page-head">
+        <div>
+          <h1>Relatórios</h1>
+        </div>
+      </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" style={{ marginBottom: 16 }}>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="font-headline font-bold text-2xl">Relatorios</h1>
+            <h1 className="font-headline font-bold text-2xl" style={{ display: "none" }}>Relatórios</h1>
             <button
               onClick={toggleValuesVisible}
               className="opacity-40 hover:opacity-100 transition-opacity"
@@ -583,7 +589,7 @@ export function Reports() {
                       width={35}
                     />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="amount" name="Parcelas" fill="var(--color-secondary)" radius={[4, 4, 0, 0]}>
+                    <Bar dataKey="amount" name="Parcelas" fill="var(--accent)" radius={[4, 4, 0, 0]}>
                       <LabelList dataKey="amount" content={renderBarLabel} />
                     </Bar>
                   </BarChart>

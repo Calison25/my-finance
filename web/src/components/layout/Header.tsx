@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
 import { useFinanceStore } from "@/stores/finance-store"
 import { useAuthStore } from "@/stores/auth-store"
+import { useThemeStore } from "@/stores/theme-store"
 
 interface UpcomingItem {
   id: string
@@ -35,6 +36,7 @@ export function Header() {
   const navigate = useNavigate()
   const { transactions, cards, banks } = useFinanceStore()
   const { appUser } = useAuthStore()
+  const { theme, toggleTheme } = useThemeStore()
   const [notifOpen, setNotifOpen] = useState(false)
 
   const today = new Date()
@@ -49,12 +51,7 @@ export function Header() {
       (t) => !t.is_realized && t.is_bill && t.date >= todayStr && t.date <= in5daysStr
     )
     for (const tx of billTxs) {
-      items.push({
-        id: tx.id,
-        description: tx.description,
-        amount: tx.amount,
-        date: tx.date,
-      })
+      items.push({ id: tx.id, description: tx.description, amount: tx.amount, date: tx.date })
     }
 
     const now = new Date()
@@ -74,11 +71,9 @@ export function Header() {
       )
       const total = cardTxs.reduce((acc, t) => acc + t.amount, 0)
       if (total <= 0) continue
-
       const bank = banks.find((b) => b.id === card.bank_id)
       const dueDay = card.due_day!
       const dueDateStr = `${selectedMonth}-${String(dueDay).padStart(2, "0")}`
-
       items.push({
         id: `card-invoice-${card.id}`,
         description: `Fatura ${bank ? `${bank.name} - ` : ""}${card.name}`,
@@ -86,7 +81,6 @@ export function Header() {
         date: dueDateStr,
       })
     }
-
     return items.sort((a, b) => a.date.localeCompare(b.date))
   }, [transactions, cards, banks, todayStr, in5daysStr])
 
@@ -101,86 +95,116 @@ export function Header() {
   }, [notifOpen])
 
   return (
-    <header className="bg-surface sticky top-0 z-50">
-      <div className="flex justify-between items-center w-full px-6 py-4">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full overflow-hidden ghost-border bg-surface-container-high flex items-center justify-center">
-            <Icon name="account_balance" className="text-primary text-xl" filled />
-          </div>
-          <h1 className="text-xl font-bold tracking-tight text-primary font-headline">
-            My Finance
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
+    <header className="topbar">
+      <div className="topbar-left" />
+      <div className="topbar-right">
+        <button
+          className="icon-btn"
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Modo claro" : "Modo escuro"}
+        >
+          <Icon name={theme === "dark" ? "light_mode" : "dark_mode"} className="text-[18px]" />
+        </button>
+
+        <div className="notif-dropdown" style={{ position: "relative" }}>
           <button
-            type="button"
-            onClick={() => navigate("/settings")}
-            className="p-1 rounded-full hover:ring-2 hover:ring-primary/30 transition-all cursor-pointer"
-            title="Configuracoes"
+            className="icon-btn"
+            onClick={() => setNotifOpen(!notifOpen)}
+            title="Notificações"
           >
-            {appUser?.avatar_url ? (
-              <img
-                src={appUser.avatar_url}
-                alt={appUser.name ?? "Avatar"}
-                className="w-9 h-9 rounded-full"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center">
-                <Icon name="person" className="text-on-primary-container text-sm" />
-              </div>
+            <Icon name="notifications" className="text-[18px]" />
+            {upcomingItems.length > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: 4,
+                  right: 4,
+                  minWidth: 14,
+                  height: 14,
+                  padding: "0 4px",
+                  borderRadius: 999,
+                  background: "var(--negative)",
+                  color: "#fff",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  display: "grid",
+                  placeItems: "center",
+                  fontFamily: "var(--font-mono)",
+                }}
+              >
+                {upcomingItems.length}
+              </span>
             )}
           </button>
-          <div className="relative notif-dropdown">
-            <button
-              type="button"
-              onClick={() => setNotifOpen(!notifOpen)}
-              className="relative p-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-300 rounded-full active:scale-95 cursor-pointer"
-            >
-              <Icon name="notifications" />
-              {upcomingItems.length > 0 && (
-                <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-error text-on-error text-[10px] font-bold px-1 pointer-events-none">
-                  {upcomingItems.length}
-                </span>
-              )}
-            </button>
 
-            {notifOpen && (
-              <div className="absolute right-0 top-full mt-2 w-80 bg-surface-container-low rounded-xl ghost-border shadow-2xl z-50 overflow-hidden">
-                <div className="px-4 py-3 border-b border-outline-variant/15">
-                  <p className="font-headline font-bold text-sm">Vencimentos proximos</p>
-                  <p className="text-[10px] text-on-surface-variant">Proximos 5 dias</p>
-                </div>
-                {upcomingItems.length === 0 ? (
-                  <div className="px-4 py-6 text-center">
-                    <p className="text-sm text-on-surface-variant">Nenhum vencimento proximo</p>
-                  </div>
-                ) : (
-                  <div className="max-h-64 overflow-y-auto divide-y divide-outline-variant/10">
-                    {upcomingItems.map((item) => (
-                      <div key={item.id} className="px-4 py-3 flex items-center gap-3">
-                        <Icon name="schedule" className="text-error text-sm shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{item.description}</p>
-                          <p className="text-[10px] text-on-surface-variant">{formatDate(item.date)}</p>
-                        </div>
-                        <span className="text-sm font-bold text-error shrink-0">
-                          <MoneyValue value={item.amount} />
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => { navigate("/bills"); setNotifOpen(false) }}
-                  className="w-full px-4 py-3 text-center text-xs font-bold text-primary border-t border-outline-variant/15 hover:bg-surface-container-high transition-colors"
-                >
-                  Ver todos os vencimentos
-                </button>
+          {notifOpen && (
+            <div
+              className="filter-popover"
+              style={{ width: 320, right: 0, top: 44 }}
+            >
+              <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--hairline)" }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>Vencimentos próximos</div>
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>Próximos 5 dias</div>
               </div>
-            )}
-          </div>
+              {upcomingItems.length === 0 ? (
+                <div style={{ padding: 24, textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
+                  Nenhum vencimento próximo
+                </div>
+              ) : (
+                <div style={{ maxHeight: 260, overflowY: "auto" }}>
+                  {upcomingItems.map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "10px 14px",
+                        borderBottom: "1px solid var(--hairline)",
+                      }}
+                    >
+                      <Icon name="schedule" className="text-[14px]" style={{ color: "var(--negative)" }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {item.description}
+                        </div>
+                        <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 1 }}>{formatDate(item.date)}</div>
+                      </div>
+                      <span className="num" style={{ fontSize: 12, color: "var(--negative)", fontWeight: 500 }}>
+                        <MoneyValue value={item.amount} />
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => { navigate("/bills"); setNotifOpen(false) }}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--accent)",
+                  borderTop: "1px solid var(--hairline)",
+                }}
+              >
+                Ver todos os vencimentos
+              </button>
+            </div>
+          )}
         </div>
+
+        <button
+          className="avatar"
+          onClick={() => navigate("/settings")}
+          title="Configurações"
+        >
+          {appUser?.avatar_url ? (
+            <img src={appUser.avatar_url} alt={appUser.name ?? "Avatar"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            (appUser?.name?.[0] ?? "U").toUpperCase()
+          )}
+        </button>
       </div>
     </header>
   )

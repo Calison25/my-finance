@@ -15,6 +15,7 @@ class TransactionCreate(BaseModel):
     category_id: UUID | None = None
     custom_category_name: str | None = Field(default=None, max_length=100)
     date: dt.date
+    transaction_date: dt.date | None = None
     is_scheduled: bool = False
     scheduled_date: dt.date | None = None
     is_recurring: bool = False
@@ -30,6 +31,7 @@ class TransactionUpdate(BaseModel):
     category_id: UUID | None = None
     custom_category_name: str | None = Field(default=None, max_length=100)
     date: dt.date | None = None
+    transaction_date: dt.date | None = None
     is_scheduled: bool | None = None
     scheduled_date: dt.date | None = None
     is_realized: bool | None = None
@@ -48,6 +50,7 @@ class TransactionResponse(BaseModel):
     type: TransactionType
     category_id: UUID | None
     date: dt.date
+    transaction_date: dt.date | None = None
     is_scheduled: bool
     scheduled_date: dt.date | None
     is_realized: bool

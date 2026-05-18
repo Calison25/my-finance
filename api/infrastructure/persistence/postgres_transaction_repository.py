@@ -150,9 +150,9 @@ class PostgresTransactionRepository:
                 """
                 INSERT INTO transactions
                     (id, card_id, description, amount, type, category_id,
-                     date, is_scheduled, scheduled_date, is_realized,
+                     date, transaction_date, is_scheduled, scheduled_date, is_realized,
                      is_recurring, is_bill, recurring_transaction_id, notes, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                 RETURNING *
                 """,
                 transaction.id,
@@ -162,6 +162,7 @@ class PostgresTransactionRepository:
                 transaction.type.value,
                 transaction.category_id,
                 transaction.date,
+                transaction.transaction_date,
                 transaction.is_scheduled,
                 transaction.scheduled_date,
                 transaction.is_realized,
@@ -177,7 +178,7 @@ class PostgresTransactionRepository:
         if not transactions:
             return []
 
-        columns_per_row = 15
+        columns_per_row = 16
         values_sql_parts: list[str] = []
         params: list = []
         for i, tx in enumerate(transactions):
@@ -192,6 +193,7 @@ class PostgresTransactionRepository:
                 tx.type.value,
                 tx.category_id,
                 tx.date,
+                tx.transaction_date,
                 tx.is_scheduled,
                 tx.scheduled_date,
                 tx.is_realized,
@@ -205,7 +207,7 @@ class PostgresTransactionRepository:
         query = f"""
             INSERT INTO transactions
                 (id, card_id, description, amount, type, category_id,
-                 date, is_scheduled, scheduled_date, is_realized,
+                 date, transaction_date, is_scheduled, scheduled_date, is_realized,
                  is_recurring, is_bill, recurring_transaction_id, notes, created_at)
             VALUES {", ".join(values_sql_parts)}
             RETURNING *
@@ -221,9 +223,9 @@ class PostgresTransactionRepository:
                 """
                 UPDATE transactions
                 SET description = $2, amount = $3, type = $4, category_id = $5,
-                    date = $6, is_scheduled = $7, scheduled_date = $8,
-                    is_realized = $9, notes = $10, is_recurring = $11,
-                    is_bill = $12, recurring_transaction_id = $13
+                    date = $6, transaction_date = $7, is_scheduled = $8, scheduled_date = $9,
+                    is_realized = $10, notes = $11, is_recurring = $12,
+                    is_bill = $13, recurring_transaction_id = $14
                 WHERE id = $1
                 RETURNING *
                 """,
@@ -233,6 +235,7 @@ class PostgresTransactionRepository:
                 transaction.type.value,
                 transaction.category_id,
                 transaction.date,
+                transaction.transaction_date,
                 transaction.is_scheduled,
                 transaction.scheduled_date,
                 transaction.is_realized,
@@ -330,6 +333,7 @@ class PostgresTransactionRepository:
             type=TransactionType(record["type"]),
             category_id=record["category_id"],
             date=record["date"],
+            transaction_date=record["transaction_date"],
             is_scheduled=record["is_scheduled"],
             scheduled_date=record["scheduled_date"],
             is_realized=record["is_realized"],

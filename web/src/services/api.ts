@@ -116,6 +116,7 @@ export const api = {
       category_id?: string
       custom_category_name?: string
       date: string
+      transaction_date?: string
       is_scheduled?: boolean
       scheduled_date?: string
       is_recurring?: boolean
