@@ -345,16 +345,13 @@ export function Reports() {
           <p className="text-xs text-on-surface-variant">Analise detalhada das suas financas</p>
         </div>
         <div className="flex flex-col items-start sm:items-end gap-3 w-full sm:w-auto">
-          <div className="flex gap-1 bg-surface-container-high rounded-full p-1 ghost-border overflow-x-auto w-full sm:w-auto scrollbar-thin">
+          <div className="tabs" style={{ overflowX: "auto", maxWidth: "100%" }}>
             {(Object.keys(PERIOD_LABELS) as PeriodMode[]).map((mode) => (
               <button
                 key={mode}
+                type="button"
                 onClick={() => setPeriodMode(mode)}
-                className={`px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
-                  periodMode === mode
-                    ? "bg-primary text-on-primary shadow-lg shadow-primary/20"
-                    : "text-on-surface-variant hover:bg-surface-container-highest"
-                }`}
+                className={periodMode === mode ? "active" : ""}
               >
                 {PERIOD_LABELS[mode]}
               </button>
@@ -366,14 +363,14 @@ export function Reports() {
                 type="month"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="bg-surface-container-high border-none rounded-lg px-3 py-2 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+                className="input"
               />
               <span className="text-on-surface-variant text-sm">ate</span>
               <input
                 type="month"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="bg-surface-container-high border-none rounded-lg px-3 py-2 text-sm text-on-surface focus:ring-1 focus:ring-primary/50"
+                className="input"
               />
             </div>
           )}

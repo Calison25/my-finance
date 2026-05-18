@@ -463,6 +463,7 @@ a { color: inherit; text-decoration: none; }
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
+.kpi-grid-3 { grid-template-columns: repeat(3, 1fr); }
 .kpi {
   background: var(--surface);
   border: 1px solid var(--hairline);
@@ -1617,6 +1618,7 @@ a { color: inherit; text-decoration: none; }
   .app-main { padding-bottom: 80px; }
   .mobile-tabbar { display: block; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .kpi-grid-3 { grid-template-columns: repeat(2, 1fr); }
   .chart-row { grid-template-columns: 1fr; }
   .hero-value { font-size: 36px; }
   .hero { padding: 20px; }

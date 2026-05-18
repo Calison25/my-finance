@@ -456,7 +456,7 @@ export function Transactions() {
             </div>
           </div>
 
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: 20 }}>
+          <div className="kpi-grid kpi-grid-3" style={{ marginBottom: 20 }}>
             <div className="kpi">
               <div className="kpi-label">
                 <Icon name="repeat" className="text-[12px]" />Recorrentes
@@ -673,7 +673,7 @@ function TransactionModal(props: TxModalProps) {
       const c = cards.find((x) => x.id === existing.card_id)
       return c?.type === "CREDIT_CARD" ? "card" : "account"
     }
-    return "account"
+    return "card"
   })
   const [cardId, setCardId] = useState(existing?.card_id ?? "")
   const [categoryId, setCategoryId] = useState(existing?.category_id ?? "")
@@ -694,6 +694,10 @@ function TransactionModal(props: TxModalProps) {
   const [editCascade, setEditCascade] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (type === "INCOME" && srcKind === "card") setSrcKind("account")
+  }, [type, srcKind])
 
   const filteredSrcCards = cards.filter((c) => srcKind === "card" ? c.type === "CREDIT_CARD" : c.type === "CHECKING_ACCOUNT")
   const isOtherCategory = categoryId === "__other__"
