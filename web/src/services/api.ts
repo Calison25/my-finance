@@ -104,8 +104,13 @@ export const api = {
   },
 
   transactions: {
-    list: async () => {
-      const raw = await request<Record<string, unknown>[]>("/api/transactions")
+    list: async (params?: { date_from?: string; date_to?: string; card_id?: string }) => {
+      const qs = new URLSearchParams()
+      if (params?.date_from) qs.set("date_from", params.date_from)
+      if (params?.date_to) qs.set("date_to", params.date_to)
+      if (params?.card_id) qs.set("card_id", params.card_id)
+      const url = qs.toString() ? `/api/transactions?${qs}` : "/api/transactions"
+      const raw = await request<Record<string, unknown>[]>(url)
       return raw.map(normalizeTransaction)
     },
     create: (data: {

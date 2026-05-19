@@ -89,7 +89,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export function Reports() {
-  const { transactions, categories, cards, banks, transactionSummary, fetchTransactionSummary, valuesVisible, toggleValuesVisible } = useFinanceStore()
+  const { transactions, categories, cards, banks, transactionSummary, fetchTransactionSummary, valuesVisible, toggleValuesVisible, ensureMonths } = useFinanceStore()
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month")
   const [customFrom, setCustomFrom] = useState(() => {
     const next = new Date()
@@ -110,6 +110,32 @@ export function Reports() {
       fetchTransactionSummary(month)
     }
   }, [periodMode, transactions.length, fetchTransactionSummary])
+
+  useEffect(() => {
+    const now = new Date()
+    const months: string[] = []
+    for (let i = -5; i <= 8; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+    }
+    ensureMonths(months)
+  }, [ensureMonths])
+
+  useEffect(() => {
+    if (periodMode === "custom") {
+      const [fy, fm] = customFrom.split("-").map(Number)
+      const [ty, tm] = customTo.split("-").map(Number)
+      const months: string[] = []
+      const startIdx = fy * 12 + (fm - 1)
+      const endIdx = ty * 12 + (tm - 1)
+      for (let i = startIdx; i <= endIdx; i++) {
+        const y = Math.floor(i / 12)
+        const m = (i % 12) + 1
+        months.push(`${y}-${String(m).padStart(2, "0")}`)
+      }
+      ensureMonths(months)
+    }
+  }, [periodMode, customFrom, customTo, ensureMonths])
 
   const { startDate, endDate } = useMemo(() => {
     if (periodMode === "custom") {

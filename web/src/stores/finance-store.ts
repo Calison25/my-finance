@@ -8,9 +8,12 @@ interface FinanceState {
   transactions: Transaction[]
   categories: Category[]
   isLoading: boolean
+  loadedMonths: Set<string>
   valuesVisible: boolean
   toggleValuesVisible: () => void
   fetchAll: () => Promise<void>
+  fetchMeta: () => Promise<void>
+  ensureMonths: (months: string[]) => Promise<void>
   addBank: (data: { name: string; color: string }) => void
   deleteBank: (id: string) => void
   addCard: (data: { bank_id?: string; custom_bank_name?: string; name: string; type: CardType; last_digits?: string; credit_limit?: number; billing_day?: number; due_day?: number }) => void
@@ -18,7 +21,7 @@ interface FinanceState {
   deleteCard: (id: string) => void
   addCategory: (name: string) => string
   addTransaction: (data: { card_id: string; description: string; amount: number; type: TransactionType; category_id?: string; custom_category_name?: string; date: string; transaction_date?: string; is_scheduled?: boolean; scheduled_date?: string; is_recurring?: boolean; notes?: string; installments?: number; is_bill?: boolean }) => Promise<void>
-  updateTransaction: (id: string, data: { description?: string; amount?: number; type?: TransactionType; category_id?: string | null; custom_category_name?: string; notes?: string | null; is_recurring?: boolean }, cascade?: boolean) => Promise<void>
+  updateTransaction: (id: string, data: { description?: string; amount?: number; type?: TransactionType; category_id?: string | null; custom_category_name?: string; notes?: string | null; is_recurring?: boolean; transaction_date?: string | null }, cascade?: boolean) => Promise<void>
   deleteTransaction: (id: string) => void
   deleteTransactionGroup: (id: string, scope: "all" | "future") => Promise<void>
   realizeTransaction: (id: string) => Promise<void>
@@ -32,12 +35,30 @@ interface FinanceState {
   reset: () => void
 }
 
+function monthsToRange(months: string[]): { from: string; to: string } {
+  const sorted = [...months].sort()
+  const first = sorted[0]
+  const last = sorted[sorted.length - 1]
+  const [ly, lm] = last.split("-").map(Number)
+  const lastDay = new Date(ly, lm, 0).getDate()
+  return { from: `${first}-01`, to: `${last}-${String(lastDay).padStart(2, "0")}` }
+}
+
+async function refreshLoadedTransactions(
+  loadedMonths: Set<string>,
+): Promise<Transaction[] | null> {
+  if (loadedMonths.size === 0) return null
+  const { from, to } = monthsToRange([...loadedMonths])
+  return api.transactions.list({ date_from: from, date_to: to })
+}
+
 export const useFinanceStore = create<FinanceState>()((set, get) => ({
   banks: [],
   cards: [],
   transactions: [],
   categories: [],
   isLoading: true,
+  loadedMonths: new Set<string>(),
   valuesVisible: localStorage.getItem("values-visible") !== "false",
   toggleValuesVisible: () => set((s) => {
     const next = !s.valuesVisible
@@ -46,25 +67,61 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   }),
 
   fetchAll: async () => {
-    const isInitial = get().banks.length === 0 && get().cards.length === 0 && get().transactions.length === 0
+    const isInitial = get().banks.length === 0 && get().cards.length === 0
     if (isInitial) set({ isLoading: true })
+    const now = new Date()
+    const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+    const nxt = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    const nextMonth = `${nxt.getFullYear()}-${String(nxt.getMonth() + 1).padStart(2, "0")}`
+    const { from, to } = monthsToRange([cur, nextMonth])
     const [banks, cards, transactions, categories] = await Promise.all([
       api.banks.list(),
       api.cards.list(),
-      api.transactions.list(),
+      api.transactions.list({ date_from: from, date_to: to }),
       api.categories.list(),
     ])
-    set({ banks, cards, transactions, categories, isLoading: false })
+    set({
+      banks,
+      cards,
+      transactions,
+      categories,
+      loadedMonths: new Set([cur, nextMonth]),
+      isLoading: false,
+    })
+  },
+
+  fetchMeta: async () => {
+    const [banks, cards, categories] = await Promise.all([
+      api.banks.list(),
+      api.cards.list(),
+      api.categories.list(),
+    ])
+    set({ banks, cards, categories })
+  },
+
+  ensureMonths: async (months) => {
+    const loaded = get().loadedMonths
+    const missing = Array.from(new Set(months.filter((m) => !loaded.has(m))))
+    if (missing.length === 0) return
+    const { from, to } = monthsToRange(missing)
+    const fetched = await api.transactions.list({ date_from: from, date_to: to })
+    set((s) => {
+      const fetchedMonths = new Set(missing)
+      const kept = s.transactions.filter((t) => !fetchedMonths.has(t.date.slice(0, 7)))
+      const next = new Set(s.loadedMonths)
+      for (const m of missing) next.add(m)
+      return { transactions: [...kept, ...fetched], loadedMonths: next }
+    })
   },
 
   addBank: async (data) => {
     await api.banks.create(data)
-    get().fetchAll()
+    get().fetchMeta()
   },
 
   deleteBank: async (id) => {
     await api.banks.delete(id)
-    get().fetchAll()
+    get().fetchMeta()
   },
 
   addCard: async (data) => {
@@ -85,17 +142,17 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     if (data.billing_day) body.billing_day = data.billing_day
     if (data.due_day) body.due_day = data.due_day
     await api.cards.create(body)
-    get().fetchAll()
+    get().fetchMeta()
   },
 
   updateCard: async (id, data) => {
     await api.cards.update(id, data)
-    get().fetchAll()
+    get().fetchMeta()
   },
 
   deleteCard: async (id) => {
     await api.cards.delete(id)
-    get().fetchAll()
+    get().fetchMeta()
   },
 
   addCategory: (name) => {
@@ -106,7 +163,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
         { id: tempId, name, icon: null, color: "#6B7280", is_default: false, user_id: null, household_id: null },
       ],
     }))
-    api.categories.create({ name, color: "#6B7280" }).then(() => get().fetchAll())
+    api.categories.create({ name, color: "#6B7280" }).then(() => get().fetchMeta())
     return tempId
   },
 
@@ -119,6 +176,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
       category_id: data.category_id || undefined,
       custom_category_name: data.custom_category_name || undefined,
       date: data.date,
+      transaction_date: data.transaction_date || undefined,
       is_scheduled: data.is_scheduled || false,
       scheduled_date: data.scheduled_date || undefined,
       is_recurring: data.is_recurring || false,
@@ -126,22 +184,26 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
       installments: data.installments || undefined,
       is_bill: data.is_bill || false,
     })
-    get().fetchAll()
+    const fresh = await refreshLoadedTransactions(get().loadedMonths)
+    if (fresh) set({ transactions: fresh })
   },
 
   updateTransaction: async (id, data) => {
     await api.transactions.update(id, data as Record<string, unknown>)
-    get().fetchAll()
+    const fresh = await refreshLoadedTransactions(get().loadedMonths)
+    if (fresh) set({ transactions: fresh })
   },
 
   deleteTransaction: async (id) => {
     await api.transactions.delete(id)
-    get().fetchAll()
+    const fresh = await refreshLoadedTransactions(get().loadedMonths)
+    if (fresh) set({ transactions: fresh })
   },
 
   deleteTransactionGroup: async (id, scope) => {
     await api.transactions.deleteGroup(id, scope)
-    get().fetchAll()
+    const fresh = await refreshLoadedTransactions(get().loadedMonths)
+    if (fresh) set({ transactions: fresh })
   },
 
   realizeTransaction: async (id) => {
@@ -205,6 +267,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     transactions: [],
     categories: [],
     transactionSummary: null,
+    loadedMonths: new Set<string>(),
     isLoading: false,
   }),
 

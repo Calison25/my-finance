@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
 import { useFinanceStore } from "@/stores/finance-store"
@@ -28,7 +28,7 @@ interface CardSection {
 }
 
 export function Bills() {
-  const { transactions, cards, banks, realizeTransaction, unrealizeTransaction, valuesVisible, toggleValuesVisible } = useFinanceStore()
+  const { transactions, cards, banks, realizeTransaction, unrealizeTransaction, valuesVisible, toggleValuesVisible, ensureMonths } = useFinanceStore()
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const next = new Date()
@@ -40,6 +40,8 @@ export function Bills() {
   const monthLabel = new Date(year, month - 1, 15).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
   const monthStart = `${selectedMonth}-01`
   const monthEnd = new Date(year, month, 0).toISOString().slice(0, 10)
+
+  useEffect(() => { ensureMonths([selectedMonth]) }, [selectedMonth, ensureMonths])
 
   function changeMonth(delta: number) {
     const d = new Date(year, month - 1 + delta, 1)

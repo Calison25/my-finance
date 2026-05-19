@@ -21,6 +21,7 @@ export function Dashboard() {
     toggleValuesVisible,
     transactionSummary,
     fetchTransactionSummary,
+    ensureMonths,
   } = useFinanceStore()
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -31,7 +32,8 @@ export function Dashboard() {
 
   useEffect(() => {
     fetchTransactionSummary(selectedMonth)
-  }, [selectedMonth, transactions.length, fetchTransactionSummary])
+    ensureMonths([selectedMonth])
+  }, [selectedMonth, transactions.length, fetchTransactionSummary, ensureMonths])
 
   const [y, m] = selectedMonth.split("-").map(Number)
   const monthDate = new Date(y, m - 1, 1)

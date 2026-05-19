@@ -55,7 +55,11 @@ function defaultCompetenceMonth(): string {
 }
 
 function competenceDateFor(monthStr: string): string {
-  return `${monthStr}-01`
+  const [y, m] = monthStr.split("-").map(Number)
+  const today = new Date()
+  const lastDay = new Date(y, m, 0).getDate()
+  const day = Math.min(today.getDate(), lastDay)
+  return `${monthStr}-${String(day).padStart(2, "0")}`
 }
 
 type SrcKind = "all" | "account" | "card"
@@ -71,6 +75,8 @@ export function Transactions() {
     deleteTransaction,
     deleteTransactionGroup,
     realizeTransaction,
+    unrealizeTransaction,
+    ensureMonths,
   } = useFinanceStore()
 
   const [searchParams, setSearchParams] = useSearchParams()
@@ -94,6 +100,7 @@ export function Transactions() {
   const [filterType, setFilterType] = useState<"ALL" | "EXPENSE" | "INCOME">("ALL")
   const [srcKind, setSrcKind] = useState<SrcKind>("all")
   const [filterCategoryIds, setFilterCategoryIds] = useState<Set<string>>(new Set())
+  const [filterClassification, setFilterClassification] = useState<"all" | "recurring" | "installment" | "scheduled">("all")
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchText, setSearchText] = useState("")
   const searchRef = useRef<HTMLInputElement>(null)
@@ -105,6 +112,8 @@ export function Transactions() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [modalKey, setModalKey] = useState(0) // remount on each open
   const [deletePrompt, setDeletePrompt] = useState<{ id: string; kind: "recurring" | "installment" } | null>(null)
+
+  useEffect(() => { ensureMonths([selectedMonth]) }, [selectedMonth, ensureMonths])
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -144,7 +153,7 @@ export function Transactions() {
     return CATEGORY_ICONS[c.name] ?? c.icon ?? "receipt_long"
   }
 
-  const filtered = useMemo(() => {
+  const baseFiltered = useMemo(() => {
     const needle = searchText.trim().toLowerCase()
     return transactions
       .filter((t) => t.date.startsWith(selectedMonth))
@@ -160,27 +169,36 @@ export function Transactions() {
       .filter((t) => !needle || t.description.toLowerCase().includes(needle))
   }, [transactions, selectedMonth, filterType, srcKind, filterCardId, filterCategoryIds, searchText, cards])
 
+  const filtered = useMemo(() => baseFiltered.filter((t) => {
+    if (filterClassification === "all") return true
+    if (filterClassification === "recurring") return t.is_recurring || t.classification === "recurring"
+    if (filterClassification === "installment") return t.classification === "installment"
+    if (filterClassification === "scheduled") return t.is_scheduled && !t.is_realized
+    return true
+  }), [baseFiltered, filterClassification])
+
   const sorted = useMemo(() => [...filtered].sort((a, b) => b.date.localeCompare(a.date)), [filtered])
 
   const summary = useMemo(() => {
-    const sum = (arr: typeof filtered) => arr.reduce((s, t) => s + Number(t.amount), 0)
-    const isEffectivelyRealized = (t: typeof filtered[number]) => {
+    const src = baseFiltered
+    const sum = (arr: typeof src) => arr.reduce((s, t) => s + Number(t.amount), 0)
+    const isEffectivelyRealized = (t: typeof src[number]) => {
       if (t.is_scheduled && !t.is_realized) return false
       return t.is_realized || t.is_recurring || t.classification === "installment"
     }
-    const receita = sum(filtered.filter((t) => t.type === "INCOME"))
-    const despesasRealizadas = sum(filtered.filter((t) => t.type === "EXPENSE" && isEffectivelyRealized(t)))
-    const despesasPrevistas = sum(filtered.filter((t) => t.type === "EXPENSE" && t.is_scheduled && !t.is_realized))
+    const receita = sum(src.filter((t) => t.type === "INCOME"))
+    const despesasRealizadas = sum(src.filter((t) => t.type === "EXPENSE" && isEffectivelyRealized(t)))
+    const despesasPrevistas = sum(src.filter((t) => t.type === "EXPENSE" && t.is_scheduled && !t.is_realized))
     const despesasTotal = despesasRealizadas + despesasPrevistas
     const saldoAtual = receita - despesasRealizadas
     const saldoProjetado = receita - despesasTotal
 
-    const recurring = filtered.filter((t) => t.classification === "recurring")
+    const recurring = src.filter((t) => t.classification === "recurring")
     const recurringIncome = sum(recurring.filter((t) => t.type === "INCOME"))
     const recurringExpense = sum(recurring.filter((t) => t.type === "EXPENSE"))
-    const installments = filtered.filter((t) => t.classification === "installment")
+    const installments = src.filter((t) => t.classification === "installment")
     const installmentTotal = sum(installments.filter((t) => t.type === "INCOME")) - sum(installments.filter((t) => t.type === "EXPENSE"))
-    const scheduled = filtered.filter((t) => t.classification === "scheduled")
+    const scheduled = src.filter((t) => t.classification === "scheduled")
     const scheduledTotal = sum(scheduled.filter((t) => t.type === "INCOME")) - sum(scheduled.filter((t) => t.type === "EXPENSE"))
 
     return {
@@ -198,7 +216,7 @@ export function Transactions() {
       scheduledCount: scheduled.length,
       scheduledTotal,
     }
-  }, [filtered])
+  }, [baseFiltered])
 
   const grouped = useMemo(() => {
     const acc: Record<string, typeof sorted> = {}
@@ -227,13 +245,22 @@ export function Transactions() {
     (filterType !== "ALL" ? 1 : 0) +
     (srcKind !== "all" ? 1 : 0) +
     (filterCardId ? 1 : 0) +
-    filterCategoryIds.size
+    filterCategoryIds.size +
+    (filterClassification !== "all" ? 1 : 0)
 
   function clearAllFilters() {
     setFilterType("ALL")
     setSrcKind("all")
     setFilterCardId("")
     setFilterCategoryIds(new Set())
+    setFilterClassification("all")
+  }
+
+  const classificationLabel: Record<typeof filterClassification, string> = {
+    all: "",
+    recurring: "Recorrentes",
+    installment: "Parcelados",
+    scheduled: "Agendados",
   }
 
   function toggleCategoryFilter(id: string) {
@@ -411,6 +438,12 @@ export function Transactions() {
               <button onClick={() => setFilterCardId("")}><Icon name="close" className="text-[12px]" /></button>
             </span>
           )}
+          {filterClassification !== "all" && (
+            <span className="filter-token">
+              {classificationLabel[filterClassification]}
+              <button onClick={() => setFilterClassification("all")}><Icon name="close" className="text-[12px]" /></button>
+            </span>
+          )}
           {[...filterCategoryIds].map((id) => {
             const cat = categoryOf(id)
             return (
@@ -457,7 +490,12 @@ export function Transactions() {
           </div>
 
           <div className="kpi-grid kpi-grid-3" style={{ marginBottom: 20 }}>
-            <div className="kpi">
+            <div
+              className={`kpi ${filterClassification === "recurring" ? "kpi-active" : ""}`}
+              role="button"
+              onClick={() => setFilterClassification((c) => c === "recurring" ? "all" : "recurring")}
+              style={{ cursor: "pointer" }}
+            >
               <div className="kpi-label">
                 <Icon name="repeat" className="text-[12px]" />Recorrentes
                 <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.recurringCount}</span>
@@ -476,7 +514,12 @@ export function Transactions() {
                 </div>
               </div>
             </div>
-            <div className="kpi">
+            <div
+              className={`kpi ${filterClassification === "installment" ? "kpi-active" : ""}`}
+              role="button"
+              onClick={() => setFilterClassification((c) => c === "installment" ? "all" : "installment")}
+              style={{ cursor: "pointer" }}
+            >
               <div className="kpi-label">
                 <Icon name="payments" className="text-[12px]" />Parcelados
                 <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.installmentCount}</span>
@@ -485,7 +528,12 @@ export function Transactions() {
                 {summary.installmentTotal >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.installmentTotal)} />
               </div>
             </div>
-            <div className="kpi">
+            <div
+              className={`kpi ${filterClassification === "scheduled" ? "kpi-active" : ""}`}
+              role="button"
+              onClick={() => setFilterClassification((c) => c === "scheduled" ? "all" : "scheduled")}
+              style={{ cursor: "pointer" }}
+            >
               <div className="kpi-label">
                 <Icon name="schedule" className="text-[12px]" />Agendados
                 <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.scheduledCount}</span>
@@ -545,33 +593,50 @@ export function Transactions() {
                               {tx.description}
                               {tx.is_recurring && <Icon name="repeat" className="text-[10px]" style={{ marginLeft: 4, color: "var(--accent)" }} />}
                               {tx.is_scheduled && !tx.is_realized && <Icon name="schedule" className="text-[10px]" style={{ marginLeft: 4, color: "var(--warning)" }} />}
+                              {tx.transaction_date && (
+                                <span
+                                  title="Data real do evento"
+                                  style={{
+                                    marginLeft: 8,
+                                    padding: "2px 6px",
+                                    fontSize: 10,
+                                    fontWeight: 500,
+                                    borderRadius: 6,
+                                    background: "color-mix(in srgb, var(--accent) 14%, transparent)",
+                                    color: "var(--accent)",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 3,
+                                    verticalAlign: "middle",
+                                  }}
+                                >
+                                  <Icon name="event" className="text-[10px]" />
+                                  {new Date(tx.transaction_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "")}
+                                </span>
+                              )}
                             </div>
                             <div className="tx-sub">
                               <span>{cat?.name ?? "Outros"}</span>
                               <span className="dot" />
                               <span>{bank?.name ?? ""} {card?.name ?? ""}</span>
-                              {tx.transaction_date && tx.transaction_date !== tx.date && (
-                                <>
-                                  <span className="dot" />
-                                  <span>Ocorreu {new Date(tx.transaction_date + "T12:00:00").toLocaleDateString("pt-BR")}</span>
-                                </>
-                              )}
                             </div>
                           </div>
                           <div className={`tx-amount ${tx.type === "INCOME" ? "positive" : "negative"} ${tx.is_scheduled && !tx.is_realized ? "scheduled" : ""}`}>
                             {tx.type === "INCOME" ? "+" : "-"}<MoneyValue value={tx.amount} />
                           </div>
                           <div style={{ display: "flex", gap: 2 }}>
-                            {tx.is_scheduled && !tx.is_realized && (
-                              <button
-                                className="icon-btn"
-                                style={{ width: 28, height: 28, color: "var(--positive)" }}
-                                onClick={(e) => { e.stopPropagation(); realizeTransaction(tx.id) }}
-                                title="Marcar como realizado"
-                              >
-                                <Icon name="check_circle" className="text-[14px]" />
-                              </button>
-                            )}
+                            <button
+                              className="icon-btn"
+                              style={{ width: 28, height: 28, color: tx.is_realized ? "var(--positive)" : "var(--text-3)" }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (tx.is_realized) unrealizeTransaction(tx.id)
+                                else realizeTransaction(tx.id)
+                              }}
+                              title={tx.is_realized ? "Desmarcar como realizado" : "Marcar como realizado"}
+                            >
+                              <Icon name={tx.is_realized ? "check_circle" : "radio_button_unchecked"} className="text-[14px]" />
+                            </button>
                             <button
                               className="icon-btn"
                               style={{ width: 28, height: 28, color: "var(--negative)" }}
@@ -726,6 +791,7 @@ function TransactionModal(props: TxModalProps) {
           custom_category_name: isOtherCategory ? customCategoryName : undefined,
           notes: notes || null,
           is_recurring: isRecurring,
+          transaction_date: hasTxDate && transactionDate ? transactionDate : null,
         }, editCascade), "Transação atualizada")
       } else {
         await toast.run("Criando transação...", () => addTransaction({
