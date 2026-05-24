@@ -1164,7 +1164,7 @@ a { color: inherit; text-decoration: none; }
 }
 .src-item:hover { border-color: var(--hairline-3); }
 .src-item.active { border-color: var(--accent-line); background: var(--accent-soft); }
-.src-item .src-name { font-size: 13px; font-weight: 500; flex: 1; }
+.src-item .src-name { font-size: 13px; font-weight: 500; flex: 1; text-align: left; }
 .src-item .src-sub { font-size: 11px; color: var(--text-3); }
 .src-item .src-tick {
   width: 16px; height: 16px;

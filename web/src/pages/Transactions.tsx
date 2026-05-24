@@ -166,7 +166,16 @@ export function Transactions() {
       })
       .filter((t) => !filterCardId || t.card_id === filterCardId)
       .filter((t) => filterCategoryIds.size === 0 || (t.category_id && filterCategoryIds.has(t.category_id)))
-      .filter((t) => !needle || t.description.toLowerCase().includes(needle))
+      .filter((t) => {
+        if (!needle) return true
+        if (t.description.toLowerCase().includes(needle)) return true
+        const amountStr = t.amount.toFixed(2)
+        const amountBR = amountStr.replace(".", ",")
+        const needleNum = needle.replace(/\./g, "").replace(",", ".")
+        if (amountStr.includes(needleNum)) return true
+        if (amountBR.includes(needle)) return true
+        return false
+      })
   }, [transactions, selectedMonth, filterType, srcKind, filterCardId, filterCategoryIds, searchText, cards])
 
   const filtered = useMemo(() => baseFiltered.filter((t) => {
@@ -764,6 +773,19 @@ function TransactionModal(props: TxModalProps) {
     if (type === "INCOME" && srcKind === "card") setSrcKind("account")
   }, [type, srcKind])
 
+  const autoCategoryRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (editingId) return
+    const desc = description.trim().toLowerCase()
+    if (!desc) return
+    if (categoryId && categoryId !== autoCategoryRef.current) return
+    const match = transactions.find((t) => baseDesc(t.description).trim().toLowerCase() === desc && t.category_id)
+    if (match && match.category_id && match.category_id !== categoryId) {
+      setCategoryId(match.category_id)
+      autoCategoryRef.current = match.category_id
+    }
+  }, [description, transactions, editingId, categoryId])
+
   const filteredSrcCards = cards.filter((c) => srcKind === "card" ? c.type === "CREDIT_CARD" : c.type === "CHECKING_ACCOUNT")
   const isOtherCategory = categoryId === "__other__"
 
@@ -1006,6 +1028,18 @@ function TransactionModal(props: TxModalProps) {
           <div className="field">
             <label className="label">Parcelas (2–48)</label>
             <input className="input" type="number" min={2} max={48} value={installments} onChange={(e) => setInstallments(e.target.value)} placeholder="Ex: 10" />
+            {(() => {
+              const total = parseBRLToNumber(amount)
+              const n = Number(installments)
+              if (!total || !n || n < 2) return null
+              const per = total / n
+              const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+              return (
+                <span className="help">
+                  {fmt(total)} em <strong>{n}x</strong> de <strong>{fmt(per)}</strong>
+                </span>
+              )
+            })()}
           </div>
         )}
 
