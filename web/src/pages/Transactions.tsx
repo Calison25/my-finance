@@ -48,6 +48,14 @@ function formatDayHeader(dateStr: string): string {
   return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "long" }).replace(".", "")
 }
 
+function formatCreatedAt(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const date = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+  const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+  return `${date} às ${time}`
+}
+
 function defaultCompetenceMonth(): string {
   const next = new Date()
   next.setMonth(next.getMonth() + 1)
@@ -177,6 +185,14 @@ export function Transactions() {
         return false
       })
   }, [transactions, selectedMonth, filterType, srcKind, filterCardId, filterCategoryIds, searchText, cards])
+
+  const lastCreatedInMonth = useMemo(() => {
+    const monthTxs = transactions.filter((t) => t.date.startsWith(selectedMonth))
+    if (monthTxs.length === 0) return null
+    return monthTxs.reduce((latest, t) =>
+      (t.created_at ?? "") > (latest.created_at ?? "") ? t : latest
+    )
+  }, [transactions, selectedMonth])
 
   const filtered = useMemo(() => baseFiltered.filter((t) => {
     if (filterClassification === "all") return true
@@ -553,6 +569,34 @@ export function Transactions() {
             </div>
           </div>
         </>
+      )}
+
+      {lastCreatedInMonth && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 14px",
+            marginBottom: 10,
+            borderRadius: 10,
+            background: "var(--surface-2)",
+            border: "1px solid var(--hairline)",
+            fontSize: 13,
+            flexWrap: "wrap",
+          }}
+        >
+          <Icon name="history" className="text-[14px]" style={{ color: "var(--accent)" }} />
+          <span style={{ color: "var(--text-3)" }}>Última transação cadastrada no mês:</span>
+          <span style={{ fontWeight: 600, color: "var(--text)" }}>{lastCreatedInMonth.description}</span>
+          <span style={{ color: lastCreatedInMonth.type === "INCOME" ? "var(--positive)" : "var(--negative)" }}>
+            {lastCreatedInMonth.type === "INCOME" ? "+" : "-"}
+            <MoneyValue value={Math.abs(Number(lastCreatedInMonth.amount))} />
+          </span>
+          <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>
+            {formatCreatedAt(lastCreatedInMonth.created_at)}
+          </span>
+        </div>
       )}
 
       {sorted.length === 0 ? (
