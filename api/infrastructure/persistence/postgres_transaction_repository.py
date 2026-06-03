@@ -151,8 +151,9 @@ class PostgresTransactionRepository:
                 INSERT INTO transactions
                     (id, card_id, description, amount, type, category_id,
                      date, transaction_date, is_scheduled, scheduled_date, is_realized,
-                     is_recurring, is_bill, recurring_transaction_id, notes, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                     is_recurring, is_bill, recurring_transaction_id, installment_group_id,
+                     notes, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
                 RETURNING *
                 """,
                 transaction.id,
@@ -169,6 +170,7 @@ class PostgresTransactionRepository:
                 transaction.is_recurring,
                 transaction.is_bill,
                 transaction.recurring_transaction_id,
+                transaction.installment_group_id,
                 transaction.notes,
                 transaction.created_at,
             )
@@ -178,7 +180,7 @@ class PostgresTransactionRepository:
         if not transactions:
             return []
 
-        columns_per_row = 16
+        columns_per_row = 17
         values_sql_parts: list[str] = []
         params: list = []
         for i, tx in enumerate(transactions):
@@ -200,6 +202,7 @@ class PostgresTransactionRepository:
                 tx.is_recurring,
                 tx.is_bill,
                 tx.recurring_transaction_id,
+                tx.installment_group_id,
                 tx.notes,
                 tx.created_at,
             ])
@@ -208,7 +211,8 @@ class PostgresTransactionRepository:
             INSERT INTO transactions
                 (id, card_id, description, amount, type, category_id,
                  date, transaction_date, is_scheduled, scheduled_date, is_realized,
-                 is_recurring, is_bill, recurring_transaction_id, notes, created_at)
+                 is_recurring, is_bill, recurring_transaction_id, installment_group_id,
+                 notes, created_at)
             VALUES {", ".join(values_sql_parts)}
             RETURNING *
         """
@@ -225,7 +229,8 @@ class PostgresTransactionRepository:
                 SET description = $2, amount = $3, type = $4, category_id = $5,
                     date = $6, transaction_date = $7, is_scheduled = $8, scheduled_date = $9,
                     is_realized = $10, notes = $11, is_recurring = $12,
-                    is_bill = $13, recurring_transaction_id = $14
+                    is_bill = $13, recurring_transaction_id = $14,
+                    installment_group_id = $15
                 WHERE id = $1
                 RETURNING *
                 """,
@@ -243,6 +248,7 @@ class PostgresTransactionRepository:
                 transaction.is_recurring,
                 transaction.is_bill,
                 transaction.recurring_transaction_id,
+                transaction.installment_group_id,
             )
         if row is None:
             return None
@@ -250,15 +256,15 @@ class PostgresTransactionRepository:
 
     async def delete_by_recurring_id(
         self, recurring_transaction_id: UUID, from_date: date | None = None
-    ) -> None:
+    ) -> int:
         async with self._pool.acquire() as conn:
             if from_date is None:
-                await conn.execute(
+                status = await conn.execute(
                     "DELETE FROM transactions WHERE recurring_transaction_id = $1",
                     recurring_transaction_id,
                 )
             else:
-                await conn.execute(
+                status = await conn.execute(
                     """
                     DELETE FROM transactions
                     WHERE recurring_transaction_id = $1 AND date >= $2
@@ -266,31 +272,54 @@ class PostgresTransactionRepository:
                     recurring_transaction_id,
                     from_date,
                 )
+        return int(status.split()[-1])
 
     async def delete_installment_group(
         self, card_id: UUID, base_description: str, from_date: date | None = None
-    ) -> None:
-        pattern = f"{base_description} (%/%)"
+    ) -> int:
         async with self._pool.acquire() as conn:
             if from_date is None:
-                await conn.execute(
-                    """
+                status = await conn.execute(
+                    r"""
                     DELETE FROM transactions
-                    WHERE card_id = $1 AND description LIKE $2
+                    WHERE card_id = $1
+                      AND description ~ '\(\d+/\d+\)$'
+                      AND btrim(regexp_replace(description, '\s*\(\d+/\d+\)$', '')) = $2
                     """,
                     card_id,
-                    pattern,
+                    base_description,
                 )
             else:
-                await conn.execute(
-                    """
+                status = await conn.execute(
+                    r"""
                     DELETE FROM transactions
-                    WHERE card_id = $1 AND description LIKE $2 AND date >= $3
+                    WHERE card_id = $1
+                      AND description ~ '\(\d+/\d+\)$'
+                      AND btrim(regexp_replace(description, '\s*\(\d+/\d+\)$', '')) = $2
+                      AND date >= $3
                     """,
                     card_id,
-                    pattern,
+                    base_description,
                     from_date,
                 )
+        return int(status.split()[-1])
+
+    async def delete_installment_group_by_id(
+        self, installment_group_id: UUID, from_date: date | None = None
+    ) -> int:
+        async with self._pool.acquire() as conn:
+            if from_date is None:
+                status = await conn.execute(
+                    "DELETE FROM transactions WHERE installment_group_id = $1",
+                    installment_group_id,
+                )
+            else:
+                status = await conn.execute(
+                    "DELETE FROM transactions WHERE installment_group_id = $1 AND date >= $2",
+                    installment_group_id,
+                    from_date,
+                )
+        return int(status.split()[-1])
 
     async def delete(self, transaction_id: UUID) -> None:
         async with self._pool.acquire() as conn:
@@ -340,6 +369,7 @@ class PostgresTransactionRepository:
             is_recurring=record["is_recurring"],
             is_bill=record["is_bill"],
             recurring_transaction_id=record["recurring_transaction_id"],
+            installment_group_id=record["installment_group_id"],
             notes=record["notes"],
             created_at=record["created_at"],
         )

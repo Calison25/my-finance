@@ -57,6 +57,7 @@ class TransactionResponse(BaseModel):
     is_recurring: bool
     is_bill: bool
     recurring_transaction_id: UUID | None
+    installment_group_id: UUID | None = None
     notes: str | None
     created_at: dt.datetime
     classification: str | None = None

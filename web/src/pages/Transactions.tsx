@@ -783,6 +783,8 @@ function TransactionModal(props: TxModalProps) {
 
   function baseDesc(d: string) { return d.replace(/\s\(\d+\/\d+\)$/, "") }
 
+  const installmentSuffix = existing?.description.match(/\s*\(\d+\/\d+\)$/)?.[0] ?? ""
+
   const [type, setType] = useState<TransactionType>(existing?.type ?? "EXPENSE")
   const [amount, setAmount] = useState(existing ? formatCentsToBRL(Math.round(existing.amount * 100)) : "")
   const [description, setDescription] = useState(existing ? baseDesc(existing.description) : "")
@@ -850,7 +852,7 @@ function TransactionModal(props: TxModalProps) {
     try {
       if (editingId) {
         await toast.run("Salvando...", () => updateTransaction(editingId, {
-          description,
+          description: description + installmentSuffix,
           amount: amountNum,
           type,
           category_id: isOtherCategory ? null : (categoryId || null),

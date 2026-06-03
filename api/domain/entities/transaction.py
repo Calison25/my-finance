@@ -22,5 +22,6 @@ class Transaction(BaseModel):
     is_recurring: bool = False
     is_bill: bool = False
     recurring_transaction_id: UUID | None = None
+    installment_group_id: UUID | None = None
     notes: str | None = None
     created_at: datetime

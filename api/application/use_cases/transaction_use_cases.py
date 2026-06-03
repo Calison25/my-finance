@@ -24,7 +24,7 @@ def classify_transaction(tx: Transaction) -> str:
         return "scheduled"
     if tx.is_recurring:
         return "recurring"
-    if _INSTALLMENT_RE.search(tx.description):
+    if tx.installment_group_id is not None or _INSTALLMENT_RE.search(tx.description):
         return "installment"
     return "regular"
 
@@ -157,6 +157,7 @@ class CreateTransactionUseCase:
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
         now = datetime.now(UTC)
+        group_id = uuid4() if installments > 1 else None
 
         transactions: list[Transaction] = []
         for i in range(installments):
@@ -181,6 +182,7 @@ class CreateTransactionUseCase:
                     scheduled_date=tx_date if data.is_scheduled else None,
                     is_realized=(not data.is_scheduled) and (not data.is_bill),
                     is_bill=data.is_bill,
+                    installment_group_id=group_id,
                     notes=data.notes,
                     created_at=now,
                 )
@@ -301,19 +303,23 @@ class DeleteTransactionGroupUseCase:
 
         from_date = transaction.date if scope == "future" else None
 
-        if transaction.recurring_transaction_id is not None:
-            await self._repo.delete_by_recurring_id(
+        if transaction.installment_group_id is not None:
+            deleted = await self._repo.delete_installment_group_by_id(
+                transaction.installment_group_id, from_date
+            )
+        elif transaction.recurring_transaction_id is not None:
+            deleted = await self._repo.delete_by_recurring_id(
                 transaction.recurring_transaction_id, from_date
             )
-            return
-
-        if _INSTALLMENT_RE.search(transaction.description):
+        elif _INSTALLMENT_RE.search(transaction.description):
             base_description = _INSTALLMENT_RE.sub("", transaction.description).rstrip()
-            await self._repo.delete_installment_group(
+            deleted = await self._repo.delete_installment_group(
                 transaction.card_id, base_description, from_date
             )
-            return
+        else:
+            raise DomainException("Transação não é recorrente nem parcelada")
 
-        raise DomainException(
-            "Transação não é recorrente nem parcelada"
-        )
+        if deleted == 0:
+            raise DomainException(
+                "Nenhuma transação encontrada para excluir neste grupo."
+            )
