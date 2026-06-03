@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
@@ -24,7 +24,7 @@ function fmtMonth(d: Date) {
 
 export function Cards() {
   const navigate = useNavigate()
-  const { cards: allCards, banks, addCard, updateCard, deleteCard, getCardExpensesByMonth, valuesVisible, toggleValuesVisible } = useFinanceStore()
+  const { cards: allCards, banks, addCard, updateCard, deleteCard, getCardExpensesByMonth, valuesVisible, toggleValuesVisible, ensureMonths } = useFinanceStore()
   const cards = allCards.filter((c) => c.type === "CREDIT_CARD")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -34,6 +34,9 @@ export function Cards() {
     next.setMonth(next.getMonth() + 1)
     return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
   })
+
+  useEffect(() => { ensureMonths([selectedMonth]) }, [selectedMonth, ensureMonths])
+
   const [y, m] = selectedMonth.split("-").map(Number)
   const monthDate = new Date(y, m - 1, 1)
 

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
@@ -19,7 +19,7 @@ function fmtMonth(d: Date) {
 
 export function Accounts() {
   const navigate = useNavigate()
-  const { cards, banks, addCard, updateCard, deleteCard, getCardBalanceByMonth, valuesVisible, toggleValuesVisible } = useFinanceStore()
+  const { cards, banks, addCard, updateCard, deleteCard, getCardBalanceByMonth, valuesVisible, toggleValuesVisible, ensureMonths } = useFinanceStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...EMPTY_FORM })
@@ -28,6 +28,8 @@ export function Accounts() {
     next.setMonth(next.getMonth() + 1)
     return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
   })
+
+  useEffect(() => { ensureMonths([selectedMonth]) }, [selectedMonth, ensureMonths])
 
   const isOtherBank = form.bank_id === "__other__"
   const checkingAccounts = cards.filter((c) => c.type === "CHECKING_ACCOUNT")
