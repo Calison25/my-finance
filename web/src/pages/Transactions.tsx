@@ -119,7 +119,7 @@ export function Transactions() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [modalKey, setModalKey] = useState(0) // remount on each open
-  const [deletePrompt, setDeletePrompt] = useState<{ id: string; kind: "recurring" | "installment" } | null>(null)
+  const [deletePrompt, setDeletePrompt] = useState<{ id: string; kind: "recurring" | "installment" | "regular" } | null>(null)
 
   useEffect(() => { ensureMonths([selectedMonth]) }, [selectedMonth, ensureMonths])
 
@@ -186,14 +186,6 @@ export function Transactions() {
       })
   }, [transactions, selectedMonth, filterType, srcKind, filterCardId, filterCategoryIds, searchText, cards])
 
-  const lastCreatedInMonth = useMemo(() => {
-    const monthTxs = transactions.filter((t) => t.date.startsWith(selectedMonth))
-    if (monthTxs.length === 0) return null
-    return monthTxs.reduce((latest, t) =>
-      (t.created_at ?? "") > (latest.created_at ?? "") ? t : latest
-    )
-  }, [transactions, selectedMonth])
-
   const filtered = useMemo(() => baseFiltered.filter((t) => {
     if (filterClassification === "all") return true
     if (filterClassification === "recurring") return t.is_recurring || t.classification === "recurring"
@@ -201,6 +193,13 @@ export function Transactions() {
     if (filterClassification === "scheduled") return t.is_scheduled && !t.is_realized
     return true
   }), [baseFiltered, filterClassification])
+
+  const lastCreatedInMonth = useMemo(() => {
+    if (filtered.length === 0) return null
+    return filtered.reduce((latest, t) =>
+      (t.created_at ?? "") > (latest.created_at ?? "") ? t : latest
+    )
+  }, [filtered])
 
   const sorted = useMemo(() => [...filtered].sort((a, b) => b.date.localeCompare(a.date)), [filtered])
 
@@ -697,7 +696,7 @@ export function Transactions() {
                                 e.stopPropagation()
                                 if (tx.classification === "recurring") setDeletePrompt({ id: tx.id, kind: "recurring" })
                                 else if (tx.classification === "installment") setDeletePrompt({ id: tx.id, kind: "installment" })
-                                else if (confirm("Excluir esta transação?")) deleteTransaction(tx.id)
+                                else setDeletePrompt({ id: tx.id, kind: "regular" })
                               }}
                             >
                               <Icon name="delete" className="text-[13px]" />
@@ -733,28 +732,57 @@ export function Transactions() {
       <Dialog
         open={deletePrompt !== null}
         onClose={() => setDeletePrompt(null)}
-        title={deletePrompt?.kind === "recurring" ? "Excluir recorrente" : "Excluir parcelamento"}
+        title={
+          deletePrompt?.kind === "recurring"
+            ? "Excluir recorrente"
+            : deletePrompt?.kind === "installment"
+              ? "Excluir parcelamento"
+              : "Excluir transação"
+        }
       >
-        <p style={{ marginBottom: 16 }}>
-          {deletePrompt?.kind === "recurring"
-            ? "Deseja excluir todas as recorrências ou apenas desta em diante?"
-            : "Deseja excluir todas as parcelas ou apenas desta em diante?"}
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button className="btn btn-secondary" onClick={async () => {
-            if (!deletePrompt) return
-            const p = deletePrompt
-            setDeletePrompt(null)
-            await toast.run("Excluindo...", () => deleteTransactionGroup(p.id, "future"), "Excluídas a partir desta")
-          }}>Desta em diante</button>
-          <button className="btn btn-danger" onClick={async () => {
-            if (!deletePrompt) return
-            const p = deletePrompt
-            setDeletePrompt(null)
-            await toast.run("Excluindo todas...", () => deleteTransactionGroup(p.id, "all"), "Todas excluídas")
-          }}>Todas</button>
-          <button className="btn btn-ghost" onClick={() => setDeletePrompt(null)}>Cancelar</button>
-        </div>
+        {deletePrompt?.kind === "regular" ? (
+          <>
+            <p style={{ marginBottom: 16 }}>Tem certeza que deseja excluir esta transação?</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button className="btn btn-danger" onClick={async () => {
+                if (!deletePrompt) return
+                const p = deletePrompt
+                setDeletePrompt(null)
+                await toast.run("Excluindo...", () => deleteTransaction(p.id), "Transação excluída")
+              }}>Excluir</button>
+              <button className="btn btn-ghost" onClick={() => setDeletePrompt(null)}>Cancelar</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ marginBottom: 16 }}>
+              {deletePrompt?.kind === "recurring"
+                ? "Deseja excluir apenas esta, desta em diante, ou todas as recorrências?"
+                : "Deseja excluir apenas esta, desta em diante, ou todas as parcelas?"}
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button className="btn btn-secondary" onClick={async () => {
+                if (!deletePrompt) return
+                const p = deletePrompt
+                setDeletePrompt(null)
+                await toast.run("Excluindo...", () => deleteTransaction(p.id), "Transação excluída")
+              }}>Apenas esta</button>
+              <button className="btn btn-secondary" onClick={async () => {
+                if (!deletePrompt) return
+                const p = deletePrompt
+                setDeletePrompt(null)
+                await toast.run("Excluindo...", () => deleteTransactionGroup(p.id, "future"), "Excluídas a partir desta")
+              }}>Desta em diante</button>
+              <button className="btn btn-danger" onClick={async () => {
+                if (!deletePrompt) return
+                const p = deletePrompt
+                setDeletePrompt(null)
+                await toast.run("Excluindo todas...", () => deleteTransactionGroup(p.id, "all"), "Todas excluídas")
+              }}>Todas</button>
+              <button className="btn btn-ghost" onClick={() => setDeletePrompt(null)}>Cancelar</button>
+            </div>
+          </>
+        )}
       </Dialog>
     </div>
   )
