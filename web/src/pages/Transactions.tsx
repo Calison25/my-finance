@@ -694,7 +694,7 @@ export function Transactions() {
                               style={{ width: 28, height: 28, color: "var(--negative)" }}
                               onClick={(e) => {
                                 e.stopPropagation()
-                                if (tx.classification === "recurring") setDeletePrompt({ id: tx.id, kind: "recurring" })
+                                if (tx.is_recurring || tx.classification === "recurring") setDeletePrompt({ id: tx.id, kind: "recurring" })
                                 else if (tx.classification === "installment") setDeletePrompt({ id: tx.id, kind: "installment" })
                                 else setDeletePrompt({ id: tx.id, kind: "regular" })
                               }}
