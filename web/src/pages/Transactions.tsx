@@ -195,9 +195,11 @@ export function Transactions() {
     const isFuture = (t: typeof src[number]) => t.classification === "scheduled"
     const signedSum = (arr: typeof src) =>
       arr.reduce((s, t) => s + (t.type === "INCOME" ? Number(t.amount) : -Number(t.amount)), 0)
+    const expenseSum = (arr: typeof src) =>
+      arr.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + Number(t.amount), 0)
 
     return {
-      realizado: signedSum(src.filter((t) => !isFuture(t))),
+      totalDespesa: expenseSum(src.filter((t) => !isFuture(t))),
       futuro: signedSum(src.filter((t) => isFuture(t))),
     }
   }, [baseFiltered])
@@ -445,16 +447,20 @@ export function Transactions() {
       {sorted.length > 0 && (
         <div className="kpi-grid" style={{ marginBottom: 16, gridTemplateColumns: "repeat(2, 1fr)" }}>
           <div
-            className={`kpi ${filterClassification === "realized" ? "kpi-active" : ""}`}
+            className={`kpi ${filterClassification === "realized" && filterType === "EXPENSE" ? "kpi-active" : ""}`}
             role="button"
             style={{ cursor: "pointer" }}
-            onClick={() => setFilterClassification(filterClassification === "realized" ? "all" : "realized")}
+            onClick={() => {
+              const active = filterClassification === "realized" && filterType === "EXPENSE"
+              setFilterClassification(active ? "all" : "realized")
+              setFilterType(active ? "ALL" : "EXPENSE")
+            }}
           >
-            <div className="kpi-label"><Icon name="check_circle" className="text-[12px]" />Realizado</div>
-            <div className={`kpi-value ${summary.realizado >= 0 ? "positive" : "negative"}`}>
-              <MoneyValue value={summary.realizado} />
+            <div className="kpi-label"><Icon name="payments" className="text-[12px]" />Total Despesa</div>
+            <div className="kpi-value negative">
+              <MoneyValue value={summary.totalDespesa} />
             </div>
-            <div className="kpi-meta">Transações já concluídas</div>
+            <div className="kpi-meta">Despesas já concluídas no mês</div>
           </div>
           <div
             className={`kpi ${filterClassification === "scheduled" ? "kpi-active" : ""}`}
