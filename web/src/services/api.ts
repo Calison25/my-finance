@@ -1,7 +1,11 @@
-import type { Bank, Card, Transaction, TransactionSummary, Category, Member, HouseholdInvite } from "@/types"
+import type { Bank, Card, Transaction, TransactionSummary, Category, Member, HouseholdInvite, ExpenseGoal } from "@/types"
 import { supabase } from "@/lib/supabase"
 
+const LOCAL_DEV = import.meta.env.VITE_LOCAL_DEV === "true"
+
 async function getAccessToken(): Promise<string | null> {
+  if (LOCAL_DEV) return "local-dev"
+  if (!supabase) return null
   const { data } = await supabase.auth.getSession()
   return data.session?.access_token ?? null
 }
@@ -168,6 +172,15 @@ export const api = {
       }),
     delete: (id: string) =>
       request<void>(`/api/categories/${id}`, { method: "DELETE" }),
+  },
+
+  expenseGoal: {
+    get: () => request<ExpenseGoal>("/api/expense-goal"),
+    set: (amount: number) =>
+      request<ExpenseGoal>("/api/expense-goal", {
+        method: "PUT",
+        body: JSON.stringify({ amount }),
+      }),
   },
 
   household: {

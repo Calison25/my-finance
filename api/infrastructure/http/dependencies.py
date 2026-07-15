@@ -22,6 +22,9 @@ from api.infrastructure.persistence.postgres_household_repository import (
 from api.infrastructure.persistence.postgres_household_invite_repository import (
     PostgresHouseholdInviteRepository,
 )
+from api.infrastructure.persistence.postgres_expense_goal_repository import (
+    PostgresExpenseGoalRepository,
+)
 
 from api.application.use_cases.bank_use_cases import (
     CreateBankUseCase,
@@ -59,6 +62,10 @@ from api.application.use_cases.household_use_cases import (
     ListInvitesUseCase,
     ListMembersUseCase,
     RemoveMemberUseCase,
+)
+from api.application.use_cases.expense_goal_use_cases import (
+    GetExpenseGoalUseCase,
+    SetExpenseGoalUseCase,
 )
 
 
@@ -109,6 +116,12 @@ def get_household_invite_repository(
     pool: asyncpg.Pool = Depends(get_db_pool),
 ) -> PostgresHouseholdInviteRepository:
     return PostgresHouseholdInviteRepository(pool)
+
+
+def get_expense_goal_repository(
+    pool: asyncpg.Pool = Depends(get_db_pool),
+) -> PostgresExpenseGoalRepository:
+    return PostgresExpenseGoalRepository(pool)
 
 
 # --- Use case factories: Bank ---
@@ -304,3 +317,18 @@ def get_cancel_invite(
     ),
 ) -> CancelInviteUseCase:
     return CancelInviteUseCase(invite_repo)
+
+
+# --- Use case factories: Expense Goal ---
+
+
+def get_get_expense_goal(
+    repo: PostgresExpenseGoalRepository = Depends(get_expense_goal_repository),
+) -> GetExpenseGoalUseCase:
+    return GetExpenseGoalUseCase(repo)
+
+
+def get_set_expense_goal(
+    repo: PostgresExpenseGoalRepository = Depends(get_expense_goal_repository),
+) -> SetExpenseGoalUseCase:
+    return SetExpenseGoalUseCase(repo)

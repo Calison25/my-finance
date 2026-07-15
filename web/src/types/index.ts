@@ -115,6 +115,10 @@ export interface Member {
   created_at: string
 }
 
+export interface ExpenseGoal {
+  amount: number | null
+}
+
 export interface HouseholdInvite {
   id: string
   household_id: string

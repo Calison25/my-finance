@@ -48,14 +48,6 @@ function formatDayHeader(dateStr: string): string {
   return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "long" }).replace(".", "")
 }
 
-function formatCreatedAt(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ""
-  const date = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
-  const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-  return `${date} às ${time}`
-}
-
 function defaultCompetenceMonth(): string {
   const next = new Date()
   next.setMonth(next.getMonth() + 1)
@@ -105,10 +97,15 @@ export function Transactions() {
   const setSelectedMonth = (m: string) => updateParams({ month: m })
   const setFilterCardId = (id: string) => updateParams({ card_id: id || null })
 
-  const [filterType, setFilterType] = useState<"ALL" | "EXPENSE" | "INCOME">("ALL")
+  const filterType = (searchParams.get("type") as "ALL" | "EXPENSE" | "INCOME" | null) ?? "ALL"
+  const setFilterType = (t: "ALL" | "EXPENSE" | "INCOME") => updateParams({ type: t === "ALL" ? null : t })
+
+  type ClassificationFilter = "all" | "recurring" | "installment" | "scheduled" | "realized"
+  const filterClassification = (searchParams.get("classification") as ClassificationFilter | null) ?? "all"
+  const setFilterClassification = (c: ClassificationFilter) => updateParams({ classification: c === "all" ? null : c })
+
   const [srcKind, setSrcKind] = useState<SrcKind>("all")
   const [filterCategoryIds, setFilterCategoryIds] = useState<Set<string>>(new Set())
-  const [filterClassification, setFilterClassification] = useState<"all" | "recurring" | "installment" | "scheduled">("all")
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchText, setSearchText] = useState("")
   const searchRef = useRef<HTMLInputElement>(null)
@@ -167,6 +164,11 @@ export function Transactions() {
       .filter((t) => t.date.startsWith(selectedMonth))
       .filter((t) => filterType === "ALL" || t.type === filterType)
       .filter((t) => {
+        if (filterClassification === "all") return true
+        if (filterClassification === "realized") return t.classification !== "scheduled"
+        return t.classification === filterClassification
+      })
+      .filter((t) => {
         if (srcKind === "all") return true
         const c = cardOf(t.card_id)
         if (!c) return true
@@ -184,61 +186,19 @@ export function Transactions() {
         if (amountBR.includes(needle)) return true
         return false
       })
-  }, [transactions, selectedMonth, filterType, srcKind, filterCardId, filterCategoryIds, searchText, cards])
+  }, [transactions, selectedMonth, filterType, filterClassification, srcKind, filterCardId, filterCategoryIds, searchText, cards])
 
-  const filtered = useMemo(() => baseFiltered.filter((t) => {
-    if (filterClassification === "all") return true
-    if (filterClassification === "recurring") return t.is_recurring || t.classification === "recurring"
-    if (filterClassification === "installment") return t.classification === "installment"
-    if (filterClassification === "scheduled") return t.is_scheduled && !t.is_realized
-    return true
-  }), [baseFiltered, filterClassification])
-
-  const lastCreatedInMonth = useMemo(() => {
-    if (filtered.length === 0) return null
-    return filtered.reduce((latest, t) =>
-      (t.created_at ?? "") > (latest.created_at ?? "") ? t : latest
-    )
-  }, [filtered])
-
-  const sorted = useMemo(() => [...filtered].sort((a, b) => b.date.localeCompare(a.date)), [filtered])
+  const sorted = useMemo(() => [...baseFiltered].sort((a, b) => b.date.localeCompare(a.date)), [baseFiltered])
 
   const summary = useMemo(() => {
     const src = baseFiltered
-    const sum = (arr: typeof src) => arr.reduce((s, t) => s + Number(t.amount), 0)
-    const isEffectivelyRealized = (t: typeof src[number]) => {
-      if (t.is_scheduled && !t.is_realized) return false
-      return t.is_realized || t.is_recurring || t.classification === "installment"
-    }
-    const receita = sum(src.filter((t) => t.type === "INCOME"))
-    const despesasRealizadas = sum(src.filter((t) => t.type === "EXPENSE" && isEffectivelyRealized(t)))
-    const despesasPrevistas = sum(src.filter((t) => t.type === "EXPENSE" && t.is_scheduled && !t.is_realized))
-    const despesasTotal = despesasRealizadas + despesasPrevistas
-    const saldoAtual = receita - despesasRealizadas
-    const saldoProjetado = receita - despesasTotal
-
-    const recurring = src.filter((t) => t.classification === "recurring")
-    const recurringIncome = sum(recurring.filter((t) => t.type === "INCOME"))
-    const recurringExpense = sum(recurring.filter((t) => t.type === "EXPENSE"))
-    const installments = src.filter((t) => t.classification === "installment")
-    const installmentTotal = sum(installments.filter((t) => t.type === "INCOME")) - sum(installments.filter((t) => t.type === "EXPENSE"))
-    const scheduled = src.filter((t) => t.classification === "scheduled")
-    const scheduledTotal = sum(scheduled.filter((t) => t.type === "INCOME")) - sum(scheduled.filter((t) => t.type === "EXPENSE"))
+    const isFuture = (t: typeof src[number]) => t.classification === "scheduled"
+    const signedSum = (arr: typeof src) =>
+      arr.reduce((s, t) => s + (t.type === "INCOME" ? Number(t.amount) : -Number(t.amount)), 0)
 
     return {
-      receita,
-      despesasTotal,
-      despesasPrevistas,
-      saldoAtual,
-      saldoProjetado,
-      recurringCount: recurring.length,
-      recurringIncome,
-      recurringExpense,
-      recurringNet: recurringIncome - recurringExpense,
-      installmentCount: installments.length,
-      installmentTotal,
-      scheduledCount: scheduled.length,
-      scheduledTotal,
+      realizado: signedSum(src.filter((t) => !isFuture(t))),
+      futuro: signedSum(src.filter((t) => isFuture(t))),
     }
   }, [baseFiltered])
 
@@ -267,24 +227,25 @@ export function Transactions() {
 
   const activeFilterCount =
     (filterType !== "ALL" ? 1 : 0) +
+    (filterClassification !== "all" ? 1 : 0) +
     (srcKind !== "all" ? 1 : 0) +
     (filterCardId ? 1 : 0) +
-    filterCategoryIds.size +
-    (filterClassification !== "all" ? 1 : 0)
+    filterCategoryIds.size
 
-  function clearAllFilters() {
-    setFilterType("ALL")
-    setSrcKind("all")
-    setFilterCardId("")
-    setFilterCategoryIds(new Set())
-    setFilterClassification("all")
-  }
-
-  const classificationLabel: Record<typeof filterClassification, string> = {
+  const classificationLabel: Record<ClassificationFilter, string> = {
     all: "",
     recurring: "Recorrentes",
     installment: "Parcelados",
     scheduled: "Agendados",
+    realized: "Realizado",
+  }
+
+  function clearAllFilters() {
+    setFilterType("ALL")
+    setFilterClassification("all")
+    setSrcKind("all")
+    setFilterCardId("")
+    setFilterCategoryIds(new Set())
   }
 
   function toggleCategoryFilter(id: string) {
@@ -450,6 +411,12 @@ export function Transactions() {
               <button onClick={() => setFilterType("ALL")}><Icon name="close" className="text-[12px]" /></button>
             </span>
           )}
+          {filterClassification !== "all" && (
+            <span className="filter-token">
+              {classificationLabel[filterClassification]}
+              <button onClick={() => setFilterClassification("all")}><Icon name="close" className="text-[12px]" /></button>
+            </span>
+          )}
           {srcKind !== "all" && (
             <span className="filter-token">
               {srcKind === "card" ? "Só cartões" : "Só contas"}
@@ -460,12 +427,6 @@ export function Transactions() {
             <span className="filter-token">
               {cardOf(filterCardId)?.name}
               <button onClick={() => setFilterCardId("")}><Icon name="close" className="text-[12px]" /></button>
-            </span>
-          )}
-          {filterClassification !== "all" && (
-            <span className="filter-token">
-              {classificationLabel[filterClassification]}
-              <button onClick={() => setFilterClassification("all")}><Icon name="close" className="text-[12px]" /></button>
             </span>
           )}
           {[...filterCategoryIds].map((id) => {
@@ -482,119 +443,31 @@ export function Transactions() {
       )}
 
       {sorted.length > 0 && (
-        <>
-          <div className="kpi-grid" style={{ marginBottom: 16 }}>
-            <div className="kpi">
-              <div className="kpi-label"><Icon name="trending_up" className="text-[12px]" />Receita</div>
-              <div className="kpi-value positive"><MoneyValue value={summary.receita} /></div>
+        <div className="kpi-grid" style={{ marginBottom: 16, gridTemplateColumns: "repeat(2, 1fr)" }}>
+          <div
+            className={`kpi ${filterClassification === "realized" ? "kpi-active" : ""}`}
+            role="button"
+            style={{ cursor: "pointer" }}
+            onClick={() => setFilterClassification(filterClassification === "realized" ? "all" : "realized")}
+          >
+            <div className="kpi-label"><Icon name="check_circle" className="text-[12px]" />Realizado</div>
+            <div className={`kpi-value ${summary.realizado >= 0 ? "positive" : "negative"}`}>
+              <MoneyValue value={summary.realizado} />
             </div>
-            <div className="kpi">
-              <div className="kpi-label"><Icon name="trending_down" className="text-[12px]" />Despesas</div>
-              <div className="kpi-value negative"><MoneyValue value={summary.despesasTotal} /></div>
-              {summary.despesasPrevistas > 0 && (
-                <div className="kpi-meta">
-                  Previstas: <span className="num" style={{ color: "var(--negative)" }}><MoneyValue value={summary.despesasPrevistas} /></span>
-                </div>
-              )}
-            </div>
-            <div className="kpi">
-              <div className="kpi-label"><Icon name="account_balance" className="text-[12px]" />Saldo Atual</div>
-              <div className={`kpi-value ${summary.saldoAtual >= 0 ? "positive" : "negative"}`}>
-                <MoneyValue value={summary.saldoAtual} />
-              </div>
-              <div className="kpi-meta">Receita - despesas realizadas</div>
-            </div>
-            <div className="kpi">
-              <div className="kpi-label"><Icon name="savings" className="text-[12px]" />Saldo Projetado</div>
-              <div className={`kpi-value ${summary.saldoProjetado >= 0 ? "positive" : "negative"}`}>
-                <MoneyValue value={summary.saldoProjetado} />
-              </div>
-              <div className="kpi-meta">Quanto ainda posso gastar</div>
-            </div>
+            <div className="kpi-meta">Transações já concluídas</div>
           </div>
-
-          <div className="kpi-grid kpi-grid-3" style={{ marginBottom: 20 }}>
-            <div
-              className={`kpi ${filterClassification === "recurring" ? "kpi-active" : ""}`}
-              role="button"
-              onClick={() => setFilterClassification((c) => c === "recurring" ? "all" : "recurring")}
-              style={{ cursor: "pointer" }}
-            >
-              <div className="kpi-label">
-                <Icon name="repeat" className="text-[12px]" />Recorrentes
-                <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.recurringCount}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-                <div className={`kpi-value ${summary.recurringNet >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
-                  {summary.recurringNet >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.recurringNet)} />
-                </div>
-                <div style={{ display: "flex", gap: 8, fontSize: 11, fontFamily: "var(--font-mono)" }}>
-                  {summary.recurringIncome > 0 && (
-                    <span style={{ color: "var(--positive)" }}>+<MoneyValue value={summary.recurringIncome} /></span>
-                  )}
-                  {summary.recurringExpense > 0 && (
-                    <span style={{ color: "var(--negative)" }}>-<MoneyValue value={summary.recurringExpense} /></span>
-                  )}
-                </div>
-              </div>
+          <div
+            className={`kpi ${filterClassification === "scheduled" ? "kpi-active" : ""}`}
+            role="button"
+            style={{ cursor: "pointer" }}
+            onClick={() => setFilterClassification(filterClassification === "scheduled" ? "all" : "scheduled")}
+          >
+            <div className="kpi-label"><Icon name="schedule" className="text-[12px]" />Futuro</div>
+            <div className={`kpi-value ${summary.futuro >= 0 ? "positive" : "negative"}`}>
+              <MoneyValue value={summary.futuro} />
             </div>
-            <div
-              className={`kpi ${filterClassification === "installment" ? "kpi-active" : ""}`}
-              role="button"
-              onClick={() => setFilterClassification((c) => c === "installment" ? "all" : "installment")}
-              style={{ cursor: "pointer" }}
-            >
-              <div className="kpi-label">
-                <Icon name="payments" className="text-[12px]" />Parcelados
-                <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.installmentCount}</span>
-              </div>
-              <div className={`kpi-value ${summary.installmentTotal >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
-                {summary.installmentTotal >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.installmentTotal)} />
-              </div>
-            </div>
-            <div
-              className={`kpi ${filterClassification === "scheduled" ? "kpi-active" : ""}`}
-              role="button"
-              onClick={() => setFilterClassification((c) => c === "scheduled" ? "all" : "scheduled")}
-              style={{ cursor: "pointer" }}
-            >
-              <div className="kpi-label">
-                <Icon name="schedule" className="text-[12px]" />Agendados
-                <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.scheduledCount}</span>
-              </div>
-              <div className={`kpi-value ${summary.scheduledTotal >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
-                {summary.scheduledTotal >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.scheduledTotal)} />
-              </div>
-            </div>
+            <div className="kpi-meta">Agendadas para o mês</div>
           </div>
-        </>
-      )}
-
-      {lastCreatedInMonth && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "10px 14px",
-            marginBottom: 10,
-            borderRadius: 10,
-            background: "var(--surface-2)",
-            border: "1px solid var(--hairline)",
-            fontSize: 13,
-            flexWrap: "wrap",
-          }}
-        >
-          <Icon name="history" className="text-[14px]" style={{ color: "var(--accent)" }} />
-          <span style={{ color: "var(--text-3)" }}>Última transação cadastrada no mês:</span>
-          <span style={{ fontWeight: 600, color: "var(--text)" }}>{lastCreatedInMonth.description}</span>
-          <span style={{ color: lastCreatedInMonth.type === "INCOME" ? "var(--positive)" : "var(--negative)" }}>
-            {lastCreatedInMonth.type === "INCOME" ? "+" : "-"}
-            <MoneyValue value={Math.abs(Number(lastCreatedInMonth.amount))} />
-          </span>
-          <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>
-            {formatCreatedAt(lastCreatedInMonth.created_at)}
-          </span>
         </div>
       )}
 

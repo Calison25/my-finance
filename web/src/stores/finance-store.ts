@@ -32,6 +32,9 @@ interface FinanceState {
   getCardBalanceByMonth: (cardId: string, month: string) => number
   transactionSummary: TransactionSummary | null
   fetchTransactionSummary: (month: string, cardId?: string) => Promise<void>
+  expenseGoal: number | null
+  fetchExpenseGoal: () => Promise<void>
+  setExpenseGoal: (amount: number) => Promise<void>
   reset: () => void
 }
 
@@ -42,6 +45,20 @@ function monthsToRange(months: string[]): { from: string; to: string } {
   const [ly, lm] = last.split("-").map(Number)
   const lastDay = new Date(ly, lm, 0).getDate()
   return { from: `${first}-01`, to: `${last}-${String(lastDay).padStart(2, "0")}` }
+}
+
+function monthsCoveredBy(from: string, to: string): string[] {
+  const [fy, fm] = from.slice(0, 7).split("-").map(Number)
+  const [ty, tm] = to.slice(0, 7).split("-").map(Number)
+  const months: string[] = []
+  let y = fy
+  let m = fm
+  while (y < ty || (y === ty && m <= tm)) {
+    months.push(`${y}-${String(m).padStart(2, "0")}`)
+    m += 1
+    if (m > 12) { m = 1; y += 1 }
+  }
+  return months
 }
 
 async function refreshLoadedTransactions(
@@ -106,10 +123,15 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     const { from, to } = monthsToRange(missing)
     const fetched = await api.transactions.list({ date_from: from, date_to: to })
     set((s) => {
-      const fetchedMonths = new Set(missing)
-      const kept = s.transactions.filter((t) => !fetchedMonths.has(t.date.slice(0, 7)))
+      // The API call above returns every transaction in the contiguous [from, to]
+      // range, which can include months already loaded (when `missing` has gaps).
+      // Drop and replace the *entire* covered range, not just `missing`, or those
+      // in-between months end up duplicated (kept copy + freshly fetched copy).
+      const covered = monthsCoveredBy(from, to)
+      const coveredSet = new Set(covered)
+      const kept = s.transactions.filter((t) => !coveredSet.has(t.date.slice(0, 7)))
       const next = new Set(s.loadedMonths)
-      for (const m of missing) next.add(m)
+      for (const m of covered) next.add(m)
       return { transactions: [...kept, ...fetched], loadedMonths: next }
     })
   },
@@ -269,7 +291,22 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     transactionSummary: null,
     loadedMonths: new Set<string>(),
     isLoading: false,
+    expenseGoal: null,
   }),
+
+  expenseGoal: null,
+  fetchExpenseGoal: async () => {
+    try {
+      const raw = await api.expenseGoal.get()
+      set({ expenseGoal: raw.amount == null ? null : Number(raw.amount) })
+    } catch {
+      // silent - goal is optional, dashboard works without it
+    }
+  },
+  setExpenseGoal: async (amount) => {
+    const raw = await api.expenseGoal.set(amount)
+    set({ expenseGoal: raw.amount == null ? null : Number(raw.amount) })
+  },
 
   transactionSummary: null,
   fetchTransactionSummary: async (month, cardId) => {

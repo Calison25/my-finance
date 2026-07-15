@@ -1,11 +1,32 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
+import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
 
 function fmtMonth(d: Date) {
   return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+}
+
+function formatCreatedAt(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const date = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+  const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+  return `${date} às ${time}`
+}
+
+function formatCentsToBRL(cents: number): string {
+  if (cents === 0) return ""
+  const reais = Math.floor(cents / 100)
+  const cv = cents % 100
+  return `${reais.toLocaleString("pt-BR")},${String(cv).padStart(2, "0")}`
+}
+
+function parseBRLToNumber(s: string): number {
+  const d = s.replace(/\D/g, "")
+  return d ? parseInt(d, 10) / 100 : 0
 }
 
 export function Dashboard() {
@@ -19,9 +40,10 @@ export function Dashboard() {
     getCardExpensesByMonth,
     valuesVisible,
     toggleValuesVisible,
-    transactionSummary,
-    fetchTransactionSummary,
     ensureMonths,
+    expenseGoal,
+    fetchExpenseGoal,
+    setExpenseGoal,
   } = useFinanceStore()
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -31,32 +53,76 @@ export function Dashboard() {
   })
 
   useEffect(() => {
-    fetchTransactionSummary(selectedMonth)
     ensureMonths([selectedMonth])
-  }, [selectedMonth, transactions.length, fetchTransactionSummary, ensureMonths])
+  }, [selectedMonth, ensureMonths])
+
+  useEffect(() => {
+    fetchExpenseGoal()
+  }, [fetchExpenseGoal])
 
   const [y, m] = selectedMonth.split("-").map(Number)
   const monthDate = new Date(y, m - 1, 1)
-  const monthStart = `${selectedMonth}-01`
-  const monthEnd = new Date(y, m, 0).toISOString().slice(0, 10)
 
   function changeMonth(delta: number) {
     const d = new Date(y, m - 1 + delta, 1)
     setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
   }
 
-  const s = transactionSummary
-  const receita = s?.realized.income ?? 0
-  const despesas = s?.realized.expenses ?? 0
-  const previstas = s?.pending.expenses ?? 0
+  const monthTx = useMemo(
+    () => transactions.filter((t) => t.date.startsWith(selectedMonth)),
+    [transactions, selectedMonth],
+  )
+
+  const summary = useMemo(() => {
+    const src = monthTx
+    const sum = (arr: typeof src) => arr.reduce((s, t) => s + Number(t.amount), 0)
+    const isEffectivelyRealized = (t: typeof src[number]) => {
+      if (t.is_scheduled && !t.is_realized) return false
+      return t.is_realized || t.is_recurring || t.classification === "installment"
+    }
+    const receita = sum(src.filter((t) => t.type === "INCOME"))
+    const despesasRealizadas = sum(src.filter((t) => t.type === "EXPENSE" && isEffectivelyRealized(t)))
+    const despesasPrevistas = sum(src.filter((t) => t.type === "EXPENSE" && t.is_scheduled && !t.is_realized))
+    const despesasTotal = despesasRealizadas + despesasPrevistas
+    const saldoAtual = receita - despesasRealizadas
+    const saldoFuturo = receita - despesasTotal
+
+    const recurring = src.filter((t) => t.classification === "recurring")
+    const recurringIncome = sum(recurring.filter((t) => t.type === "INCOME"))
+    const recurringExpense = sum(recurring.filter((t) => t.type === "EXPENSE"))
+    const installments = src.filter((t) => t.classification === "installment")
+    const installmentTotal = sum(installments.filter((t) => t.type === "INCOME")) - sum(installments.filter((t) => t.type === "EXPENSE"))
+    const scheduled = src.filter((t) => t.classification === "scheduled")
+    const scheduledTotal = sum(scheduled.filter((t) => t.type === "INCOME")) - sum(scheduled.filter((t) => t.type === "EXPENSE"))
+
+    return {
+      receita,
+      despesasTotal,
+      despesasPrevistas,
+      saldoAtual,
+      saldoFuturo,
+      recurringCount: recurring.length,
+      recurringIncome,
+      recurringExpense,
+      recurringNet: recurringIncome - recurringExpense,
+      installmentCount: installments.length,
+      installmentTotal,
+      scheduledCount: scheduled.length,
+      scheduledTotal,
+    }
+  }, [monthTx])
+
+  const lastCreatedInMonth = useMemo(() => {
+    if (monthTx.length === 0) return null
+    return monthTx.reduce((latest, t) => ((t.created_at ?? "") > (latest.created_at ?? "") ? t : latest))
+  }, [monthTx])
+
   const patrimonio = cards
     .filter((c) => c.type === "CHECKING_ACCOUNT")
     .reduce((acc, c) => acc + getCardBalanceByMonth(c.id, selectedMonth), 0)
-  const saldoAtual = receita - despesas
-  const saldoProjetado = saldoAtual - previstas
 
   const recent = [...transactions]
-    .filter((t) => t.date >= monthStart && t.date <= monthEnd)
+    .filter((t) => t.date.startsWith(selectedMonth))
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 6)
 
@@ -70,6 +136,35 @@ export function Dashboard() {
     const card = cards.find((c) => c.id === cardId)
     if (!card) return null
     return banks.find((b) => b.id === card.bank_id) ?? null
+  }
+
+  function fmtBRL(v: number) {
+    return valuesVisible ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "R$ ••••••"
+  }
+
+  // ---- meta de despesa ----
+  const [goalModalOpen, setGoalModalOpen] = useState(false)
+  const [goalInput, setGoalInput] = useState("")
+  const despesaAbs = summary.despesasTotal
+  const hasGoal = expenseGoal != null
+  const overGoal = hasGoal && despesaAbs > (expenseGoal as number)
+  const sobra = hasGoal ? (expenseGoal as number) - despesaAbs : 0
+  const goalPct = hasGoal && (expenseGoal as number) > 0 ? Math.min(100, (despesaAbs / (expenseGoal as number)) * 100) : 0
+  const goalMessage = !hasGoal
+    ? "Defina uma meta de despesa para acompanhar quanto você pode gastar no mês."
+    : overGoal
+      ? `Você já ultrapassou sua meta de despesa em ${fmtBRL(despesaAbs - (expenseGoal as number))}.`
+      : `Você já usou ${fmtBRL(despesaAbs)} da sua meta de ${fmtBRL(expenseGoal as number)} — ainda tem ${fmtBRL(sobra)} sobrando.`
+
+  function openGoalModal() {
+    setGoalInput(expenseGoal != null ? formatCentsToBRL(Math.round(expenseGoal * 100)) : "")
+    setGoalModalOpen(true)
+  }
+
+  async function handleSaveGoal() {
+    const amount = parseBRLToNumber(goalInput)
+    await setExpenseGoal(amount)
+    setGoalModalOpen(false)
   }
 
   return (
@@ -101,32 +196,155 @@ export function Dashboard() {
         <div className="hero-value" style={{ marginTop: 10 }}>
           <MoneyValue value={patrimonio} />
         </div>
-        <div className="hero-deltas">
-          {receita > 0 && (
-            <span className="hero-chip positive">
-              <Icon name="trending_up" className="text-[12px]" />
-              +<MoneyValue value={receita} />
-            </span>
-          )}
-          {previstas > 0 && (
-            <span className="hero-chip">
-              <Icon name="schedule" className="text-[12px]" />
-              <MoneyValue value={previstas} /> previsto
-            </span>
-          )}
-        </div>
       </div>
 
       {/* KPIs */}
-      <div className="kpi-grid" style={{ marginBottom: 28 }}>
-        <KPI label="Receita" icon="trending_up" value={receita} variant="positive" />
-        <KPI label="Despesas" icon="trending_down" value={despesas} variant="negative"
-             meta={<>Previstas: <span className="num" style={{ color: "var(--negative)" }}><MoneyValue value={previstas} /></span></>} />
-        <KPI label="Saldo Atual" icon="account_balance" value={saldoAtual} variant={saldoAtual >= 0 ? "positive" : "negative"}
-             meta="Receita - despesas realizadas" />
-        <KPI label="Saldo Projetado" icon="savings" value={saldoProjetado} variant={saldoProjetado >= 0 ? "positive" : "negative"}
-             meta="Quanto ainda posso gastar" />
+      <div className="kpi-grid" style={{ marginBottom: 16, gridTemplateColumns: "repeat(3, 1fr)" }}>
+        <KPI label="Receita" icon="trending_up" value={summary.receita} variant="positive"
+             onClick={() => navigate(`/transactions?month=${selectedMonth}&type=INCOME`)} />
+        <KPI label="Despesas" icon="trending_down" value={summary.despesasTotal} variant="negative"
+             meta={summary.despesasPrevistas > 0 ? <>Previstas: <span className="num" style={{ color: "var(--negative)" }}><MoneyValue value={summary.despesasPrevistas} /></span></> : undefined}
+             onClick={() => navigate(`/transactions?month=${selectedMonth}&type=EXPENSE`)} />
+        <div className="kpi">
+          <div className="kpi-label"><Icon name="account_balance" className="text-[12px]" />Saldo</div>
+          <div style={{ display: "flex", gap: 20, marginTop: 2 }}>
+            <div>
+              <div style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>Atual</div>
+              <div className={`kpi-value ${summary.saldoAtual >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+                <MoneyValue value={summary.saldoAtual} />
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>Futuro</div>
+              <div className={`kpi-value ${summary.saldoFuturo >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+                <MoneyValue value={summary.saldoFuturo} />
+              </div>
+            </div>
+          </div>
+          <div className="kpi-meta" style={{ marginTop: 8 }}>Atual: receita − despesas realizadas · Futuro: quanto ainda posso gastar</div>
+        </div>
       </div>
+
+      {/* Recorrentes / Parcelados / Agendados */}
+      <div className="kpi-grid kpi-grid-3" style={{ marginBottom: 16 }}>
+        <div
+          className="kpi"
+          role="button"
+          style={{ cursor: "pointer" }}
+          onClick={() => navigate(`/transactions?month=${selectedMonth}&classification=recurring`)}
+        >
+          <div className="kpi-label">
+            <Icon name="repeat" className="text-[12px]" />Recorrentes
+            <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.recurringCount}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+            <div className={`kpi-value ${summary.recurringNet >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+              {summary.recurringNet >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.recurringNet)} />
+            </div>
+            <div style={{ display: "flex", gap: 8, fontSize: 11, fontFamily: "var(--font-mono)" }}>
+              {summary.recurringIncome > 0 && (
+                <span style={{ color: "var(--positive)" }}>+<MoneyValue value={summary.recurringIncome} /></span>
+              )}
+              {summary.recurringExpense > 0 && (
+                <span style={{ color: "var(--negative)" }}>-<MoneyValue value={summary.recurringExpense} /></span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div
+          className="kpi"
+          role="button"
+          style={{ cursor: "pointer" }}
+          onClick={() => navigate(`/transactions?month=${selectedMonth}&classification=installment`)}
+        >
+          <div className="kpi-label">
+            <Icon name="payments" className="text-[12px]" />Parcelados
+            <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.installmentCount}</span>
+          </div>
+          <div className={`kpi-value ${summary.installmentTotal >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+            {summary.installmentTotal >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.installmentTotal)} />
+          </div>
+        </div>
+        <div
+          className="kpi"
+          role="button"
+          style={{ cursor: "pointer" }}
+          onClick={() => navigate(`/transactions?month=${selectedMonth}&classification=scheduled`)}
+        >
+          <div className="kpi-label">
+            <Icon name="schedule" className="text-[12px]" />Agendados
+            <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.scheduledCount}</span>
+          </div>
+          <div className={`kpi-value ${summary.scheduledTotal >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+            {summary.scheduledTotal >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.scheduledTotal)} />
+          </div>
+        </div>
+      </div>
+
+      {/* Meta de despesa */}
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: hasGoal ? 14 : 4 }}>
+          <div className="panel-title" style={{ fontSize: 12, letterSpacing: "0.04em" }}>META DE DESPESA</div>
+          <button className="btn btn-ghost btn-sm" onClick={openGoalModal}>
+            <Icon name="edit" className="text-[12px]" /> Editar
+          </button>
+        </div>
+        {hasGoal ? (
+          <>
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+              <div>
+                <div className="kpi-label">Gasto</div>
+                <div className="kpi-value negative"><MoneyValue value={despesaAbs} /></div>
+              </div>
+              <div>
+                <div className="kpi-label">Meta</div>
+                <div className="kpi-value"><MoneyValue value={expenseGoal as number} /></div>
+              </div>
+              <div>
+                <div className="kpi-label">{overGoal ? "Ultrapassou" : "Sobra"}</div>
+                <div className={`kpi-value ${overGoal ? "negative" : "positive"}`}>
+                  <MoneyValue value={overGoal ? despesaAbs - (expenseGoal as number) : sobra} />
+                </div>
+              </div>
+            </div>
+            <div style={{ height: 10, borderRadius: 6, overflow: "hidden", background: "var(--surface-2)", marginTop: 16 }}>
+              <div style={{ width: `${goalPct}%`, height: "100%", background: overGoal ? "var(--negative)" : "var(--positive)" }} />
+            </div>
+            <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-3)", lineHeight: 1.5 }}>{goalMessage}</div>
+          </>
+        ) : (
+          <div style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.5 }}>{goalMessage}</div>
+        )}
+      </div>
+
+      {/* Última transação */}
+      {lastCreatedInMonth && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 14px",
+            marginBottom: 16,
+            borderRadius: 10,
+            background: "var(--surface-2)",
+            border: "1px solid var(--hairline)",
+            fontSize: 13,
+            flexWrap: "wrap",
+          }}
+        >
+          <Icon name="history" className="text-[14px]" style={{ color: "var(--accent)" }} />
+          <span style={{ color: "var(--text-3)" }}>Última transação cadastrada no mês:</span>
+          <span style={{ fontWeight: 600, color: "var(--text)" }}>{lastCreatedInMonth.description}</span>
+          <span style={{ color: lastCreatedInMonth.type === "INCOME" ? "var(--positive)" : "var(--negative)" }}>
+            {lastCreatedInMonth.type === "INCOME" ? "+" : "-"}
+            <MoneyValue value={Math.abs(Number(lastCreatedInMonth.amount))} />
+          </span>
+          <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>
+            {formatCreatedAt(lastCreatedInMonth.created_at)}
+          </span>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)", gap: 16 }} className="dash-grid">
         {/* Credit Cards */}
@@ -242,6 +460,31 @@ export function Dashboard() {
         </div>
       </div>
 
+      <Dialog open={goalModalOpen} onClose={() => setGoalModalOpen(false)} title="Meta de despesa">
+        <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16, lineHeight: 1.5 }}>
+          Defina quanto você gostaria de gastar no mês. A diferença para a despesa realizada + prevista é sua sobra (ou o quanto ultrapassou).
+        </p>
+        <div className="field">
+          <label className="label">Valor da meta</label>
+          <input
+            className="input input-amount despesa"
+            value={goalInput}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/\D/g, "")
+              const cents = raw ? parseInt(raw, 10) : 0
+              setGoalInput(formatCentsToBRL(cents))
+            }}
+            placeholder="0,00"
+            inputMode="numeric"
+            autoFocus
+          />
+        </div>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+          <button className="btn btn-secondary" onClick={() => setGoalModalOpen(false)}>Cancelar</button>
+          <button className="btn btn-primary" onClick={handleSaveGoal}>Salvar</button>
+        </div>
+      </Dialog>
+
       <style>{`
         @media (max-width: 1100px) {
           .dash-grid { grid-template-columns: 1fr !important; }
@@ -251,9 +494,9 @@ export function Dashboard() {
   )
 }
 
-function KPI({ label, icon, value, variant, meta }: { label: string; icon: string; value: number; variant?: "positive" | "negative" | ""; meta?: React.ReactNode }) {
+function KPI({ label, icon, value, variant, meta, onClick }: { label: string; icon: string; value: number; variant?: "positive" | "negative" | ""; meta?: React.ReactNode; onClick?: () => void }) {
   return (
-    <div className="kpi">
+    <div className="kpi" role={onClick ? "button" : undefined} style={onClick ? { cursor: "pointer" } : undefined} onClick={onClick}>
       <div className="kpi-label">
         <Icon name={icon} className="text-[12px]" />
         {label}

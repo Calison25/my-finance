@@ -63,13 +63,13 @@ export function FinancialSummaryCards({ summary, className = "" }: Props) {
         <p className="text-[10px] text-on-surface-variant mt-1">Receita - despesas realizadas</p>
       </div>
 
-      {/* Saldo Projetado */}
+      {/* Saldo Futuro */}
       <div className={`rounded-xl p-5 ghost-border ${projectedPositive ? "bg-surface-container-high" : "bg-error-container/10 border-error/20"}`}>
         <div className="flex items-center gap-3 mb-3">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${projectedPositive ? "bg-warning-container/20" : "bg-error-container/20"}`}>
             <Icon name="savings" className={projectedPositive ? "text-warning" : "text-error"} />
           </div>
-          <p className="text-sm text-on-surface-variant">Saldo Projetado</p>
+          <p className="text-sm text-on-surface-variant">Saldo Futuro</p>
         </div>
         <p className={`text-lg sm:text-2xl font-headline font-bold truncate ${projectedPositive ? "text-income" : "text-error"}`}>
           <MoneyValue value={summary.projected_balance} />

@@ -15,6 +15,7 @@ from api.infrastructure.http.category_router import router as category_router
 from api.infrastructure.http.dashboard_router import router as dashboard_router
 from api.infrastructure.http.auth_router import router as auth_router
 from api.infrastructure.http.household_router import router as household_router
+from api.infrastructure.http.expense_goal_router import router as expense_goal_router
 
 logger = logging.getLogger("myfinance")
 
@@ -66,6 +67,7 @@ app.include_router(card_router, prefix="/api/cards", tags=["Cards"])
 app.include_router(transaction_router, prefix="/api/transactions", tags=["Transactions"])
 app.include_router(category_router, prefix="/api/categories", tags=["Categories"])
 app.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(expense_goal_router, prefix="/api/expense-goal", tags=["ExpenseGoal"])
 
 
 @app.exception_handler(NotFoundError)
