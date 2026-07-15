@@ -11,6 +11,8 @@ from api.infrastructure.persistence.postgres_user_repository import (
     PostgresUserRepository,
 )
 
+LOCAL_DEV_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+
 _jwks_client: PyJWKClient | None = None
 
 
@@ -28,7 +30,17 @@ def _extract_bearer(authorization: str | None) -> str:
     return authorization[7:]
 
 
+def _is_local_dev(token: str) -> bool:
+    return not settings.supabase_url and token == "local-dev"
+
+
 def decode_jwt(token: str) -> dict:
+    if _is_local_dev(token):
+        return {
+            "sub": str(LOCAL_DEV_USER_ID),
+            "email": "dev@localhost",
+            "user_metadata": {"full_name": "Dev Local", "avatar_url": None},
+        }
     try:
         client = _get_jwks_client()
         signing_key = client.get_signing_key_from_jwt(token)
@@ -51,6 +63,11 @@ async def get_current_user(
     user_repo: PostgresUserRepository = Depends(get_user_repository),
 ) -> User:
     token = _extract_bearer(authorization)
+    if _is_local_dev(token):
+        user = await user_repo.get_by_id(LOCAL_DEV_USER_ID)
+        if user is None:
+            raise HTTPException(status_code=401, detail="Local dev user not provisioned — call /api/auth/me first")
+        return user
     payload = decode_jwt(token)
     user_id = UUID(payload["sub"])
     user = await user_repo.get_by_id(user_id)

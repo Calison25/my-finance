@@ -3,6 +3,8 @@ import type { Session, User as SupabaseUser } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
 import { useFinanceStore } from "@/stores/finance-store"
 
+const LOCAL_DEV = import.meta.env.VITE_LOCAL_DEV === "true"
+
 interface AppUser {
   id: string
   household_id: string
@@ -40,12 +42,15 @@ export const useAuthStore = create<AuthState>()((set) => ({
   error: null,
 
   signInWithGoogle: async () => {
+    if (LOCAL_DEV) {
+      await provisionUser("local-dev", set)
+      return
+    }
+    if (!supabase) return
     set({ error: null, isLoading: true })
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: window.location.origin,
-      },
+      options: { redirectTo: window.location.origin },
     })
     if (error) {
       set({ error: error.message, isLoading: false })
@@ -53,7 +58,9 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   signOut: async () => {
-    await supabase.auth.signOut()
+    if (!LOCAL_DEV && supabase) {
+      await supabase.auth.signOut()
+    }
     useFinanceStore.getState().reset()
     set({
       supabaseUser: null,
@@ -66,6 +73,16 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   initialize: () => {
+    if (LOCAL_DEV) {
+      provisionUser("local-dev", set)
+      return () => {}
+    }
+
+    if (!supabase) {
+      set({ isLoading: false })
+      return () => {}
+    }
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         set({ session, supabaseUser: session.user })
