@@ -77,15 +77,16 @@ export function Dashboard() {
   const summary = useMemo(() => {
     const src = monthTx
     const sum = (arr: typeof src) => arr.reduce((s, t) => s + Number(t.amount), 0)
-    const isEffectivelyRealized = (t: typeof src[number]) => {
-      if (t.is_scheduled && !t.is_realized) return false
-      return t.is_realized || t.is_recurring || t.classification === "installment"
-    }
+    // Regra única do app: realizado = is_realized (a bolinha de check),
+    // a mesma usada nos cards da página de Transações.
     const receita = sum(src.filter((t) => t.type === "INCOME"))
-    const despesasRealizadas = sum(src.filter((t) => t.type === "EXPENSE" && isEffectivelyRealized(t)))
-    const despesasPrevistas = sum(src.filter((t) => t.type === "EXPENSE" && t.is_scheduled && !t.is_realized))
+    const receitaRealizada = sum(src.filter((t) => t.type === "INCOME" && t.is_realized))
+    const despesasRealizadas = sum(src.filter((t) => t.type === "EXPENSE" && t.is_realized))
+    const despesasPrevistas = sum(src.filter((t) => t.type === "EXPENSE" && !t.is_realized))
     const despesasTotal = despesasRealizadas + despesasPrevistas
-    const saldoAtual = receita - despesasRealizadas
+    // Atual: o que posso gastar desconsiderando o futuro (só realizadas).
+    // Futuro: o que posso gastar contando tudo, inclusive não realizadas.
+    const saldoAtual = receitaRealizada - despesasRealizadas
     const saldoFuturo = receita - despesasTotal
 
     const recurring = src.filter((t) => t.classification === "recurring")
@@ -222,7 +223,7 @@ export function Dashboard() {
               </div>
             </div>
           </div>
-          <div className="kpi-meta" style={{ marginTop: 8 }}>Atual: receita − despesas realizadas · Futuro: quanto ainda posso gastar</div>
+          <div className="kpi-meta" style={{ marginTop: 8 }}>Atual: só o realizado · Futuro: contando tudo, inclusive não realizadas</div>
         </div>
       </div>
 
