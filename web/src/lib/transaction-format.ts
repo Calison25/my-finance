@@ -64,3 +64,18 @@ export function baseDescription(d: string): string {
 export function realDateOf(t: { date: string; transaction_date: string | null }): string {
   return t.transaction_date ?? t.date
 }
+
+// Espelho de classify_transaction do backend — usado para recompor a
+// classificação após updates pontuais (a resposta do update vem sem ela).
+export function classifyTransaction(t: {
+  is_scheduled: boolean
+  is_realized: boolean
+  is_recurring: boolean
+  installment_group_id?: string | null
+  description: string
+}): string {
+  if (t.is_scheduled && !t.is_realized) return "scheduled"
+  if (t.is_recurring) return "recurring"
+  if (t.installment_group_id || /\(\d+\/\d+\)$/.test(t.description)) return "installment"
+  return "regular"
+}

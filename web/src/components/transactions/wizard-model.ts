@@ -1,5 +1,11 @@
-import { competenceDateFor, competenceLabel, parseBRLToNumber } from "@/lib/transaction-format"
-import type { TransactionType } from "@/types"
+import {
+  baseDescription,
+  competenceDateFor,
+  competenceLabel,
+  formatCentsToBRL,
+  parseBRLToNumber,
+} from "@/lib/transaction-format"
+import type { Card, Transaction, TransactionType } from "@/types"
 
 export interface WizardForm {
   type: TransactionType
@@ -19,6 +25,7 @@ export interface WizardForm {
   isRecurring: boolean
   notes: string
   isBill: boolean
+  editCascade: boolean
 }
 
 export const WIZARD_STEPS = [
@@ -54,6 +61,31 @@ export function emptyWizardForm(defaultMonth: string): WizardForm {
     isRecurring: false,
     notes: "",
     isBill: false,
+    editCascade: false,
+  }
+}
+
+export function wizardFormFromTransaction(tx: Transaction, cards: Card[]): WizardForm {
+  const card = cards.find((c) => c.id === tx.card_id)
+  return {
+    type: tx.type,
+    amount: formatCentsToBRL(Math.round(tx.amount * 100)),
+    description: baseDescription(tx.description),
+    srcKind: card?.type === "CREDIT_CARD" ? "card" : "account",
+    cardId: tx.card_id,
+    categoryId: tx.category_id ?? "",
+    customCategoryName: "",
+    categorySearch: "",
+    competence: tx.date.slice(0, 7),
+    transactionDate: tx.transaction_date ?? "",
+    isInstallment: false,
+    installments: 2,
+    isScheduled: tx.is_scheduled,
+    scheduledDate: tx.scheduled_date ?? "",
+    isRecurring: tx.is_recurring,
+    notes: tx.notes ?? "",
+    isBill: tx.is_bill,
+    editCascade: false,
   }
 }
 
@@ -116,6 +148,37 @@ export interface AddTransactionPayload {
   installments?: number
   is_recurring?: boolean
   is_bill?: boolean
+}
+
+export interface UpdateTransactionPayload {
+  description: string
+  amount: number
+  type: TransactionType
+  category_id: string | null
+  custom_category_name?: string
+  date?: string
+  notes: string | null
+  is_recurring: boolean
+  is_bill: boolean
+  transaction_date: string | null
+}
+
+export function buildUpdateTransactionPayload(form: WizardForm, existing: Transaction): UpdateTransactionPayload {
+  const isOther = isOtherCategory(form)
+  const installmentSuffix = existing.description.match(/\s*\(\d+\/\d+\)$/)?.[0] ?? ""
+  return {
+    description: form.description.trim() + installmentSuffix,
+    amount: parseBRLToNumber(form.amount),
+    type: form.type,
+    category_id: isOther ? null : (form.categoryId || null),
+    custom_category_name: isOther ? form.customCategoryName.trim() : undefined,
+    // Só envia a competência quando o mês mudou, para não alterar o dia original.
+    date: form.competence !== existing.date.slice(0, 7) ? competenceDateFor(form.competence) : undefined,
+    notes: form.notes.trim() || null,
+    is_recurring: form.isRecurring,
+    is_bill: form.isBill,
+    transaction_date: form.transactionDate || null,
+  }
 }
 
 export function buildAddTransactionPayload(form: WizardForm): AddTransactionPayload {

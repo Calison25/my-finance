@@ -6,16 +6,7 @@ import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
 import { toast } from "@/components/ui/Toast"
 import { TransactionWizard } from "@/components/transactions/TransactionWizard"
-import {
-  categoryIconFor,
-  formatCentsToBRL,
-  parseBRLToNumber,
-  defaultCompetenceMonth,
-  competenceLabel,
-  baseDescription,
-  realDateOf,
-} from "@/lib/transaction-format"
-import type { TransactionType } from "@/types"
+import { categoryIconFor, defaultCompetenceMonth, realDateOf } from "@/lib/transaction-format"
 
 function fmtMonth(d: Date) {
   return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
@@ -69,7 +60,7 @@ export function Transactions() {
   const filterType = (searchParams.get("type") as "ALL" | "EXPENSE" | "INCOME" | null) ?? "ALL"
   const setFilterType = (t: "ALL" | "EXPENSE" | "INCOME") => updateParams({ type: t === "ALL" ? null : t })
 
-  type ClassificationFilter = "all" | "recurring" | "installment" | "scheduled" | "realized"
+  type ClassificationFilter = "all" | "recurring" | "installment" | "scheduled" | "realized" | "pending"
   const filterClassification = (searchParams.get("classification") as ClassificationFilter | null) ?? "all"
   const setFilterClassification = (c: ClassificationFilter) => updateParams({ classification: c === "all" ? null : c })
 
@@ -132,7 +123,8 @@ export function Transactions() {
       .filter((t) => filterType === "ALL" || t.type === filterType)
       .filter((t) => {
         if (filterClassification === "all") return true
-        if (filterClassification === "realized") return t.classification !== "scheduled"
+        if (filterClassification === "realized") return t.is_realized
+        if (filterClassification === "pending") return !t.is_realized
         return t.classification === filterClassification
       })
       .filter((t) => {
@@ -162,15 +154,16 @@ export function Transactions() {
 
   const summary = useMemo(() => {
     const src = baseFiltered
-    const isFuture = (t: typeof src[number]) => t.classification === "scheduled"
+    // Futuro = tudo que ainda não foi realizado (agendadas e desmarcadas).
+    const isPending = (t: typeof src[number]) => !t.is_realized
     const signedSum = (arr: typeof src) =>
       arr.reduce((s, t) => s + (t.type === "INCOME" ? Number(t.amount) : -Number(t.amount)), 0)
     const expenseSum = (arr: typeof src) =>
       arr.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + Number(t.amount), 0)
 
     return {
-      totalDespesa: expenseSum(src.filter((t) => !isFuture(t))),
-      futuro: signedSum(src.filter((t) => isFuture(t))),
+      totalDespesa: expenseSum(src.filter((t) => !isPending(t))),
+      futuro: signedSum(src.filter(isPending)),
     }
   }, [baseFiltered])
 
@@ -196,7 +189,8 @@ export function Transactions() {
     recurring: "Recorrentes",
     installment: "Parcelados",
     scheduled: "Agendados",
-    realized: "Realizado",
+    realized: "Realizadas",
+    pending: "Não realizadas",
   }
 
   function clearAllFilters() {
@@ -418,16 +412,16 @@ export function Transactions() {
             <div className="kpi-meta">Despesas já concluídas no mês</div>
           </div>
           <div
-            className={`kpi ${filterClassification === "scheduled" ? "kpi-active" : ""}`}
+            className={`kpi ${filterClassification === "pending" ? "kpi-active" : ""}`}
             role="button"
             style={{ cursor: "pointer" }}
-            onClick={() => setFilterClassification(filterClassification === "scheduled" ? "all" : "scheduled")}
+            onClick={() => setFilterClassification(filterClassification === "pending" ? "all" : "pending")}
           >
             <div className="kpi-label"><Icon name="schedule" className="text-[12px]" />Futuro</div>
             <div className={`kpi-value ${summary.futuro >= 0 ? "positive" : "negative"}`}>
               <MoneyValue value={summary.futuro} />
             </div>
-            <div className="kpi-meta">Agendadas para o mês</div>
+            <div className="kpi-meta">Agendadas e não realizadas do mês</div>
           </div>
         </div>
       )}
@@ -527,14 +521,15 @@ export function Transactions() {
           key={modalKey}
           defaultMonth={selectedMonth}
           onClose={() => setWizardOpen(false)}
-          onCreated={() => setWizardOpen(false)}
+          onSaved={() => setWizardOpen(false)}
         />
       )}
 
       {editingId && (
-        <TransactionEditModal
+        <TransactionWizard
           key={modalKey}
-          transactionId={editingId}
+          defaultMonth={selectedMonth}
+          editingId={editingId}
           onClose={() => setEditingId(null)}
           onSaved={() => setEditingId(null)}
         />
@@ -596,200 +591,5 @@ export function Transactions() {
         )}
       </Dialog>
     </div>
-  )
-}
-
-interface TxEditModalProps {
-  transactionId: string
-  onClose: () => void
-  onSaved: () => void
-}
-
-function TransactionEditModal({ transactionId, onClose, onSaved }: TxEditModalProps) {
-  const { transactions, categories, updateTransaction } = useFinanceStore()
-  const existing = transactions.find((t) => t.id === transactionId) ?? null
-
-  const installmentSuffix = existing?.description.match(/\s*\(\d+\/\d+\)$/)?.[0] ?? ""
-
-  const [type, setType] = useState<TransactionType>(existing?.type ?? "EXPENSE")
-  const [amount, setAmount] = useState(existing ? formatCentsToBRL(Math.round(existing.amount * 100)) : "")
-  const [description, setDescription] = useState(existing ? baseDescription(existing.description) : "")
-  const [categoryId, setCategoryId] = useState(existing?.category_id ?? "")
-  const [customCategoryName, setCustomCategoryName] = useState("")
-  const [competence, setCompetence] = useState(existing ? existing.date.slice(0, 7) : defaultCompetenceMonth())
-  const [transactionDate, setTransactionDate] = useState(existing?.transaction_date ?? "")
-  const isRecurring = existing?.is_recurring ?? false
-  const [isBill, setIsBill] = useState(existing?.is_bill ?? false)
-  const [notes, setNotes] = useState(existing?.notes ?? "")
-  const [editCascade, setEditCascade] = useState(false)
-  const [moreOpen, setMoreOpen] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-
-  const isOtherCategory = categoryId === "__other__"
-  const competenceLabelText = competenceLabel(competence)
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (submitting) return
-    const amountNum = parseBRLToNumber(amount)
-    if (!amountNum || !description || !categoryId || (isOtherCategory && !customCategoryName)) {
-      toast.error("Preencha os campos obrigatórios")
-      return
-    }
-    setSubmitting(true)
-    try {
-      await toast.run("Salvando...", () => updateTransaction(transactionId, {
-        description: description + installmentSuffix,
-        amount: amountNum,
-        type,
-        category_id: isOtherCategory ? null : (categoryId || null),
-        custom_category_name: isOtherCategory ? customCategoryName : undefined,
-        notes: notes || null,
-        is_recurring: isRecurring,
-        transaction_date: transactionDate || null,
-      }, editCascade), "Transação atualizada")
-      onSaved()
-    } catch {} finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <Dialog open={true} onClose={onClose} title="Editar transação">
-      <form onSubmit={handleSubmit}>
-        {/* Type toggle */}
-        <div className="type-toggle">
-          {(["EXPENSE", "INCOME"] as TransactionType[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setType(t)}
-              className={`${type === t ? "active" : ""} ${t === "EXPENSE" ? "despesa" : "receita"}`}
-            >
-              {t === "EXPENSE" ? "Despesa" : "Receita"}
-            </button>
-          ))}
-        </div>
-
-        {/* Amount */}
-        <div className="field">
-          <input
-            className={`input input-amount ${type === "EXPENSE" ? "despesa" : "receita"}`}
-            value={amount}
-            onChange={(e) => {
-              const raw = e.target.value.replace(/\D/g, "")
-              const cents = raw ? parseInt(raw, 10) : 0
-              setAmount(formatCentsToBRL(cents))
-            }}
-            placeholder="0,00"
-            inputMode="numeric"
-          />
-        </div>
-
-        {/* Description */}
-        <div className="field">
-          <label className="label">Descrição <span className="req">*</span></label>
-          <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Supermercado" required />
-        </div>
-
-        {/* Category */}
-        <div className="field">
-          <label className="label">Categoria <span className="req">*</span></label>
-          <div className="cat-pills">
-            <button
-              type="button"
-              className={`cat-pill ${isOtherCategory ? "active" : ""}`}
-              onClick={() => setCategoryId("__other__")}
-            >
-              <Icon name="add" className="text-[12px]" /> Outra
-            </button>
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className={`cat-pill ${categoryId === c.id ? "active" : ""}`}
-                onClick={() => setCategoryId(c.id)}
-              >
-                <Icon name={categoryIconFor(c)} className="text-[12px]" />
-                {c.name}
-              </button>
-            ))}
-          </div>
-          {isOtherCategory && (
-            <input
-              className="input"
-              style={{ marginTop: 8 }}
-              placeholder="Nome da nova categoria"
-              value={customCategoryName}
-              onChange={(e) => setCustomCategoryName(e.target.value)}
-              autoFocus
-              required
-            />
-          )}
-        </div>
-
-        {/* Competence + transaction date */}
-        <div className="field">
-          <label className="label">Mês de competência <span className="req">*</span></label>
-          <input
-            type="month"
-            className="input"
-            value={competence}
-            onChange={(e) => setCompetence(e.target.value)}
-            required
-          />
-          <span className="help">A transação aparecerá em <strong>{competenceLabelText}</strong></span>
-        </div>
-        <div className="field">
-          <label className="label">Data real da transação</label>
-          <input
-            type="date"
-            className="input"
-            value={transactionDate}
-            onChange={(e) => setTransactionDate(e.target.value)}
-          />
-          <span className="help">Quando o gasto de fato aconteceu. Se vazio, será considerado o dia 1 do mês de competência.</span>
-        </div>
-
-        {/* More options */}
-        <div className="collapsible">
-          <button type="button" className="collapsible-head" onClick={() => setMoreOpen((s) => !s)}>
-            <Icon name={moreOpen ? "expand_less" : "expand_more"} className="text-[14px]" /> Mais opções
-          </button>
-          {moreOpen && (
-            <div className="collapsible-body">
-              <div className="field">
-                <label className="label">Observações</label>
-                <textarea className="textarea" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-              </div>
-              <div className="check-row" onClick={() => setIsBill((s) => !s)}>
-                <div className={`cb ${isBill ? "checked" : ""}`}>{isBill && <Icon name="check" className="text-[12px]" />}</div>
-                <div>
-                  <div className="cb-label">Aparece nos vencimentos</div>
-                  <div className="cb-help">Mostra na tela de Vencimentos para controle de pagamento</div>
-                </div>
-              </div>
-              {existing?.classification === "installment" && (
-                <div className="check-row" style={{ marginTop: 8 }} onClick={() => setEditCascade((s) => !s)}>
-                  <div className={`cb ${editCascade ? "checked" : ""}`}>{editCascade && <Icon name="check" className="text-[12px]" />}</div>
-                  <div>
-                    <div className="cb-label">Aplicar a todas as parcelas</div>
-                    <div className="cb-help">Altera valor, descrição e categoria em todas</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting && <span className="spinner" />}
-            Salvar
-          </button>
-        </div>
-      </form>
-    </Dialog>
   )
 }

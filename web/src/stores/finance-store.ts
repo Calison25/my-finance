@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import type { Bank, Card, Transaction, TransactionSummary, Category, CardType, TransactionType } from "@/types"
 import { api } from "@/services/api"
+import { classifyTransaction } from "@/lib/transaction-format"
 
 interface FinanceState {
   banks: Bank[]
@@ -22,7 +23,7 @@ interface FinanceState {
   deleteCard: (id: string) => void
   addCategory: (name: string) => string
   addTransaction: (data: { card_id: string; description: string; amount: number; type: TransactionType; category_id?: string; custom_category_name?: string; date: string; transaction_date?: string; is_scheduled?: boolean; scheduled_date?: string; is_recurring?: boolean; notes?: string; installments?: number; is_bill?: boolean }) => Promise<void>
-  updateTransaction: (id: string, data: { description?: string; amount?: number; type?: TransactionType; category_id?: string | null; custom_category_name?: string; notes?: string | null; is_recurring?: boolean; transaction_date?: string | null }, cascade?: boolean) => Promise<void>
+  updateTransaction: (id: string, data: { description?: string; amount?: number; type?: TransactionType; category_id?: string | null; custom_category_name?: string; date?: string; notes?: string | null; is_recurring?: boolean; is_bill?: boolean; transaction_date?: string | null }, cascade?: boolean) => Promise<void>
   deleteTransaction: (id: string) => Promise<void>
   deleteTransactionGroup: (id: string, scope: "all" | "future") => Promise<void>
   realizeTransaction: (id: string) => Promise<void>
@@ -239,14 +240,20 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   realizeTransaction: async (id) => {
     const updated = await api.transactions.realize(id)
     set((s) => ({
-      transactions: s.transactions.map((t) => (t.id === id ? { ...t, ...updated } : t)),
+      // O endpoint de update não devolve `classification`; recompõe localmente
+      // para a transação não sumir dos filtros/cards até o próximo refetch.
+      transactions: s.transactions.map((t) =>
+        t.id === id ? { ...t, ...updated, classification: classifyTransaction({ ...t, ...updated }) } : t,
+      ),
     }))
   },
 
   unrealizeTransaction: async (id) => {
     const updated = await api.transactions.update(id, { is_realized: false } as Record<string, unknown>)
     set((s) => ({
-      transactions: s.transactions.map((t) => (t.id === id ? { ...t, ...updated } : t)),
+      transactions: s.transactions.map((t) =>
+        t.id === id ? { ...t, ...updated, classification: classifyTransaction({ ...t, ...updated }) } : t,
+      ),
     }))
   },
 

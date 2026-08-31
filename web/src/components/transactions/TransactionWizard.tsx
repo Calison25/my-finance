@@ -7,9 +7,11 @@ import { baseDescription } from "@/lib/transaction-format"
 import {
   WIZARD_STEPS,
   buildAddTransactionPayload,
+  buildUpdateTransactionPayload,
   emptyWizardForm,
   isStepValid,
   missingRequired,
+  wizardFormFromTransaction,
   type WizardForm,
 } from "./wizard-model"
 import { CategoriaStep, OpcionaisStep, PagamentoStep, QuandoStep, RevisaoStep, ValorStep } from "./wizard-steps"
@@ -17,14 +19,20 @@ import { CategoriaStep, OpcionaisStep, PagamentoStep, QuandoStep, RevisaoStep, V
 interface TransactionWizardProps {
   defaultMonth: string
   onClose: () => void
-  onCreated: () => void
+  onSaved: () => void
+  editingId?: string | null
 }
 
-export function TransactionWizard({ defaultMonth, onClose, onCreated }: TransactionWizardProps) {
-  const { cards, banks, categories, transactions, addTransaction } = useFinanceStore()
+export function TransactionWizard({ defaultMonth, onClose, onSaved, editingId }: TransactionWizardProps) {
+  const { cards, banks, categories, transactions, addTransaction, updateTransaction } = useFinanceStore()
+
+  const existing = editingId ? transactions.find((t) => t.id === editingId) ?? null : null
+  const editMode = existing !== null
 
   const [step, setStep] = useState(0)
-  const [form, setForm] = useState<WizardForm>(() => emptyWizardForm(defaultMonth))
+  const [form, setForm] = useState<WizardForm>(() =>
+    existing ? wizardFormFromTransaction(existing, cards) : emptyWizardForm(defaultMonth),
+  )
   const [submitting, setSubmitting] = useState(false)
   const stepRef = useRef<HTMLFormElement>(null)
   const railRef = useRef<HTMLDivElement>(null)
@@ -42,6 +50,7 @@ export function TransactionWizard({ defaultMonth, onClose, onCreated }: Transact
 
   const autoCategoryRef = useRef<string | null>(null)
   useEffect(() => {
+    if (editMode) return
     const desc = form.description.trim().toLowerCase()
     if (!desc) return
     if (form.categoryId && form.categoryId !== autoCategoryRef.current) return
@@ -68,8 +77,16 @@ export function TransactionWizard({ defaultMonth, onClose, onCreated }: Transact
     if (submitting) return
     setSubmitting(true)
     try {
-      await toast.run("Criando transação...", () => addTransaction(buildAddTransactionPayload(form)), "Transação criada")
-      onCreated()
+      if (existing) {
+        await toast.run(
+          "Salvando...",
+          () => updateTransaction(existing.id, buildUpdateTransactionPayload(form, existing), form.editCascade),
+          "Transação atualizada",
+        )
+      } else {
+        await toast.run("Criando transação...", () => addTransaction(buildAddTransactionPayload(form)), "Transação criada")
+      }
+      onSaved()
     } catch {
       // erro já reportado via toast
     } finally {
@@ -86,7 +103,7 @@ export function TransactionWizard({ defaultMonth, onClose, onCreated }: Transact
       footerClassName="wiz-foot"
       title={
         <div className="wiz-title">
-          <span>Nova transação</span>
+          <span>{editMode ? "Editar transação" : "Nova transação"}</span>
           <span className="wiz-title-sub">Etapa {step + 1} de {WIZARD_STEPS.length} · {WIZARD_STEPS[step].label}</span>
         </div>
       }
@@ -100,7 +117,7 @@ export function TransactionWizard({ defaultMonth, onClose, onCreated }: Transact
           <span className="wiz-foot-hint">{footerHint}</span>
           <button type="submit" form="tx-wizard" className="btn btn-primary" disabled={!valid || submitting}>
             {submitting && <span className="spinner" />}
-            {isLast ? "Criar transação" : "Continuar"}
+            {isLast ? (editMode ? "Salvar" : "Criar transação") : "Continuar"}
           </button>
         </>
       }
@@ -127,10 +144,10 @@ export function TransactionWizard({ defaultMonth, onClose, onCreated }: Transact
 
       <form id="tx-wizard" ref={stepRef} className="wiz-step" onSubmit={handleSubmit}>
         {step === 0 && <ValorStep form={form} patch={patch} />}
-        {step === 1 && <PagamentoStep form={form} patch={patch} cards={cards} banks={banks} />}
+        {step === 1 && <PagamentoStep form={form} patch={patch} cards={cards} banks={banks} editMode={editMode} />}
         {step === 2 && <CategoriaStep form={form} patch={patch} categories={categories} />}
-        {step === 3 && <QuandoStep form={form} patch={patch} />}
-        {step === 4 && <OpcionaisStep form={form} patch={patch} />}
+        {step === 3 && <QuandoStep form={form} patch={patch} editMode={editMode} />}
+        {step === 4 && <OpcionaisStep form={form} patch={patch} showCascade={editMode && existing?.classification === "installment"} />}
         {step === 5 && (
           <RevisaoStep form={form} patch={patch} cards={cards} banks={banks} categories={categories} onGoTo={setStep} />
         )}

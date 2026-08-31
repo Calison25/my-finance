@@ -43,6 +43,7 @@ export interface Transaction {
   is_recurring: boolean
   is_bill: boolean
   recurring_transaction_id: string | null
+  installment_group_id?: string | null
   notes: string | null
   created_at: string
   classification: string | null

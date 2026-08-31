@@ -38,6 +38,7 @@ export function ValorStep({ form, patch }: StepProps) {
             }}
             placeholder="0,00"
             inputMode="numeric"
+            autoFocus
           />
         </div>
       </div>
@@ -49,7 +50,6 @@ export function ValorStep({ form, patch }: StepProps) {
           value={form.description}
           onChange={(e) => patch({ description: e.target.value })}
           placeholder="Ex: Supermercado"
-          autoFocus
         />
       </div>
     </>
@@ -59,9 +59,10 @@ export function ValorStep({ form, patch }: StepProps) {
 interface PagamentoStepProps extends StepProps {
   cards: Card[]
   banks: Bank[]
+  editMode?: boolean
 }
 
-export function PagamentoStep({ form, patch, cards, banks }: PagamentoStepProps) {
+export function PagamentoStep({ form, patch, cards, banks, editMode }: PagamentoStepProps) {
   const filteredCards = cards.filter((c) => (form.srcKind === "card" ? c.type === "CREDIT_CARD" : c.type === "CHECKING_ACCOUNT"))
 
   return (
@@ -73,6 +74,7 @@ export function PagamentoStep({ form, patch, cards, banks }: PagamentoStepProps)
             type="button"
             className={`src-tab ${form.srcKind === "account" ? "active" : ""}`}
             onClick={() => patch({ srcKind: "account", cardId: "" })}
+            disabled={editMode}
           >
             <Icon name="account_balance" className="text-[14px]" /> Conta
           </button>
@@ -80,7 +82,7 @@ export function PagamentoStep({ form, patch, cards, banks }: PagamentoStepProps)
             type="button"
             className={`src-tab ${form.srcKind === "card" ? "active" : ""}`}
             onClick={() => patch({ srcKind: "card", cardId: "" })}
-            disabled={form.type === "INCOME"}
+            disabled={editMode || form.type === "INCOME"}
           >
             <Icon name="credit_card" className="text-[14px]" /> Cartão
           </button>
@@ -98,7 +100,8 @@ export function PagamentoStep({ form, patch, cards, banks }: PagamentoStepProps)
                   key={c.id}
                   type="button"
                   className={`src-item ${form.cardId === c.id ? "active" : ""}`}
-                  onClick={() => patch({ cardId: c.id })}
+                  onClick={editMode ? undefined : () => patch({ cardId: c.id })}
+                  disabled={editMode && form.cardId !== c.id}
                 >
                   <div className="bi sm" style={{ background: bank?.color ?? "var(--c-porto)" }}>
                     {bank?.name?.slice(0, 2).toUpperCase() ?? "?"}
@@ -111,6 +114,7 @@ export function PagamentoStep({ form, patch, cards, banks }: PagamentoStepProps)
           )}
         </div>
       </div>
+      {editMode && <span className="help">A origem não pode ser alterada na edição.</span>}
     </div>
   )
 }
@@ -159,7 +163,11 @@ export function CategoriaStep({ form, patch, categories }: CategoriaStepProps) {
   )
 }
 
-export function QuandoStep({ form, patch }: StepProps) {
+interface QuandoStepProps extends StepProps {
+  editMode?: boolean
+}
+
+export function QuandoStep({ form, patch, editMode }: QuandoStepProps) {
   const total = (() => {
     const raw = form.amount.replace(/\D/g, "")
     return raw ? parseInt(raw, 10) / 100 : 0
@@ -199,25 +207,29 @@ export function QuandoStep({ form, patch }: StepProps) {
           <button
             type="button"
             className={`opt-pill ${!form.isInstallment && !form.isScheduled && !form.isRecurring ? "active" : ""}`}
-            onClick={() => patch({ isInstallment: false, isScheduled: false, isRecurring: false })}
+            onClick={() => patch(editMode ? { isRecurring: false } : { isInstallment: false, isScheduled: false, isRecurring: false })}
           >
             Única
           </button>
-          <button
-            type="button"
-            className={`opt-pill ${form.isInstallment ? "active" : ""}`}
-            disabled={form.isRecurring}
-            onClick={() => patch({ isInstallment: !form.isInstallment })}
-          >
-            <Icon name="payments" className="text-[12px]" /> Parcelado
-          </button>
-          <button
-            type="button"
-            className={`opt-pill ${form.isScheduled ? "active" : ""}`}
-            onClick={() => patch({ isScheduled: !form.isScheduled })}
-          >
-            <Icon name="schedule" className="text-[12px]" /> Agendado
-          </button>
+          {!editMode && (
+            <button
+              type="button"
+              className={`opt-pill ${form.isInstallment ? "active" : ""}`}
+              disabled={form.isRecurring}
+              onClick={() => patch({ isInstallment: !form.isInstallment })}
+            >
+              <Icon name="payments" className="text-[12px]" /> Parcelado
+            </button>
+          )}
+          {!editMode && (
+            <button
+              type="button"
+              className={`opt-pill ${form.isScheduled ? "active" : ""}`}
+              onClick={() => patch({ isScheduled: !form.isScheduled })}
+            >
+              <Icon name="schedule" className="text-[12px]" /> Agendado
+            </button>
+          )}
           <button
             type="button"
             className={`opt-pill ${form.isRecurring ? "active" : ""}`}
@@ -246,7 +258,7 @@ export function QuandoStep({ form, patch }: StepProps) {
         </div>
       )}
 
-      {form.isScheduled && (
+      {!editMode && form.isScheduled && (
         <div className="field">
           <label className="label">Data prevista</label>
           <input className="input" type="date" value={form.scheduledDate} onChange={(e) => patch({ scheduledDate: e.target.value })} />
@@ -256,7 +268,11 @@ export function QuandoStep({ form, patch }: StepProps) {
   )
 }
 
-export function OpcionaisStep({ form, patch }: StepProps) {
+interface OpcionaisStepProps extends StepProps {
+  showCascade?: boolean
+}
+
+export function OpcionaisStep({ form, patch, showCascade }: OpcionaisStepProps) {
   return (
     <>
       <span className="help">Tudo aqui é opcional — se não quiser preencher, siga para a revisão.</span>
@@ -273,6 +289,16 @@ export function OpcionaisStep({ form, patch }: StepProps) {
           <div className="cb-help">Mostra na tela de Vencimentos para controle de pagamento</div>
         </div>
       </div>
+
+      {showCascade && (
+        <div className={`check-row ${form.editCascade ? "checked" : ""}`} onClick={() => patch({ editCascade: !form.editCascade })}>
+          <div className={`cb ${form.editCascade ? "checked" : ""}`}>{form.editCascade && <Icon name="check" className="text-[12px]" />}</div>
+          <div>
+            <div className="cb-label">Aplicar a todas as parcelas</div>
+            <div className="cb-help">Altera valor, descrição e categoria em todas</div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

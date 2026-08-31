@@ -200,7 +200,7 @@ export function Dashboard() {
       </div>
 
       {/* KPIs */}
-      <div className="kpi-grid" style={{ marginBottom: 16, gridTemplateColumns: "repeat(3, 1fr)" }}>
+      <div className="kpi-grid kpi-grid-3" style={{ marginBottom: 16 }}>
         <KPI label="Receita" icon="trending_up" value={summary.receita} variant="positive"
              onClick={() => navigate(`/transactions?month=${selectedMonth}&type=INCOME`)} />
         <KPI label="Despesas" icon="trending_down" value={summary.despesasTotal} variant="negative"
@@ -208,16 +208,16 @@ export function Dashboard() {
              onClick={() => navigate(`/transactions?month=${selectedMonth}&type=EXPENSE`)} />
         <div className="kpi">
           <div className="kpi-label"><Icon name="account_balance" className="text-[12px]" />Saldo</div>
-          <div style={{ display: "flex", gap: 20, marginTop: 2 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 20px", marginTop: 2 }}>
             <div>
               <div style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>Atual</div>
-              <div className={`kpi-value ${summary.saldoAtual >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+              <div className={`kpi-value sm ${summary.saldoAtual >= 0 ? "positive" : "negative"}`}>
                 <MoneyValue value={summary.saldoAtual} />
               </div>
             </div>
             <div>
               <div style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>Futuro</div>
-              <div className={`kpi-value ${summary.saldoFuturo >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+              <div className={`kpi-value sm ${summary.saldoFuturo >= 0 ? "positive" : "negative"}`}>
                 <MoneyValue value={summary.saldoFuturo} />
               </div>
             </div>
@@ -238,8 +238,8 @@ export function Dashboard() {
             <Icon name="repeat" className="text-[12px]" />Recorrentes
             <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.recurringCount}</span>
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-            <div className={`kpi-value ${summary.recurringNet >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+            <div className={`kpi-value sm ${summary.recurringNet >= 0 ? "positive" : "negative"}`}>
               {summary.recurringNet >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.recurringNet)} />
             </div>
             <div style={{ display: "flex", gap: 8, fontSize: 11, fontFamily: "var(--font-mono)" }}>
@@ -262,7 +262,7 @@ export function Dashboard() {
             <Icon name="payments" className="text-[12px]" />Parcelados
             <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.installmentCount}</span>
           </div>
-          <div className={`kpi-value ${summary.installmentTotal >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+          <div className={`kpi-value sm ${summary.installmentTotal >= 0 ? "positive" : "negative"}`}>
             {summary.installmentTotal >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.installmentTotal)} />
           </div>
         </div>
@@ -276,7 +276,7 @@ export function Dashboard() {
             <Icon name="schedule" className="text-[12px]" />Agendados
             <span style={{ marginLeft: "auto", color: "var(--text-3)", fontFamily: "var(--font-mono)" }}>{summary.scheduledCount}</span>
           </div>
-          <div className={`kpi-value ${summary.scheduledTotal >= 0 ? "positive" : "negative"}`} style={{ fontSize: 20 }}>
+          <div className={`kpi-value sm ${summary.scheduledTotal >= 0 ? "positive" : "negative"}`}>
             {summary.scheduledTotal >= 0 ? "+" : "-"}<MoneyValue value={Math.abs(summary.scheduledTotal)} />
           </div>
         </div>
@@ -369,7 +369,7 @@ export function Dashboard() {
                   const bank = banks.find((b) => b.id === card.bank_id)
                   const expenses = getCardExpensesByMonth(card.id, selectedMonth)
                   return (
-                    <div key={card.id} className="card-row" onClick={() => navigate(`/transactions?card_id=${card.id}`)}
+                    <div key={card.id} className="card-row" onClick={() => navigate(`/transactions?month=${selectedMonth}&card_id=${card.id}`)}
                          style={{ padding: 14, display: "grid", gridTemplateColumns: "32px 1fr", alignItems: "start" }}>
                       <div className="bi" style={{ background: bank?.color ?? "var(--c-porto)" }}>
                         {bank?.name?.slice(0, 2).toUpperCase() ?? "CC"}
@@ -426,7 +426,7 @@ export function Dashboard() {
           <div className="panel">
             <div className="panel-head">
               <div className="panel-title">Atividade recente</div>
-              <button className="btn btn-ghost btn-sm" onClick={() => navigate("/transactions")}>Ver tudo</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/transactions?month=${selectedMonth}`)}>Ver tudo</button>
             </div>
             <div>
               {recent.length === 0 ? (
@@ -438,7 +438,7 @@ export function Dashboard() {
                   const cat = categoryOf(tx.category_id)
                   const bank = bankOf(tx.card_id)
                   return (
-                    <div key={tx.id} className="tx-row" onClick={() => navigate("/transactions")}>
+                    <div key={tx.id} className="tx-row" onClick={() => navigate(`/transactions?month=${selectedMonth}`)}>
                       <div className="tx-icon" style={{ background: cat?.color ?? "var(--surface-2)", color: "#fff" }}>
                         <Icon name={cat?.icon ?? "receipt_long"} className="text-[13px]" />
                       </div>
