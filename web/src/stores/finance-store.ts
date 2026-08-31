@@ -8,6 +8,7 @@ interface FinanceState {
   transactions: Transaction[]
   categories: Category[]
   isLoading: boolean
+  error: string | null
   loadedMonths: Set<string>
   valuesVisible: boolean
   toggleValuesVisible: () => void
@@ -75,6 +76,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   transactions: [],
   categories: [],
   isLoading: true,
+  error: null,
   loadedMonths: new Set<string>(),
   valuesVisible: localStorage.getItem("values-visible") !== "false",
   toggleValuesVisible: () => set((s) => {
@@ -86,25 +88,31 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   fetchAll: async () => {
     const isInitial = get().banks.length === 0 && get().cards.length === 0
     if (isInitial) set({ isLoading: true })
-    const now = new Date()
-    const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-    const nxt = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-    const nextMonth = `${nxt.getFullYear()}-${String(nxt.getMonth() + 1).padStart(2, "0")}`
-    const { from, to } = monthsToRange([cur, nextMonth])
-    const [banks, cards, transactions, categories] = await Promise.all([
-      api.banks.list(),
-      api.cards.list(),
-      api.transactions.list({ date_from: from, date_to: to }),
-      api.categories.list(),
-    ])
-    set({
-      banks,
-      cards,
-      transactions,
-      categories,
-      loadedMonths: new Set([cur, nextMonth]),
-      isLoading: false,
-    })
+    set({ error: null })
+    try {
+      const now = new Date()
+      const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+      const nxt = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      const nextMonth = `${nxt.getFullYear()}-${String(nxt.getMonth() + 1).padStart(2, "0")}`
+      const { from, to } = monthsToRange([cur, nextMonth])
+      const [banks, cards, transactions, categories] = await Promise.all([
+        api.banks.list(),
+        api.cards.list(),
+        api.transactions.list({ date_from: from, date_to: to }),
+        api.categories.list(),
+      ])
+      set({
+        banks,
+        cards,
+        transactions,
+        categories,
+        loadedMonths: new Set([cur, nextMonth]),
+      })
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Não foi possível carregar seus dados" })
+    } finally {
+      set({ isLoading: false })
+    }
   },
 
   fetchMeta: async () => {
@@ -291,6 +299,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     transactionSummary: null,
     loadedMonths: new Set<string>(),
     isLoading: false,
+    error: null,
     expenseGoal: null,
   }),
 

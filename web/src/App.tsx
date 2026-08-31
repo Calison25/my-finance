@@ -5,6 +5,8 @@ import { Sidebar } from "@/components/layout/Sidebar"
 import { Header } from "@/components/layout/Header"
 import { MobileNav } from "@/components/layout/MobileNav"
 import { ToastHost } from "@/components/ui/Toast"
+import { OfflineBanner } from "@/components/pwa/OfflineBanner"
+import { UpdatePrompt } from "@/components/pwa/UpdatePrompt"
 import { Dashboard } from "@/pages/Dashboard"
 import { Accounts } from "@/pages/Accounts"
 import { Cards } from "@/pages/Cards"
@@ -20,7 +22,7 @@ import { useAuthStore } from "@/stores/auth-store"
 const queryClient = new QueryClient()
 
 function AppLayout({ children }: { children: React.ReactNode }) {
-  const { fetchAll, isLoading } = useFinanceStore()
+  const { fetchAll, isLoading, error, banks, cards } = useFinanceStore()
 
   useEffect(() => {
     fetchAll()
@@ -34,14 +36,31 @@ function AppLayout({ children }: { children: React.ReactNode }) {
     )
   }
 
+  if (error && banks.length === 0 && cards.length === 0) {
+    return (
+      <div className="app" style={{ alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center", padding: 24 }}>
+          <p style={{ color: "var(--text-2)", fontSize: 14, marginBottom: 16 }}>
+            Não foi possível carregar seus dados. Verifique sua conexão.
+          </p>
+          <button type="button" className="btn btn-primary" onClick={() => fetchAll()}>
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="app">
+      <OfflineBanner />
       <Sidebar />
       <div className="app-main">
         <Header />
         {children}
       </div>
       <MobileNav />
+      <UpdatePrompt />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { Icon } from "@/components/ui/Icon"
 import { useAuthStore } from "@/stores/auth-store"
 import { api } from "@/services/api"
+import { InstallPrompt } from "@/components/pwa/InstallPrompt"
 import type { Member, HouseholdInvite } from "@/types"
 
 export function Settings() {
@@ -233,6 +234,8 @@ export function Settings() {
           </form>
         )}
       </section>
+
+      <InstallPrompt />
 
       {/* Sign Out */}
       <section className="glass-card ghost-border rounded-2xl p-6">
