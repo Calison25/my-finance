@@ -162,7 +162,8 @@ export function Transactions() {
       arr.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + Number(t.amount), 0)
 
     return {
-      totalDespesa: expenseSum(src.filter((t) => !isPending(t))),
+      // Mesmo número do card "Despesas" do dashboard: todas as despesas do mês.
+      totalDespesa: expenseSum(src),
       futuro: signedSum(src.filter(isPending)),
     }
   }, [baseFiltered])
@@ -396,20 +397,16 @@ export function Transactions() {
       {sorted.length > 0 && (
         <div className="kpi-grid" style={{ marginBottom: 16, gridTemplateColumns: "repeat(2, 1fr)" }}>
           <div
-            className={`kpi ${filterClassification === "realized" && filterType === "EXPENSE" ? "kpi-active" : ""}`}
+            className={`kpi ${filterType === "EXPENSE" ? "kpi-active" : ""}`}
             role="button"
             style={{ cursor: "pointer" }}
-            onClick={() => {
-              const active = filterClassification === "realized" && filterType === "EXPENSE"
-              setFilterClassification(active ? "all" : "realized")
-              setFilterType(active ? "ALL" : "EXPENSE")
-            }}
+            onClick={() => setFilterType(filterType === "EXPENSE" ? "ALL" : "EXPENSE")}
           >
             <div className="kpi-label"><Icon name="payments" className="text-[12px]" />Total Despesa</div>
             <div className="kpi-value negative">
               <MoneyValue value={summary.totalDespesa} />
             </div>
-            <div className="kpi-meta">Despesas já concluídas no mês</div>
+            <div className="kpi-meta">Todas as despesas do mês</div>
           </div>
           <div
             className={`kpi ${filterClassification === "pending" ? "kpi-active" : ""}`}

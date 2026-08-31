@@ -77,16 +77,15 @@ export function Dashboard() {
   const summary = useMemo(() => {
     const src = monthTx
     const sum = (arr: typeof src) => arr.reduce((s, t) => s + Number(t.amount), 0)
-    // Regra única do app: realizado = is_realized (a bolinha de check),
-    // a mesma usada nos cards da página de Transações.
+    // Despesas do mês são gasto comprometido mesmo antes de pagas (contas fixas,
+    // parcelas); só as AGENDADAS são "futuro" descontável do saldo Atual.
     const receita = sum(src.filter((t) => t.type === "INCOME"))
-    const receitaRealizada = sum(src.filter((t) => t.type === "INCOME" && t.is_realized))
-    const despesasRealizadas = sum(src.filter((t) => t.type === "EXPENSE" && t.is_realized))
-    const despesasPrevistas = sum(src.filter((t) => t.type === "EXPENSE" && !t.is_realized))
-    const despesasTotal = despesasRealizadas + despesasPrevistas
-    // Atual: o que posso gastar desconsiderando o futuro (só realizadas).
-    // Futuro: o que posso gastar contando tudo, inclusive não realizadas.
-    const saldoAtual = receitaRealizada - despesasRealizadas
+    const despesasTotal = sum(src.filter((t) => t.type === "EXPENSE"))
+    const despesasPrevistas = sum(src.filter((t) => t.type === "EXPENSE" && t.is_scheduled && !t.is_realized))
+    const despesasComprometidas = despesasTotal - despesasPrevistas
+    // Atual: quanto posso gastar desconsiderando as agendadas.
+    // Futuro: quanto posso gastar contando tudo que está lançado no mês.
+    const saldoAtual = receita - despesasComprometidas
     const saldoFuturo = receita - despesasTotal
 
     const recurring = src.filter((t) => t.classification === "recurring")
@@ -223,7 +222,7 @@ export function Dashboard() {
               </div>
             </div>
           </div>
-          <div className="kpi-meta" style={{ marginTop: 8 }}>Atual: só o realizado · Futuro: contando tudo, inclusive não realizadas</div>
+          <div className="kpi-meta" style={{ marginTop: 8 }}>Atual: desconta tudo, menos as agendadas · Futuro: desconta tudo, inclusive agendadas</div>
         </div>
       </div>
 
