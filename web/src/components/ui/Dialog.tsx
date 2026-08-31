@@ -4,12 +4,15 @@ import { Icon } from "./Icon"
 interface DialogProps {
   open: boolean
   onClose: () => void
-  title: string
+  title: ReactNode
   children: ReactNode
   footer?: ReactNode
+  className?: string
+  bodyClassName?: string
+  footerClassName?: string
 }
 
-export function Dialog({ open, onClose, title, children, footer }: DialogProps) {
+export function Dialog({ open, onClose, title, children, footer, className, bodyClassName, footerClassName }: DialogProps) {
   useEffect(() => {
     if (open) document.body.style.overflow = "hidden"
     else document.body.style.overflow = ""
@@ -30,15 +33,15 @@ export function Dialog({ open, onClose, title, children, footer }: DialogProps) 
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className={`modal ${className ?? ""}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <div className="modal-title">{title}</div>
           <button className="icon-btn" onClick={onClose} title="Fechar">
             <Icon name="close" className="text-[16px]" />
           </button>
         </div>
-        <div className="modal-body">{children}</div>
-        {footer && <div className="modal-foot">{footer}</div>}
+        <div className={`modal-body ${bodyClassName ?? ""}`}>{children}</div>
+        {footer && <div className={`modal-foot ${footerClassName ?? ""}`}>{footer}</div>}
       </div>
     </div>
   )

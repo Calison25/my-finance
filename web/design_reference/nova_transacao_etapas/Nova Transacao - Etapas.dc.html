@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;background:#0a0a0b;}
+  a{color:#34d399;text-decoration:none;}
+  a:hover{color:#5ee7b5;}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:8px}
+  input,textarea,select{font-family:'Inter',sans-serif;}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#0a0a0b;font-family:'Inter',sans-serif;color:#eef0f2;padding:32px 28px 90px;box-sizing:border-box;">
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:26px;">
+    <div>
+      <div style="font-size:22px;font-weight:700;">Nova transação em etapas</div>
+      <div style="font-size:13px;color:#7a8390;margin-top:6px;max-width:620px;line-height:1.5;">Todos os campos da tela atual continuam presentes, distribuídos em 6 etapas navegáveis. Trilha lateral com resumo ao vivo no desktop, pílulas numeradas no mobile.</div>
+    </div>
+    <div style="display:flex;background:#16181c;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:3px;gap:2px;">
+      <div style="{{ devMobileStyle }}" onClick="{{ setDeviceMobile }}">Mobile</div>
+      <div style="{{ devDesktopStyle }}" onClick="{{ setDeviceDesktop }}">Desktop</div>
+    </div>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:18px;">
+    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+      <sc-for list="{{ options }}" as="o" hint-placeholder-count="3">
+        <div id="{{ o.id }}" style="display:flex;flex-direction:column;gap:12px;">
+
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="background:#1c2a22;color:#34d399;border:1px solid rgba(52,211,153,0.35);border-radius:7px;font-size:12px;font-weight:700;padding:3px 9px;font-family:'IBM Plex Mono',monospace;">{{ o.badge }}</div>
+            <div style="font-size:14px;font-weight:700;">{{ o.name }}</div>
+          </div>
+          <div style="font-size:12px;color:#7a8390;max-width:{{ o.frameWidth }};line-height:1.5;">{{ o.tagline }}</div>
+
+          <div style="{{ o.frameStyle }}">
+            <!-- modal header -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;">
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <div style="font-size:15px;font-weight:700;">Nova transação</div>
+                <div style="font-size:11px;color:#7a8390;">{{ o.stepSubtitle }}</div>
+              </div>
+              <div onClick="{{ o.onReset }}" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#c7cbd1;font-size:14px;">×</div>
+            </div>
+
+            <div style="{{ o.bodyWrapStyle }}">
+
+              <!-- ===== chrome A: barra segmentada com rótulos ===== -->
+              <sc-if value="{{ o.isA }}" hint-placeholder-val="{{ true }}">
+                <div style="padding:16px 18px 4px;flex-shrink:0;">
+                  <div style="display:flex;gap:6px;">
+                    <sc-for list="{{ o.segments }}" as="s" hint-placeholder-count="4">
+                      <div onClick="{{ s.onClick }}" style="flex:1;cursor:pointer;">
+                        <div style="{{ s.barStyle }}"></div>
+                        <sc-if value="{{ o.showStepLabels }}" hint-placeholder-val="{{ false }}">
+                          <div style="{{ s.labelStyle }}">{{ s.label }}</div>
+                        </sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <sc-if value="{{ o.hideStepLabels }}" hint-placeholder-val="{{ true }}">
+                    <div style="font-size:11px;color:#7a8390;margin-top:10px;font-weight:600;letter-spacing:.04em;">{{ o.counterText }}</div>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <!-- ===== chrome B: trilha numerada + resumo ===== -->
+              <sc-if value="{{ o.isB }}" hint-placeholder-val="{{ false }}">
+                <div style="{{ o.railStyle }}">
+                  <div style="{{ o.railListStyle }}">
+                    <sc-for list="{{ o.segments }}" as="s" hint-placeholder-count="5">
+                      <div onClick="{{ s.onClick }}" style="{{ s.trailItemStyle }}">
+                        <div style="{{ s.dotStyle }}">{{ s.dotText }}</div>
+                        <div style="{{ s.trailLabelStyle }}">{{ s.label }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <sc-if value="{{ o.showSummary }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top:auto;padding-top:16px;border-top:1px solid rgba(255,255,255,0.07);display:flex;flex-direction:column;gap:8px;">
+                      <div style="font-size:10px;color:#5f6672;font-weight:700;letter-spacing:.08em;">RESUMO</div>
+                      <sc-for list="{{ o.summary }}" as="r" hint-placeholder-count="3">
+                        <div style="display:flex;flex-direction:column;gap:1px;">
+                          <div style="font-size:10px;color:#5f6672;">{{ r.label }}</div>
+                          <div style="font-size:12px;color:#c7cbd1;font-weight:600;">{{ r.value }}</div>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <!-- ===== chrome C: linha fina + contador ===== -->
+              <sc-if value="{{ o.isC }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:14px 18px 0;flex-shrink:0;">
+                  <div style="height:3px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden;">
+                    <div style="{{ o.thinBarStyle }}"></div>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+                    <div style="font-size:18px;font-weight:700;">{{ o.stepQuestion }}</div>
+                    <div style="font-size:11px;color:#5f6672;font-family:'IBM Plex Mono',monospace;">{{ o.counterShort }}</div>
+                  </div>
+                </div>
+              </sc-if>
+
+              <!-- ===== corpo da etapa (compartilhado) ===== -->
+              <div style="{{ o.stepBodyStyle }}">
+                <sc-for list="{{ o.fields }}" as="f" hint-placeholder-count="3">
+                  <div style="display:flex;flex-direction:column;gap:8px;">
+                    <sc-if value="{{ f.hasLabel }}" hint-placeholder-val="{{ true }}">
+                      <div style="font-size:11px;color:#7a8390;font-weight:700;letter-spacing:.08em;">{{ f.label }}</div>
+                    </sc-if>
+
+                    <sc-if value="{{ f.isTypeToggle }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;gap:8px;">
+                        <div onClick="{{ f.setDespesa }}" style="{{ f.despesaStyle }}">DESPESA</div>
+                        <div onClick="{{ f.setReceita }}" style="{{ f.receitaStyle }}">RECEITA</div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ f.isAmount }}" hint-placeholder-val="{{ false }}">
+                      <div style="{{ f.amountBoxStyle }}">
+                        <div style="font-size:12px;color:#7a8390;margin-bottom:4px;">R$</div>
+                        <input value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="0,00" style="{{ f.amountInputStyle }}">
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ f.isKeypad }}" hint-placeholder-val="{{ false }}">
+                      <div style="{{ f.amountBoxStyle }}">
+                        <div style="font-size:12px;color:#7a8390;">R$</div>
+                        <div style="{{ f.displayStyle }}">{{ f.display }}</div>
+                      </div>
+                      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px;">
+                        <sc-for list="{{ f.keys }}" as="k" hint-placeholder-count="12">
+                          <div onClick="{{ k.onClick }}" style="{{ k.style }}">{{ k.label }}</div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ f.isText }}" hint-placeholder-val="{{ false }}">
+                      <input value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.placeholder }}" style="width:100%;box-sizing:border-box;background:#101113;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px 13px;font-size:14px;color:#eef0f2;outline:none;">
+                    </sc-if>
+
+                    <sc-if value="{{ f.isPaySource }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;background:#101113;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:3px;gap:2px;">
+                        <div onClick="{{ f.setConta }}" style="{{ f.contaStyle }}">Conta</div>
+                        <div onClick="{{ f.setCartao }}" style="{{ f.cartaoStyle }}">Cartão</div>
+                      </div>
+                      <div style="display:flex;flex-direction:column;gap:6px;">
+                        <sc-for list="{{ f.items }}" as="i" hint-placeholder-count="5">
+                          <div onClick="{{ i.onClick }}" style="{{ i.rowStyle }}">
+                            <div style="{{ i.badgeStyle }}">{{ i.initials }}</div>
+                            <div style="flex:1;font-size:13px;font-weight:600;">{{ i.name }}</div>
+                            <div style="font-size:12px;color:#7a8390;">{{ i.bank }}</div>
+                            <sc-if value="{{ i.selected }}" hint-placeholder-val="{{ false }}">
+                              <div style="color:#34d399;font-size:13px;">✓</div>
+                            </sc-if>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ f.isCategory }}" hint-placeholder-val="{{ false }}">
+                      <input value="{{ f.search }}" onChange="{{ f.onSearch }}" placeholder="Buscar categoria" style="width:100%;box-sizing:border-box;background:#101113;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;font-size:13px;color:#eef0f2;outline:none;">
+                      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                        <sc-for list="{{ f.chips }}" as="c" hint-placeholder-count="10">
+                          <div onClick="{{ c.onClick }}" style="{{ c.style }}">
+                            <span style="font-size:13px;">{{ c.icon }}</span>{{ c.label }}
+                          </div>
+                        </sc-for>
+                      </div>
+                      <sc-if value="{{ f.noMatch }}" hint-placeholder-val="{{ false }}">
+                        <div style="font-size:12px;color:#5f6672;">Nenhuma categoria encontrada.</div>
+                      </sc-if>
+                    </sc-if>
+
+                    <sc-if value="{{ f.isMonth }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;align-items:center;justify-content:space-between;background:#101113;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 14px;">
+                        <div onClick="{{ f.prev }}" style="color:#7a8390;cursor:pointer;font-size:16px;padding:0 6px;">‹</div>
+                        <div style="font-size:14px;font-weight:600;">{{ f.value }}</div>
+                        <div onClick="{{ f.next }}" style="color:#7a8390;cursor:pointer;font-size:16px;padding:0 6px;">›</div>
+                      </div>
+                      <div style="font-size:11px;color:#5f6672;">A transação aparecerá em <b style="color:#c7cbd1;">{{ f.value }}</b></div>
+                    </sc-if>
+
+                    <sc-if value="{{ f.isCheckbox }}" hint-placeholder-val="{{ false }}">
+                      <div onClick="{{ f.onToggle }}" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;background:#101113;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:12px 13px;">
+                        <div style="{{ f.boxStyle }}">{{ f.check }}</div>
+                        <div style="display:flex;flex-direction:column;gap:2px;">
+                          <div style="font-size:13px;font-weight:600;color:#c7cbd1;">{{ f.title }}</div>
+                          <div style="font-size:11px;color:#5f6672;line-height:1.4;">{{ f.hint }}</div>
+                        </div>
+                      </div>
+                      <sc-if value="{{ f.showDate }}" hint-placeholder-val="{{ false }}">
+                        <input value="{{ f.dateValue }}" onChange="{{ f.onDateChange }}" placeholder="dd/mm/aaaa" style="width:100%;box-sizing:border-box;background:#101113;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:11px 13px;font-size:13px;color:#eef0f2;outline:none;">
+                      </sc-if>
+                    </sc-if>
+
+                    <sc-if value="{{ f.isRecurrence }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                        <sc-for list="{{ f.chips }}" as="c" hint-placeholder-count="4">
+                          <div onClick="{{ c.onClick }}" style="{{ c.style }}">
+                            <span>{{ c.icon }}</span>{{ c.label }}
+                          </div>
+                        </sc-for>
+                      </div>
+                      <sc-if value="{{ f.showParcelas }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:flex;align-items:center;gap:10px;background:#101113;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 13px;">
+                          <div style="font-size:12px;color:#7a8390;flex:1;">Parcelas</div>
+                          <div onClick="{{ f.lessParcelas }}" style="color:#7a8390;cursor:pointer;padding:0 8px;">−</div>
+                          <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;min-width:24px;text-align:center;">{{ f.parcelas }}</div>
+                          <div onClick="{{ f.moreParcelas }}" style="color:#7a8390;cursor:pointer;padding:0 8px;">+</div>
+                        </div>
+                      </sc-if>
+                    </sc-if>
+
+                    <sc-if value="{{ f.isMore }}" hint-placeholder-val="{{ false }}">
+                      <div onClick="{{ f.onToggle }}" style="display:flex;align-items:center;gap:8px;color:#7a8390;font-size:13px;font-weight:600;cursor:pointer;">
+                        <span>{{ f.caret }}</span> Mais opções
+                        <sc-if value="{{ f.hasExtras }}" hint-placeholder-val="{{ false }}">
+                          <span style="background:#1c2a22;color:#34d399;border-radius:20px;font-size:10px;padding:2px 7px;font-weight:700;">preenchido</span>
+                        </sc-if>
+                      </div>
+                      <sc-if value="{{ f.open }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:flex;flex-direction:column;gap:12px;padding-top:4px;">
+                          <div style="font-size:11px;color:#7a8390;font-weight:700;letter-spacing:.08em;">OBSERVAÇÕES</div>
+                          <textarea value="{{ f.obs }}" onChange="{{ f.onObsChange }}" placeholder="Opcional" style="width:100%;box-sizing:border-box;min-height:70px;background:#101113;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:11px 13px;font-size:13px;color:#eef0f2;outline:none;resize:vertical;"></textarea>
+                          <div onClick="{{ f.onVencToggle }}" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;background:#101113;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:12px 13px;">
+                            <div style="{{ f.vencBoxStyle }}">{{ f.vencCheck }}</div>
+                            <div style="display:flex;flex-direction:column;gap:2px;">
+                              <div style="font-size:13px;font-weight:600;color:#c7cbd1;">Aparece nos vencimentos</div>
+                              <div style="font-size:11px;color:#5f6672;line-height:1.4;">Mostra na tela de Vencimentos para controle de pagamento</div>
+                            </div>
+                          </div>
+                        </div>
+                      </sc-if>
+                    </sc-if>
+
+                    <sc-if value="{{ f.isExtras }}" hint-placeholder-val="{{ false }}">
+                      <div style="font-size:12px;color:#7a8390;line-height:1.5;margin-bottom:4px;">Tudo aqui é opcional — se não quiser preencher, siga para a revisão.</div>
+                      <div style="font-size:11px;color:#7a8390;font-weight:700;letter-spacing:.08em;">OBSERVAÇÕES</div>
+                      <textarea value="{{ f.obs }}" onChange="{{ f.onObsChange }}" placeholder="Opcional" style="width:100%;box-sizing:border-box;min-height:90px;background:#101113;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:11px 13px;font-size:13px;color:#eef0f2;outline:none;resize:vertical;"></textarea>
+                      <div onClick="{{ f.onVencToggle }}" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;background:#101113;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:12px 13px;margin-top:8px;">
+                        <div style="{{ f.vencBoxStyle }}">{{ f.vencCheck }}</div>
+                        <div style="display:flex;flex-direction:column;gap:2px;">
+                          <div style="font-size:13px;font-weight:600;color:#c7cbd1;">Aparece nos vencimentos</div>
+                          <div style="font-size:11px;color:#5f6672;line-height:1.4;">Mostra na tela de Vencimentos para controle de pagamento</div>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ f.isReview }}" hint-placeholder-val="{{ false }}">
+                      <div style="background:#101113;border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;">
+                        <sc-for list="{{ f.rows }}" as="r" hint-placeholder-count="5">
+                          <div onClick="{{ r.onClick }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;">
+                            <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+                              <div style="font-size:10px;color:#5f6672;font-weight:700;letter-spacing:.08em;">{{ r.label }}</div>
+                              <div style="{{ r.valueStyle }}">{{ r.value }}</div>
+                            </div>
+                            <div style="font-size:11px;color:#5f6672;">editar</div>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+
+                <sc-if value="{{ o.created }}" hint-placeholder-val="{{ false }}">
+                  <div style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.35);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px;">
+                    <div style="font-size:14px;font-weight:700;color:#34d399;">Transação criada</div>
+                    <div style="font-size:12px;color:#c7cbd1;">{{ o.createdSummary }}</div>
+                    <div onClick="{{ o.onReset }}" style="font-size:12px;color:#7a8390;text-decoration:underline;cursor:pointer;margin-top:4px;">lançar outra</div>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+
+            <!-- footer -->
+            <sc-if value="{{ o.showFooter }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-top:1px solid rgba(255,255,255,0.06);flex-shrink:0;background:#101113;">
+                <sc-if value="{{ o.canBack }}" hint-placeholder-val="{{ false }}">
+                  <div onClick="{{ o.onBack }}" style="padding:12px 16px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);color:#c7cbd1;font-size:13px;font-weight:600;cursor:pointer;">Voltar</div>
+                </sc-if>
+                <div style="flex:1;font-size:11px;color:#5f6672;">{{ o.footerHint }}</div>
+                <div onClick="{{ o.onNext }}" style="{{ o.nextStyle }}">{{ o.nextLabel }}</div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000}}">
+const CATEGORIES = [
+  { id: 'outra', label: 'Outra', icon: '+' },
+  { id: 'alimentacao', label: 'Alimentacao', icon: '🍽' },
+  { id: 'cacau', label: 'Cacau', icon: '🧾' },
+  { id: 'carro', label: 'Carro', icon: '🧾' },
+  { id: 'compras', label: 'Compras', icon: '🛍' },
+  { id: 'educacao', label: 'Educacao', icon: '📚' },
+  { id: 'emprestimo', label: 'Empréstimo', icon: '🧾' },
+  { id: 'lazer', label: 'Lazer', icon: '🎬' },
+  { id: 'loteria', label: 'Loteria', icon: '🧾' },
+  { id: 'moradia', label: 'Moradia', icon: '🏠' },
+  { id: 'outros', label: 'Outros', icon: '🧾' },
+  { id: 'pais', label: 'Pais', icon: '🧾' },
+  { id: 'salario', label: 'Salario', icon: '💰' },
+  { id: 'saude', label: 'Saude', icon: '💊' },
+  { id: 'servicos', label: 'Servicos', icon: '⚙️' },
+  { id: 'trabalho', label: 'Trabalho', icon: '🧾' },
+  { id: 'transporte', label: 'Transporte', icon: '🚗' },
+];
+
+const CARDS = [
+  { id: 'inter', name: 'Inter Calison', bank: 'Inter', initials: 'IN', color: '#f7821e' },
+  { id: 'porto', name: 'Porto Carro', bank: 'Porto Seguro', initials: 'PO', color: '#6b7280' },
+  { id: 'bradesco', name: 'Bradesco Calison', bank: 'Bradesco', initials: 'BR', color: '#e04848' },
+  { id: 'nubank', name: 'Calison Nubank', bank: 'Nubank', initials: 'NU', color: '#8b5cf6' },
+  { id: 'fixos', name: 'Gastos fixos', bank: 'Gastos Fixos', initials: 'GA', color: '#6b7280' },
+];
+const ACCOUNTS = [
+  { id: 'c-inter', name: 'Inter', bank: 'Conta corrente', initials: 'IN', color: '#f7821e' },
+  { id: 'c-nubank', name: 'Nubank', bank: 'Conta corrente', initials: 'NU', color: '#8b5cf6' },
+  { id: 'c-carteira', name: 'Carteira', bank: 'Dinheiro', initials: 'CA', color: '#6b7280' },
+];
+
+const MONTHS = ['agosto de 2026', 'setembro de 2026', 'outubro de 2026', 'novembro de 2026', 'dezembro de 2026'];
+
+const RECURRENCES = [
+  { id: 'unica', label: 'Única', icon: '•' },
+  { id: 'parcelado', label: 'Parcelado', icon: '▤' },
+  { id: 'agendado', label: 'Agendado', icon: '◕' },
+  { id: 'recorrente', label: 'Recorrente', icon: '↻' },
+];
+
+const FLOWS = {
+  a: [
+    { label: 'Valor', question: 'Quanto?', fields: ['typeToggle', 'amount', 'desc'] },
+    { label: 'Pagamento', question: 'Pagar com', fields: ['paySource'] },
+    { label: 'Categoria', question: 'Categoria', fields: ['category'] },
+    { label: 'Quando', question: 'Quando', fields: ['month', 'realDate', 'recurrence', 'more'] },
+  ],
+  b: [
+    { label: 'Valor', question: 'Quanto?', fields: ['typeToggle', 'amount', 'desc'] },
+    { label: 'Pagamento', question: 'Pagar com', fields: ['paySource'] },
+    { label: 'Categoria', question: 'Categoria', fields: ['category'] },
+    { label: 'Quando', question: 'Quando', fields: ['month', 'realDate', 'recurrence'] },
+    { label: 'Opcionais', question: 'Opcionais', fields: ['extras'] },
+    { label: 'Revisão', question: 'Revisar', fields: ['review'] },
+  ],
+  c: [
+    { label: 'Valor', question: 'Quanto foi?', fields: ['typeToggle', 'keypad'] },
+    { label: 'Onde', question: 'Pagou com o quê?', fields: ['paySource'] },
+    { label: 'Categoria', question: 'Em que categoria?', fields: ['category'] },
+    { label: 'Quando', question: 'Em qual mês entra?', fields: ['month', 'recurrence', 'realDate'] },
+    { label: 'Revisar', question: 'Confere?', fields: ['desc', 'review', 'more'] },
+  ],
+};
+
+const META = {
+  a: { badge: '1a', name: 'Etapas com barra segmentada', tagline: 'Barra dividida em 4 blocos com rótulo (desktop) e contador "Etapa X de 4" (mobile). Fluxo curto, tudo que era opcional vive em "Mais opções".' },
+  b: { badge: '1b', name: 'Trilha lateral + revisão', tagline: '6 etapas navegáveis: no desktop a trilha fica à esquerda com resumo ao vivo; no mobile vira pílulas numeradas. Termina numa revisão editável.' },
+  c: { badge: '1c', name: 'Uma pergunta por etapa', tagline: 'Foco total: teclado numérico, seleção que avança sozinha e progresso em linha fina. A última etapa é a revisão, onde qualquer linha volta para sua etapa.' },
+};
+
+const emptyForm = () => ({
+  tipo: 'despesa', digits: '', desc: '', payKind: 'cartao', sourceId: 'inter',
+  categoryId: null, catSearch: '', monthIdx: 2, useRealDate: false, realDate: '',
+  recurrence: 'unica', parcelas: 2, obs: '', vencimentos: false, moreOpen: false,
+});
+
+class Component extends DCLogic {
+  state = {
+    device: 'mobile',
+    a: { step: 0, form: emptyForm(), created: false },
+    b: { step: 0, form: emptyForm(), created: false },
+    c: { step: 0, form: emptyForm(), created: false },
+  };
+
+  setDeviceMobile = () => this.setState({ device: 'mobile' });
+  setDeviceDesktop = () => this.setState({ device: 'desktop' });
+
+  upd(k, patch) { this.setState((s) => ({ [k]: { ...s[k], form: { ...s[k].form, ...patch }, created: false } })); }
+  goto(k, i) { this.setState((s) => ({ [k]: { ...s[k], step: Math.max(0, Math.min(FLOWS[k].length - 1, i)) } })); }
+  next(k) {
+    const st = this.state[k];
+    if (st.step === FLOWS[k].length - 1) { this.setState({ [k]: { ...st, created: true } }); return; }
+    this.goto(k, st.step + 1);
+  }
+  back(k) { this.goto(k, this.state[k].step - 1); }
+  reset(k) { this.setState({ [k]: { step: 0, form: emptyForm(), created: false } }); }
+
+  stepOfField(k, kinds) {
+    const flow = FLOWS[k];
+    for (let i = 0; i < flow.length; i++) if (flow[i].fields.some(f => kinds.indexOf(f) !== -1)) return i;
+    return 0;
+  }
+  updDigits(k, fn) {
+    this.setState((s) => ({ [k]: { ...s[k], created: false, form: { ...s[k].form, digits: fn(s[k].form.digits || '') } } }));
+  }
+  amount(form) { return (parseInt(form.digits || '0', 10) || 0) / 100; }
+  money(n) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  sourceList(form) { return form.payKind === 'cartao' ? CARDS : ACCOUNTS; }
+  sourceOf(form) { return this.sourceList(form).find(s => s.id === form.sourceId) || this.sourceList(form)[0]; }
+  categoryOf(form) { return CATEGORIES.find(c => c.id === form.categoryId) || null; }
+
+  chip(active, accent) {
+    const c = accent || '#34d399';
+    return {
+      display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 13px', borderRadius: '22px',
+      fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap',
+      background: active ? 'rgba(52,211,153,0.14)' : '#101113',
+      border: '1px solid ' + (active ? 'rgba(52,211,153,0.45)' : 'rgba(255,255,255,0.08)'),
+      color: active ? c : '#c7cbd1',
+    };
+  }
+  seg(active, color) {
+    return {
+      flex: 1, textAlign: 'center', padding: '11px 0', borderRadius: '9px', fontSize: '13px',
+      fontWeight: 700, cursor: 'pointer', letterSpacing: '.04em',
+      background: active ? color + '22' : 'transparent',
+      border: '1px solid ' + (active ? color + '66' : 'rgba(255,255,255,0.08)'),
+      color: active ? color : '#7a8390',
+    };
+  }
+  box(on) {
+    return {
+      width: '18px', height: '18px', borderRadius: '5px', flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px',
+      background: on ? '#34d399' : 'transparent', color: '#06231a',
+      border: '1px solid ' + (on ? '#34d399' : 'rgba(255,255,255,0.2)'),
+    };
+  }
+
+  field(k, kind, form, isMobile, autoAdvance) {
+    const accent = form.tipo === 'despesa' ? '#f36c60' : '#34d399';
+    const base = { kind };
+    if (kind === 'typeToggle') {
+      return {
+        ...base, isTypeToggle: true, hasLabel: false,
+        despesaStyle: this.seg(form.tipo === 'despesa', '#f36c60'),
+        receitaStyle: this.seg(form.tipo === 'receita', '#34d399'),
+        setDespesa: () => this.upd(k, { tipo: 'despesa' }),
+        setReceita: () => this.upd(k, { tipo: 'receita' }),
+      };
+    }
+    if (kind === 'amount') {
+      return {
+        ...base, isAmount: true, hasLabel: true, label: 'VALOR *',
+        value: form.digits ? this.money(this.amount(form)) : '',
+        onChange: (e) => this.upd(k, { digits: (e.target.value.match(/\d/g) || []).join('').slice(0, 11) }),
+        amountBoxStyle: { background: '#101113', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px 16px' },
+        amountInputStyle: {
+          width: '100%', boxSizing: 'border-box', background: 'transparent', border: 'none', outline: 'none',
+          color: accent, fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700,
+          fontSize: isMobile ? '30px' : '34px', letterSpacing: '.02em',
+        },
+      };
+    }
+    if (kind === 'keypad') {
+      const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫'].map(label => ({
+        label,
+        style: {
+          padding: '14px 0', textAlign: 'center', borderRadius: '12px', background: '#151719',
+          border: '1px solid rgba(255,255,255,0.07)', fontFamily: "'IBM Plex Mono',monospace",
+          fontSize: '18px', fontWeight: 600, cursor: 'pointer', userSelect: 'none',
+        },
+        onClick: () => {
+          if (label === '⌫') return this.updDigits(k, (d) => d.slice(0, -1));
+          if (label === ',') return;
+          this.updDigits(k, (d) => (d + label).slice(0, 11));
+        },
+      }));
+      return {
+        ...base, isKeypad: true, hasLabel: false, keys,
+        display: this.money(this.amount(form)),
+        amountBoxStyle: { background: '#101113', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'baseline', gap: '8px', justifyContent: 'center' },
+        displayStyle: { fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, fontSize: isMobile ? '32px' : '36px', color: accent },
+      };
+    }
+    if (kind === 'desc') {
+      return {
+        ...base, isText: true, hasLabel: true, label: 'DESCRIÇÃO *', placeholder: 'Ex: Supermercado',
+        value: form.desc, onChange: (e) => this.upd(k, { desc: e.target.value }),
+      };
+    }
+    if (kind === 'paySource') {
+      const items = this.sourceList(form).map(s => ({
+        ...s,
+        selected: s.id === form.sourceId,
+        badgeStyle: { width: '28px', height: '28px', borderRadius: '8px', background: s.color, color: '#12100c', fontSize: '11px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+        rowStyle: {
+          display: 'flex', alignItems: 'center', gap: '11px', padding: '10px 12px', borderRadius: '11px', cursor: 'pointer',
+          background: s.id === form.sourceId ? 'rgba(52,211,153,0.1)' : '#101113',
+          border: '1px solid ' + (s.id === form.sourceId ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.07)'),
+        },
+        onClick: () => { this.upd(k, { sourceId: s.id }); if (autoAdvance) setTimeout(() => this.next(k), 130); },
+      }));
+      return {
+        ...base, isPaySource: true, hasLabel: true, label: 'PAGAR COM *', items,
+        contaStyle: this.seg(form.payKind === 'conta', '#34d399'),
+        cartaoStyle: this.seg(form.payKind === 'cartao', '#34d399'),
+        setConta: () => this.upd(k, { payKind: 'conta', sourceId: ACCOUNTS[0].id }),
+        setCartao: () => this.upd(k, { payKind: 'cartao', sourceId: CARDS[0].id }),
+      };
+    }
+    if (kind === 'category') {
+      const q = form.catSearch.trim().toLowerCase();
+      const list = CATEGORIES.filter(c => c.label.toLowerCase().includes(q));
+      return {
+        ...base, isCategory: true, hasLabel: true, label: 'CATEGORIA *',
+        search: form.catSearch, onSearch: (e) => this.upd(k, { catSearch: e.target.value }),
+        noMatch: list.length === 0,
+        chips: list.map(c => ({
+          ...c, style: this.chip(c.id === form.categoryId),
+          onClick: () => { this.upd(k, { categoryId: c.id }); if (autoAdvance) setTimeout(() => this.next(k), 130); },
+        })),
+      };
+    }
+    if (kind === 'month') {
+      return {
+        ...base, isMonth: true, hasLabel: true, label: 'MÊS DE COMPETÊNCIA *',
+        value: MONTHS[form.monthIdx],
+        prev: () => this.upd(k, { monthIdx: Math.max(0, form.monthIdx - 1) }),
+        next: () => this.upd(k, { monthIdx: Math.min(MONTHS.length - 1, form.monthIdx + 1) }),
+      };
+    }
+    if (kind === 'realDate') {
+      return {
+        ...base, isCheckbox: true, hasLabel: false,
+        title: 'Data real da transação', hint: 'Opcional — use quando o gasto aconteceu em outro dia',
+        boxStyle: this.box(form.useRealDate), check: form.useRealDate ? '✓' : '',
+        onToggle: () => this.upd(k, { useRealDate: !form.useRealDate }),
+        showDate: form.useRealDate, dateValue: form.realDate,
+        onDateChange: (e) => this.upd(k, { realDate: e.target.value }),
+      };
+    }
+    if (kind === 'recurrence') {
+      return {
+        ...base, isRecurrence: true, hasLabel: true, label: 'TIPO DE LANÇAMENTO',
+        chips: RECURRENCES.map(r => ({
+          ...r, style: this.chip(r.id === form.recurrence),
+          onClick: () => this.upd(k, { recurrence: r.id }),
+        })),
+        showParcelas: form.recurrence === 'parcelado',
+        parcelas: form.parcelas,
+        lessParcelas: () => this.upd(k, { parcelas: Math.max(2, form.parcelas - 1) }),
+        moreParcelas: () => this.upd(k, { parcelas: Math.min(48, form.parcelas + 1) }),
+      };
+    }
+    if (kind === 'more') {
+      return {
+        ...base, isMore: true, hasLabel: false, open: form.moreOpen,
+        caret: form.moreOpen ? '⌃' : '⌄',
+        hasExtras: !!form.obs || form.vencimentos,
+        onToggle: () => this.upd(k, { moreOpen: !form.moreOpen }),
+        obs: form.obs, onObsChange: (e) => this.upd(k, { obs: e.target.value }),
+        vencBoxStyle: this.box(form.vencimentos), vencCheck: form.vencimentos ? '✓' : '',
+        onVencToggle: () => this.upd(k, { vencimentos: !form.vencimentos }),
+      };
+    }
+    if (kind === 'extras') {
+      return {
+        ...base, isExtras: true, hasLabel: false,
+        obs: form.obs, onObsChange: (e) => this.upd(k, { obs: e.target.value }),
+        vencBoxStyle: this.box(form.vencimentos), vencCheck: form.vencimentos ? '✓' : '',
+        onVencToggle: () => this.upd(k, { vencimentos: !form.vencimentos }),
+      };
+    }
+    if (kind === 'review') {
+      const cat = this.categoryOf(form);
+      const rec = RECURRENCES.find(r => r.id === form.recurrence);
+      const strong = { fontSize: '13px', fontWeight: 600, color: '#eef0f2' };
+      const weak = { fontSize: '13px', fontWeight: 500, color: '#5f6672' };
+      const rows = [
+        { label: form.tipo === 'despesa' ? 'DESPESA' : 'RECEITA', value: 'R$ ' + this.money(this.amount(form)), step: this.stepOfField(k, ['amount', 'keypad']), filled: this.amount(form) > 0 },
+        { label: 'DESCRIÇÃO', value: form.desc || 'sem descrição', step: this.stepOfField(k, ['desc']), filled: !!form.desc },
+        { label: 'PAGAR COM', value: this.sourceOf(form).name + ' · ' + this.sourceOf(form).bank, step: this.stepOfField(k, ['paySource']), filled: true },
+        { label: 'CATEGORIA', value: cat ? cat.label : 'escolher categoria', step: this.stepOfField(k, ['category']), filled: !!cat },
+        { label: 'MÊS / LANÇAMENTO', value: MONTHS[form.monthIdx] + ' · ' + rec.label + (form.recurrence === 'parcelado' ? ' ' + form.parcelas + 'x' : ''), step: this.stepOfField(k, ['month']), filled: true },
+      ];
+      if (FLOWS[k].some(s => s.fields.indexOf('extras') !== -1)) {
+        const extras = [];
+        if (form.obs) extras.push('observação');
+        if (form.vencimentos) extras.push('nos vencimentos');
+        rows.push({ label: 'OPCIONAIS', value: extras.length ? extras.join(' · ') : 'nada preenchido', step: this.stepOfField(k, ['extras']), filled: extras.length > 0 });
+      }
+      return {
+        ...base, isReview: true, hasLabel: false,
+        rows: rows.map(r => ({ ...r, valueStyle: r.filled ? strong : weak, onClick: () => this.goto(k, r.step) })),
+      };
+    }
+    return base;
+  }
+
+  option(k) {
+    const st = this.state[k];
+    const isMobile = this.state.device === 'mobile';
+    const flow = FLOWS[k];
+    const step = flow[st.step];
+    const form = st.form;
+    const isA = k === 'a', isB = k === 'b', isC = k === 'c';
+    const railVertical = isB && !isMobile;
+    const last = st.step === flow.length - 1;
+    const complete = this.amount(form) > 0 && !!form.desc.trim() && !!form.categoryId;
+    const valid = (() => {
+      if (last) return complete;
+      if (st.step === 0) return this.amount(form) > 0 && (isC || !!form.desc.trim());
+      if (flow[st.step].fields.includes('category')) return !!form.categoryId;
+      return true;
+    })();
+    const missing = [];
+    if (this.amount(form) <= 0) missing.push('valor');
+    if (!form.desc.trim()) missing.push('descrição');
+    if (!form.categoryId) missing.push('categoria');
+
+    const segments = flow.map((s, i) => {
+      const done = i < st.step, current = i === st.step;
+      return {
+        label: s.label,
+        onClick: () => this.goto(k, i),
+        barStyle: { height: '5px', borderRadius: '4px', background: done ? 'rgba(52,211,153,0.55)' : current ? '#34d399' : 'rgba(255,255,255,0.09)' },
+        labelStyle: { fontSize: '10px', marginTop: '7px', fontWeight: 600, letterSpacing: '.04em', color: current ? '#eef0f2' : done ? '#7a8390' : '#5f6672', textAlign: 'center' },
+        dotText: done ? '✓' : String(i + 1),
+        dotStyle: {
+          width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, fontSize: '11px', fontWeight: 700,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: current ? '#34d399' : done ? 'rgba(52,211,153,0.18)' : 'rgba(255,255,255,0.06)',
+          color: current ? '#06231a' : done ? '#34d399' : '#5f6672',
+        },
+        trailItemStyle: railVertical
+          ? { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', borderRadius: '9px', cursor: 'pointer', background: current ? 'rgba(255,255,255,0.05)' : 'transparent' }
+          : { display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 10px 6px 6px', borderRadius: '20px', cursor: 'pointer', flexShrink: 0, background: current ? 'rgba(52,211,153,0.1)' : '#151719', border: '1px solid ' + (current ? 'rgba(52,211,153,0.35)' : 'rgba(255,255,255,0.07)') },
+        trailLabelStyle: { fontSize: '12px', fontWeight: 600, color: current ? '#eef0f2' : '#7a8390', whiteSpace: 'nowrap' },
+      };
+    });
+
+    const cat = this.categoryOf(form);
+    const summary = [
+      { label: 'Valor', value: this.amount(form) > 0 ? 'R$ ' + this.money(this.amount(form)) : '—' },
+      { label: 'Pagar com', value: this.sourceOf(form).name },
+      { label: 'Categoria', value: cat ? cat.label : '—' },
+      { label: 'Mês', value: MONTHS[form.monthIdx] },
+    ];
+
+    const frameWidth = isMobile ? '390px' : isB ? '600px' : '520px';
+
+    return {
+      id: k === 'a' ? '1a' : k === 'b' ? '1b' : '1c',
+      badge: META[k].badge, name: META[k].name, tagline: META[k].tagline, frameWidth,
+      frameStyle: {
+        display: 'flex', flexDirection: 'column', width: frameWidth,
+        height: isMobile ? '760px' : '660px', background: '#0d0e10',
+        border: '1px solid rgba(255,255,255,0.08)', borderRadius: isMobile ? '30px' : '16px',
+        boxShadow: '0 30px 80px rgba(0,0,0,0.5)', overflow: 'hidden',
+      },
+      isA, isB, isC,
+      segments, summary, showSummary: railVertical,
+      counterText: 'ETAPA ' + (st.step + 1) + ' DE ' + flow.length + ' · ' + step.label.toUpperCase(),
+      counterShort: (st.step + 1) + '/' + flow.length,
+      stepQuestion: step.question,
+      stepSubtitle: isC ? step.label : 'Etapa ' + (st.step + 1) + ' de ' + flow.length + ' · ' + step.label,
+      showStepLabels: !isMobile, hideStepLabels: isMobile,
+      thinBarStyle: { width: ((st.step + 1) / flow.length) * 100 + '%', height: '100%', background: '#34d399', borderRadius: '3px' },
+      bodyWrapStyle: { display: 'flex', flexDirection: railVertical ? 'row' : 'column', flex: 1, minHeight: 0 },
+      railStyle: railVertical
+        ? { width: '190px', flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '16px 14px', display: 'flex', flexDirection: 'column' }
+        : { padding: '14px 16px 4px', display: 'flex', flexShrink: 0, overflowX: 'auto' },
+      railListStyle: railVertical
+        ? { display: 'flex', flexDirection: 'column', gap: '2px' }
+        : { display: 'flex', gap: '8px' },
+      stepBodyStyle: { flex: 1, minHeight: 0, overflowY: 'auto', padding: isMobile ? '16px' : '18px 20px', display: 'flex', flexDirection: 'column', gap: '18px' },
+      fields: step.fields.map(kind => this.field(k, kind, form, isMobile, isC)),
+      created: st.created,
+      createdSummary: (form.tipo === 'despesa' ? 'Despesa' : 'Receita') + ' de R$ ' + this.money(this.amount(form)) + ' em ' + MONTHS[form.monthIdx] + '.',
+      showFooter: !st.created,
+      canBack: st.step > 0,
+      onBack: () => this.back(k),
+      onNext: valid ? () => this.next(k) : () => {},
+      onReset: () => this.reset(k),
+      nextLabel: last ? 'Criar transação' : 'Continuar',
+      nextStyle: {
+        padding: '12px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 700,
+        cursor: valid ? 'pointer' : 'not-allowed',
+        background: valid ? '#34d399' : 'rgba(52,211,153,0.18)',
+        color: valid ? '#06231a' : 'rgba(6,35,26,0.45)',
+      },
+      footerHint: valid
+        ? (isC && !last ? 'ou toque numa opção para avançar' : '')
+        : (last ? 'falta ' + missing.join(', ') : 'preencha os campos obrigatórios'),
+    };
+  }
+
+  renderVals() {
+    const isMobile = this.state.device === 'mobile';
+    const tabBase = { padding: '7px 14px', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' };
+    const on = { ...tabBase, background: '#22252a', color: '#f2f2f2' };
+    const off = { ...tabBase, color: '#7a8390' };
+    return {
+      devMobileStyle: isMobile ? on : off,
+      devDesktopStyle: isMobile ? off : on,
+      setDeviceMobile: this.setDeviceMobile,
+      setDeviceDesktop: this.setDeviceDesktop,
+      frameStyle: {
+        display: 'flex', flexDirection: 'column',
+        width: isMobile ? '390px' : undefined,
+        height: isMobile ? '760px' : '660px',
+        background: '#0d0e10',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: isMobile ? '30px' : '16px',
+        boxShadow: '0 30px 80px rgba(0,0,0,0.5)',
+        overflow: 'hidden',
+      },
+      options: [this.option('b')],
+    };
+  }
+}
+
+</script>
+</body>
+</html>
