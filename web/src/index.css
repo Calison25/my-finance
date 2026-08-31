@@ -1,5 +1,26 @@
 @import "tailwindcss";
 
+/* Tokens de cor para as utilities Tailwind usadas nas páginas (Bills, Settings,
+   Login, Reports). Sem eles, as bordas e divisores caem em currentColor (branco). */
+@theme inline {
+  --color-income: var(--positive);
+  --color-expense: var(--negative);
+  --color-error: var(--negative);
+  --color-warning: var(--warning);
+  --color-primary: var(--accent);
+  --color-on-primary: var(--accent-fg);
+  --color-primary-container: var(--accent);
+  --color-on-primary-container: var(--accent);
+  --color-surface: var(--surface);
+  --color-surface-container-low: var(--surface);
+  --color-surface-container: var(--surface-2);
+  --color-surface-container-high: var(--surface-2);
+  --color-surface-container-highest: var(--surface-3);
+  --color-on-surface: var(--text);
+  --color-on-surface-variant: var(--text-2);
+  --color-outline-variant: var(--text-3);
+}
+
 /* ================================================================
    My Finance — Quiet design tokens
    Light mode (default) + Dark mode via [data-theme="dark"]
@@ -502,6 +523,7 @@ a { color: inherit; text-decoration: none; }
 }
 .kpi-value.positive { color: var(--positive); }
 .kpi-value.negative { color: var(--negative); }
+.kpi-value.sm { font-size: 20px; }
 .kpi-meta {
   font-size: 11px;
   color: var(--text-3);
@@ -1819,7 +1841,7 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 900px) {
   :root { --page-pad-x: 16px; }
   .sidebar { display: none; }
-  .app-main { padding-bottom: 80px; }
+  .app-main { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
   .mobile-tabbar { display: block; }
   .pwa-banner { left: 16px; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
@@ -1844,7 +1866,9 @@ a { color: inherit; text-decoration: none; }
 }
 
 @media (max-width: 540px) {
-  .kpi-value { font-size: 22px; }
+  .kpi { padding: 14px; }
+  .kpi-value { font-size: 18px; }
+  .kpi-value.sm { font-size: 16px; }
   .opt-row { grid-template-columns: 1fr 1fr; }
 }
 

@@ -231,7 +231,7 @@ export function Bills() {
         </div>
       </div>
 
-      <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: 20 }}>
+      <div className="kpi-grid kpi-grid-3" style={{ marginBottom: 20 }}>
         <div className="kpi">
           <div className="kpi-label"><Icon name="payments" className="text-[12px]" />Total</div>
           <div className="kpi-value"><MoneyValue value={totalAmount} /></div>
