@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/Icon"
 import { MoneyValue } from "@/components/ui/MoneyValue"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
+import { realDateOf } from "@/lib/transaction-format"
 
 function fmtMonth(d: Date) {
   return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
@@ -123,7 +124,7 @@ export function Dashboard() {
 
   const recent = [...transactions]
     .filter((t) => t.date.startsWith(selectedMonth))
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .sort((a, b) => realDateOf(b).localeCompare(realDateOf(a)))
     .slice(0, 6)
 
   const creditCards = cards.filter((c) => c.type === "CREDIT_CARD")

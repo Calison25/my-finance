@@ -1,3 +1,4 @@
+import calendar
 import datetime as dt
 import re
 from datetime import UTC, datetime
@@ -121,6 +122,7 @@ class CreateTransactionUseCase:
     ) -> list[TransactionResponse]:
         recurring_id = uuid4()
         now = datetime.now(UTC)
+        base_real = self._resolve_base_real(data)
 
         transactions = [
             Transaction(
@@ -131,7 +133,7 @@ class CreateTransactionUseCase:
                 type=data.type,
                 category_id=category_id,
                 date=(tx_date := self._advance_month(data.date, i)),
-                transaction_date=data.transaction_date,
+                transaction_date=self._apply_day(tx_date, base_real.day),
                 is_scheduled=data.is_scheduled,
                 scheduled_date=tx_date if data.is_scheduled else None,
                 is_realized=(not data.is_scheduled) and (not data.is_bill),
@@ -167,6 +169,9 @@ class CreateTransactionUseCase:
                 if installments > 1
                 else data.description
             )
+            # A data real da compra acompanha todas as parcelas (comportamento
+            # Nubank); sem data real, cada parcela cai no dia 1 da própria competência.
+            real_date = data.transaction_date or tx_date.replace(day=1)
 
             transactions.append(
                 Transaction(
@@ -177,7 +182,7 @@ class CreateTransactionUseCase:
                     type=data.type,
                     category_id=category_id,
                     date=tx_date,
-                    transaction_date=data.transaction_date,
+                    transaction_date=real_date,
                     is_scheduled=data.is_scheduled,
                     scheduled_date=tx_date if data.is_scheduled else None,
                     is_realized=(not data.is_scheduled) and (not data.is_bill),
@@ -192,6 +197,15 @@ class CreateTransactionUseCase:
         return [
             TransactionResponse.model_validate(t, from_attributes=True) for t in created
         ]
+
+    @staticmethod
+    def _resolve_base_real(data: TransactionCreate) -> dt.date:
+        return data.transaction_date or data.date.replace(day=1)
+
+    @staticmethod
+    def _apply_day(competence: dt.date, day: int) -> dt.date:
+        last_day = calendar.monthrange(competence.year, competence.month)[1]
+        return competence.replace(day=min(day, last_day))
 
     @staticmethod
     def _advance_month(base: dt.date, months: int) -> dt.date:
@@ -229,6 +243,11 @@ class UpdateTransactionUseCase:
             raise ForbiddenError("Acesso negado a este recurso")
 
         update_data = data.model_dump(exclude_unset=True)
+        # transaction_date é obrigatória: limpar o campo significa voltar ao
+        # default (dia 1 do mês de competência), nunca ficar NULL.
+        if update_data.get("transaction_date", ...) is None:
+            competence = update_data.get("date") or transaction.date
+            update_data["transaction_date"] = competence.replace(day=1)
         custom_category_name = update_data.pop("custom_category_name", None)
         if custom_category_name and not update_data.get("category_id"):
             new_cat = Category(

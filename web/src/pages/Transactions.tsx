@@ -5,32 +5,17 @@ import { MoneyValue } from "@/components/ui/MoneyValue"
 import { Dialog } from "@/components/ui/Dialog"
 import { useFinanceStore } from "@/stores/finance-store"
 import { toast } from "@/components/ui/Toast"
+import { TransactionWizard } from "@/components/transactions/TransactionWizard"
+import {
+  categoryIconFor,
+  formatCentsToBRL,
+  parseBRLToNumber,
+  defaultCompetenceMonth,
+  competenceLabel,
+  baseDescription,
+  realDateOf,
+} from "@/lib/transaction-format"
 import type { TransactionType } from "@/types"
-
-const CATEGORY_ICONS: Record<string, string> = {
-  Alimentação: "restaurant",
-  Transporte: "directions_car",
-  Moradia: "home",
-  Saúde: "health_and_safety",
-  Educação: "school",
-  Lazer: "movie",
-  Compras: "shopping_bag",
-  Serviços: "build",
-  Investimentos: "trending_up",
-  Outros: "receipt_long",
-}
-
-function formatCentsToBRL(cents: number): string {
-  if (cents === 0) return ""
-  const reais = Math.floor(cents / 100)
-  const cv = cents % 100
-  return `${reais.toLocaleString("pt-BR")},${String(cv).padStart(2, "0")}`
-}
-
-function parseBRLToNumber(s: string): number {
-  const d = s.replace(/\D/g, "")
-  return d ? parseInt(d, 10) / 100 : 0
-}
 
 function fmtMonth(d: Date) {
   return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
@@ -48,20 +33,6 @@ function formatDayHeader(dateStr: string): string {
   return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "long" }).replace(".", "")
 }
 
-function defaultCompetenceMonth(): string {
-  const next = new Date()
-  next.setMonth(next.getMonth() + 1)
-  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
-}
-
-function competenceDateFor(monthStr: string): string {
-  const [y, m] = monthStr.split("-").map(Number)
-  const today = new Date()
-  const lastDay = new Date(y, m, 0).getDate()
-  const day = Math.min(today.getDate(), lastDay)
-  return `${monthStr}-${String(day).padStart(2, "0")}`
-}
-
 type SrcKind = "all" | "account" | "card"
 
 export function Transactions() {
@@ -70,8 +41,6 @@ export function Transactions() {
     cards,
     categories,
     banks,
-    addTransaction,
-    updateTransaction,
     deleteTransaction,
     deleteTransactionGroup,
     realizeTransaction,
@@ -113,7 +82,7 @@ export function Transactions() {
   const filtersRef = useRef<HTMLDivElement>(null)
 
   // Modal state
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const [wizardOpen, setWizardOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [modalKey, setModalKey] = useState(0) // remount on each open
   const [deletePrompt, setDeletePrompt] = useState<{ id: string; kind: "recurring" | "installment" | "regular" } | null>(null)
@@ -153,9 +122,7 @@ export function Transactions() {
     return card ? (banks.find((b) => b.id === card.bank_id) ?? null) : null
   }
   function categoryIcon(catId: string | null) {
-    const c = categoryOf(catId)
-    if (!c) return "receipt_long"
-    return CATEGORY_ICONS[c.name] ?? c.icon ?? "receipt_long"
+    return categoryIconFor(categoryOf(catId))
   }
 
   const baseFiltered = useMemo(() => {
@@ -188,7 +155,10 @@ export function Transactions() {
       })
   }, [transactions, selectedMonth, filterType, filterClassification, srcKind, filterCardId, filterCategoryIds, searchText, cards])
 
-  const sorted = useMemo(() => [...baseFiltered].sort((a, b) => b.date.localeCompare(a.date)), [baseFiltered])
+  const sorted = useMemo(
+    () => [...baseFiltered].sort((a, b) => realDateOf(b).localeCompare(realDateOf(a))),
+    [baseFiltered],
+  )
 
   const summary = useMemo(() => {
     const src = baseFiltered
@@ -207,25 +177,12 @@ export function Transactions() {
   const grouped = useMemo(() => {
     const acc: Record<string, typeof sorted> = {}
     for (const tx of sorted) {
-      if (!acc[tx.date]) acc[tx.date] = []
-      acc[tx.date].push(tx)
+      const key = realDateOf(tx)
+      if (!acc[key]) acc[key] = []
+      acc[key].push(tx)
     }
     return acc
   }, [sorted])
-
-  const todayKey = (() => {
-    const t = new Date()
-    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`
-  })()
-  const [openDay, setOpenDay] = useState<Record<string, boolean>>({})
-  function isDayOpen(date: string) {
-    if (searchText.trim()) return true // auto-expand when searching
-    if (date in openDay) return openDay[date]
-    return date === todayKey
-  }
-  function toggleDay(date: string) {
-    setOpenDay((s) => ({ ...s, [date]: !isDayOpen(date) }))
-  }
 
   const activeFilterCount =
     (filterType !== "ALL" ? 1 : 0) +
@@ -260,14 +217,12 @@ export function Transactions() {
   }
 
   function openCreate() {
-    setEditingId(null)
     setModalKey((k) => k + 1)
-    setDialogOpen(true)
+    setWizardOpen(true)
   }
   function openEdit(id: string) {
-    setEditingId(id)
     setModalKey((k) => k + 1)
-    setDialogOpen(true)
+    setEditingId(id)
   }
 
   return (
@@ -386,7 +341,7 @@ export function Transactions() {
                         className={`popover-item ${filterCategoryIds.has(c.id) ? "active" : ""}`}
                         onClick={() => toggleCategoryFilter(c.id)}
                       >
-                        <Icon name={CATEGORY_ICONS[c.name] ?? c.icon ?? "receipt_long"} className="text-[14px]" />
+                        <Icon name={categoryIconFor(c)} className="text-[14px]" />
                         <span className="popover-item-label">{c.name}</span>
                         {filterCategoryIds.has(c.id) && <Icon name="check" className="text-[14px]" />}
                       </button>
@@ -485,15 +440,13 @@ export function Transactions() {
       ) : (
         <div className="panel" style={{ padding: "0 8px" }}>
           {Object.entries(grouped).map(([date, txs]) => {
-            const open = isDayOpen(date)
             const dayIncome = txs.filter((t) => t.type === "INCOME").reduce((s, t) => s + Number(t.amount), 0)
             const dayExpense = txs.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + Number(t.amount), 0)
             const net = dayIncome - dayExpense
             return (
-              <div key={date} className={`day-group ${open ? "" : "collapsed"}`}>
-                <div className="day-header" onClick={() => toggleDay(date)}>
+              <div key={date} className="day-group">
+                <div className="day-header">
                   <div className="day-date">
-                    <Icon name="expand_more" className="day-caret text-[14px]" />
                     {formatDayHeader(date)}
                   </div>
                   <div className="day-meta">
@@ -503,9 +456,8 @@ export function Transactions() {
                     </span>
                   </div>
                 </div>
-                {open && (
-                  <div>
-                    {txs.map((tx) => {
+                <div>
+                  {txs.map((tx) => {
                       const cat = categoryOf(tx.category_id)
                       const bank = bankOfCard(tx.card_id)
                       const card = cardOf(tx.card_id)
@@ -524,27 +476,6 @@ export function Transactions() {
                               {tx.description}
                               {tx.is_recurring && <Icon name="repeat" className="text-[10px]" style={{ marginLeft: 4, color: "var(--accent)" }} />}
                               {tx.is_scheduled && !tx.is_realized && <Icon name="schedule" className="text-[10px]" style={{ marginLeft: 4, color: "var(--warning)" }} />}
-                              {tx.transaction_date && (
-                                <span
-                                  title="Data real do evento"
-                                  style={{
-                                    marginLeft: 8,
-                                    padding: "2px 6px",
-                                    fontSize: 10,
-                                    fontWeight: 500,
-                                    borderRadius: 6,
-                                    background: "color-mix(in srgb, var(--accent) 14%, transparent)",
-                                    color: "var(--accent)",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 3,
-                                    verticalAlign: "middle",
-                                  }}
-                                >
-                                  <Icon name="event" className="text-[10px]" />
-                                  {new Date(tx.transaction_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "")}
-                                </span>
-                              )}
                             </div>
                             <div className="tx-sub">
                               <span>{cat?.name ?? "Outros"}</span>
@@ -585,26 +516,27 @@ export function Transactions() {
                       )
                     })}
                   </div>
-                )}
               </div>
             )
           })}
         </div>
       )}
 
-      {dialogOpen && (
-        <TransactionModal
+      {wizardOpen && (
+        <TransactionWizard
           key={modalKey}
-          editingId={editingId}
           defaultMonth={selectedMonth}
-          onClose={() => { setDialogOpen(false); setEditingId(null) }}
-          onSaved={() => { setDialogOpen(false); setEditingId(null) }}
-          transactions={transactions}
-          cards={cards}
-          categories={categories}
-          banks={banks}
-          addTransaction={addTransaction}
-          updateTransaction={updateTransaction}
+          onClose={() => setWizardOpen(false)}
+          onCreated={() => setWizardOpen(false)}
+        />
+      )}
+
+      {editingId && (
+        <TransactionEditModal
+          key={modalKey}
+          transactionId={editingId}
+          onClose={() => setEditingId(null)}
+          onSaved={() => setEditingId(null)}
         />
       )}
 
@@ -667,125 +599,55 @@ export function Transactions() {
   )
 }
 
-import type { Transaction, Card, Category, Bank } from "@/types"
-
-interface TxModalProps {
-  editingId: string | null
-  defaultMonth: string
+interface TxEditModalProps {
+  transactionId: string
   onClose: () => void
   onSaved: () => void
-  transactions: Transaction[]
-  cards: Card[]
-  categories: Category[]
-  banks: Bank[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  addTransaction: (data: any) => Promise<void>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  updateTransaction: (id: string, data: any, cascade?: boolean) => Promise<void>
 }
 
-function TransactionModal(props: TxModalProps) {
-  const { editingId, defaultMonth, onClose, onSaved, transactions, cards, categories, banks, addTransaction, updateTransaction } = props
-  const existing = editingId ? transactions.find((t) => t.id === editingId) ?? null : null
-
-  function baseDesc(d: string) { return d.replace(/\s\(\d+\/\d+\)$/, "") }
+function TransactionEditModal({ transactionId, onClose, onSaved }: TxEditModalProps) {
+  const { transactions, categories, updateTransaction } = useFinanceStore()
+  const existing = transactions.find((t) => t.id === transactionId) ?? null
 
   const installmentSuffix = existing?.description.match(/\s*\(\d+\/\d+\)$/)?.[0] ?? ""
 
   const [type, setType] = useState<TransactionType>(existing?.type ?? "EXPENSE")
   const [amount, setAmount] = useState(existing ? formatCentsToBRL(Math.round(existing.amount * 100)) : "")
-  const [description, setDescription] = useState(existing ? baseDesc(existing.description) : "")
-  const [srcKind, setSrcKind] = useState<"account" | "card">(() => {
-    if (existing) {
-      const c = cards.find((x) => x.id === existing.card_id)
-      return c?.type === "CREDIT_CARD" ? "card" : "account"
-    }
-    return "card"
-  })
-  const [cardId, setCardId] = useState(existing?.card_id ?? "")
+  const [description, setDescription] = useState(existing ? baseDescription(existing.description) : "")
   const [categoryId, setCategoryId] = useState(existing?.category_id ?? "")
   const [customCategoryName, setCustomCategoryName] = useState("")
-  const [competence, setCompetence] = useState(() => {
-    if (existing) return existing.date.slice(0, 7)
-    return defaultMonth
-  })
-  const [hasTxDate, setHasTxDate] = useState(!!existing?.transaction_date)
+  const [competence, setCompetence] = useState(existing ? existing.date.slice(0, 7) : defaultCompetenceMonth())
   const [transactionDate, setTransactionDate] = useState(existing?.transaction_date ?? "")
-  const [isScheduled, setIsScheduled] = useState(existing?.is_scheduled ?? false)
-  const [scheduledDate, setScheduledDate] = useState(existing?.scheduled_date ?? "")
-  const [isInstallment, setIsInstallment] = useState(false)
-  const [installments, setInstallments] = useState("")
-  const [isRecurring, setIsRecurring] = useState(existing?.is_recurring ?? false)
+  const isRecurring = existing?.is_recurring ?? false
   const [isBill, setIsBill] = useState(existing?.is_bill ?? false)
   const [notes, setNotes] = useState(existing?.notes ?? "")
   const [editCascade, setEditCascade] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    if (type === "INCOME" && srcKind === "card") setSrcKind("account")
-  }, [type, srcKind])
-
-  const autoCategoryRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (editingId) return
-    const desc = description.trim().toLowerCase()
-    if (!desc) return
-    if (categoryId && categoryId !== autoCategoryRef.current) return
-    const match = transactions.find((t) => baseDesc(t.description).trim().toLowerCase() === desc && t.category_id)
-    if (match && match.category_id && match.category_id !== categoryId) {
-      setCategoryId(match.category_id)
-      autoCategoryRef.current = match.category_id
-    }
-  }, [description, transactions, editingId, categoryId])
-
-  const filteredSrcCards = cards.filter((c) => srcKind === "card" ? c.type === "CREDIT_CARD" : c.type === "CHECKING_ACCOUNT")
   const isOtherCategory = categoryId === "__other__"
-
-  const competenceLabel = (() => {
-    const [y, m] = competence.split("-").map(Number)
-    return new Date(y, m - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
-  })()
+  const competenceLabelText = competenceLabel(competence)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (submitting) return
     const amountNum = parseBRLToNumber(amount)
-    if (!amountNum || !description || (!editingId && !cardId) || !categoryId || (isOtherCategory && !customCategoryName)) {
+    if (!amountNum || !description || !categoryId || (isOtherCategory && !customCategoryName)) {
       toast.error("Preencha os campos obrigatórios")
       return
     }
     setSubmitting(true)
     try {
-      if (editingId) {
-        await toast.run("Salvando...", () => updateTransaction(editingId, {
-          description: description + installmentSuffix,
-          amount: amountNum,
-          type,
-          category_id: isOtherCategory ? null : (categoryId || null),
-          custom_category_name: isOtherCategory ? customCategoryName : undefined,
-          notes: notes || null,
-          is_recurring: isRecurring,
-          transaction_date: hasTxDate && transactionDate ? transactionDate : null,
-        }, editCascade), "Transação atualizada")
-      } else {
-        await toast.run("Criando transação...", () => addTransaction({
-          card_id: cardId,
-          description,
-          amount: amountNum,
-          type,
-          category_id: isOtherCategory ? undefined : (categoryId || undefined),
-          custom_category_name: isOtherCategory ? customCategoryName : undefined,
-          date: competenceDateFor(competence),
-          transaction_date: hasTxDate && transactionDate ? transactionDate : undefined,
-          is_scheduled: isScheduled,
-          scheduled_date: isScheduled ? (scheduledDate || competenceDateFor(competence)) : undefined,
-          notes: notes || undefined,
-          installments: isInstallment && installments ? Number(installments) : undefined,
-          is_recurring: isRecurring || undefined,
-          is_bill: isBill || undefined,
-        }), "Transação criada")
-      }
+      await toast.run("Salvando...", () => updateTransaction(transactionId, {
+        description: description + installmentSuffix,
+        amount: amountNum,
+        type,
+        category_id: isOtherCategory ? null : (categoryId || null),
+        custom_category_name: isOtherCategory ? customCategoryName : undefined,
+        notes: notes || null,
+        is_recurring: isRecurring,
+        transaction_date: transactionDate || null,
+      }, editCascade), "Transação atualizada")
       onSaved()
     } catch {} finally {
       setSubmitting(false)
@@ -793,7 +655,7 @@ function TransactionModal(props: TxModalProps) {
   }
 
   return (
-    <Dialog open={true} onClose={onClose} title={editingId ? "Editar transação" : "Nova transação"}>
+    <Dialog open={true} onClose={onClose} title="Editar transação">
       <form onSubmit={handleSubmit}>
         {/* Type toggle */}
         <div className="type-toggle">
@@ -830,50 +692,6 @@ function TransactionModal(props: TxModalProps) {
           <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex: Supermercado" required />
         </div>
 
-        {/* Source: tabs + list */}
-        {!editingId && (
-          <div className="modal-section">
-            <div className="modal-section-head">Pagar com <span style={{ color: "var(--negative)" }}>*</span></div>
-            <div className="src-block">
-              <div className="src-tabs">
-                <button type="button" className={`src-tab ${srcKind === "account" ? "active" : ""}`}
-                        onClick={() => { setSrcKind("account"); setCardId("") }} disabled={type === "INCOME" ? false : false}>
-                  <Icon name="account_balance" className="text-[14px]" /> Conta
-                </button>
-                <button type="button" className={`src-tab ${srcKind === "card" ? "active" : ""}`}
-                        onClick={() => { setSrcKind("card"); setCardId("") }} disabled={type === "INCOME"}>
-                  <Icon name="credit_card" className="text-[14px]" /> Cartão
-                </button>
-              </div>
-              <div className="src-list-inner">
-                {filteredSrcCards.length === 0 ? (
-                  <div style={{ padding: 16, textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>
-                    Nenhuma {srcKind === "card" ? "cartão" : "conta"} cadastrada
-                  </div>
-                ) : (
-                  filteredSrcCards.map((c) => {
-                    const bank = banks.find((b) => b.id === c.bank_id)
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className={`src-item ${cardId === c.id ? "active" : ""}`}
-                        onClick={() => setCardId(c.id)}
-                      >
-                        <div className="bi sm" style={{ background: bank?.color ?? "var(--c-porto)" }}>
-                          {bank?.name?.slice(0, 2).toUpperCase() ?? "?"}
-                        </div>
-                        <span className="src-name">{c.name}</span>
-                        <span className="src-trailing" style={{ color: "var(--text-3)" }}>{bank?.name}</span>
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Category */}
         <div className="field">
           <label className="label">Categoria <span className="req">*</span></label>
@@ -892,7 +710,7 @@ function TransactionModal(props: TxModalProps) {
                 className={`cat-pill ${categoryId === c.id ? "active" : ""}`}
                 onClick={() => setCategoryId(c.id)}
               >
-                <Icon name={CATEGORY_ICONS[c.name] ?? c.icon ?? "receipt_long"} className="text-[12px]" />
+                <Icon name={categoryIconFor(c)} className="text-[12px]" />
                 {c.name}
               </button>
             ))}
@@ -920,88 +738,18 @@ function TransactionModal(props: TxModalProps) {
             onChange={(e) => setCompetence(e.target.value)}
             required
           />
-          <span className="help">A transação aparecerá em <strong>{competenceLabel}</strong></span>
+          <span className="help">A transação aparecerá em <strong>{competenceLabelText}</strong></span>
         </div>
         <div className="field">
-          <label className="label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={hasTxDate}
-              onChange={(e) => setHasTxDate(e.target.checked)}
-              style={{ accentColor: "var(--accent)" }}
-            />
-            Data real da transação (opcional)
-          </label>
-          {hasTxDate && (
-            <>
-              <input
-                type="date"
-                className="input"
-                value={transactionDate}
-                onChange={(e) => setTransactionDate(e.target.value)}
-                style={{ marginTop: 6 }}
-              />
-              <span className="help">Use quando o evento ocorreu fora do mês de competência (ex: compra antiga cobrada agora)</span>
-            </>
-          )}
+          <label className="label">Data real da transação</label>
+          <input
+            type="date"
+            className="input"
+            value={transactionDate}
+            onChange={(e) => setTransactionDate(e.target.value)}
+          />
+          <span className="help">Quando o gasto de fato aconteceu. Se vazio, será considerado o dia 1 do mês de competência.</span>
         </div>
-
-        {/* Option pills */}
-        {!editingId && (
-          <div className="field">
-            <div className="opt-pills">
-              <button
-                type="button"
-                className={`opt-pill ${isInstallment ? "active" : ""}`}
-                disabled={isRecurring}
-                onClick={() => setIsInstallment((s) => !s)}
-              >
-                <Icon name="payments" className="text-[12px]" /> Parcelado
-              </button>
-              <button
-                type="button"
-                className={`opt-pill ${isScheduled ? "active" : ""}`}
-                onClick={() => setIsScheduled((s) => !s)}
-              >
-                <Icon name="schedule" className="text-[12px]" /> Agendado
-              </button>
-              <button
-                type="button"
-                className={`opt-pill ${isRecurring ? "active" : ""}`}
-                disabled={isInstallment}
-                onClick={() => setIsRecurring((s) => !s)}
-              >
-                <Icon name="repeat" className="text-[12px]" /> Recorrente
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!editingId && isInstallment && (
-          <div className="field">
-            <label className="label">Parcelas (2–48)</label>
-            <input className="input" type="number" min={2} max={48} value={installments} onChange={(e) => setInstallments(e.target.value)} placeholder="Ex: 10" />
-            {(() => {
-              const total = parseBRLToNumber(amount)
-              const n = Number(installments)
-              if (!total || !n || n < 2) return null
-              const per = total / n
-              const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-              return (
-                <span className="help">
-                  {fmt(total)} em <strong>{n}x</strong> de <strong>{fmt(per)}</strong>
-                </span>
-              )
-            })()}
-          </div>
-        )}
-
-        {!editingId && isScheduled && (
-          <div className="field">
-            <label className="label">Data prevista</label>
-            <input className="input" type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} />
-          </div>
-        )}
 
         {/* More options */}
         <div className="collapsible">
@@ -1021,7 +769,7 @@ function TransactionModal(props: TxModalProps) {
                   <div className="cb-help">Mostra na tela de Vencimentos para controle de pagamento</div>
                 </div>
               </div>
-              {editingId && existing?.classification === "installment" && (
+              {existing?.classification === "installment" && (
                 <div className="check-row" style={{ marginTop: 8 }} onClick={() => setEditCascade((s) => !s)}>
                   <div className={`cb ${editCascade ? "checked" : ""}`}>{editCascade && <Icon name="check" className="text-[12px]" />}</div>
                   <div>
@@ -1038,7 +786,7 @@ function TransactionModal(props: TxModalProps) {
           <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
           <button type="submit" className="btn btn-primary" disabled={submitting}>
             {submitting && <span className="spinner" />}
-            {editingId ? "Salvar" : "Criar transação"}
+            Salvar
           </button>
         </div>
       </form>
