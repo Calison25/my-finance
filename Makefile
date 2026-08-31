@@ -1,4 +1,7 @@
-.PHONY: setup check-deps up down build install logs logs-api logs-web clean db-only api-only web-only lint test
+.PHONY: setup check-deps up down build install logs logs-api logs-web clean db-only api-only web-only lint test migrate
+
+# URL do Postgres visto DO HOST (o .env usa o hostname "db", que so existe dentro do compose)
+HOST_DATABASE_URL := postgresql://myfinance:myfinance@localhost:5432/myfinance
 
 PYTHON := python3.12
 NODE_MIN := 20
@@ -47,10 +50,34 @@ setup: check-deps
 	@echo "  2. Run 'make up' to start the app"
 	@echo ""
 
-# Sobe tudo: backend (Docker) + frontend (Vite dev server)
+# Aplica migracoes pendentes no banco local (tabela _migrations controla o que ja rodou)
+migrate:
+	@test -d .venv || (echo "✗ .venv not found. Run 'make setup' first." && exit 1)
+	@docker compose up -d db --wait
+	@# Shim: roles e schema auth do Supabase referenciados pelas migracoes
+	@# (nao existem num Postgres puro; RLS local e inocuo pois a API conecta como dona das tabelas)
+	@docker compose exec -T db psql -U myfinance -d myfinance -q -c "DO \$$\$$ BEGIN \
+		IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF; \
+		IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF; \
+		IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF; \
+	END \$$\$$; \
+	CREATE SCHEMA IF NOT EXISTS auth; \
+	CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid AS 'SELECT NULL::uuid' LANGUAGE sql STABLE; \
+	CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS 'SELECT NULL::jsonb' LANGUAGE sql STABLE;"
+	@DATABASE_URL="$(HOST_DATABASE_URL)" .venv/bin/python scripts/run_migrations.py
+
+# Sobe tudo: banco + migracoes + backend (Docker) + frontend (Vite dev server)
 up:
-	@echo "Starting backend (Docker) + frontend (Vite)..."
+	@test -f .env || (cp .env.example .env && echo "  ✓ .env criado a partir do .env.example")
+	@test -f web/.env || (printf '# Dev local sem Supabase: usa o token "local-dev" contra a API local.\nVITE_LOCAL_DEV=true\n' > web/.env && echo "  ✓ web/.env criado (VITE_LOCAL_DEV=true)")
+	@echo "Starting database..."
+	@docker compose up -d db --wait
+	@$(MAKE) -s migrate
+	@echo "Starting API..."
 	@docker compose up -d
+	@echo "Starting frontend (Vite)..."
+	@# Libera a 5173 se um Vite antigo ficou orfao (strictPort faz o novo falhar em vez de trocar de porta)
+	@lsof -ti tcp:5173 | xargs kill 2>/dev/null || true
 	@cd web && npm run dev &
 	@echo ""
 	@echo "  API:      http://localhost:8000"
@@ -62,7 +89,7 @@ up:
 # Para tudo
 down:
 	@docker compose down
-	@pkill -f "vite" 2>/dev/null || true
+	@lsof -ti tcp:5173 | xargs kill 2>/dev/null || true
 	@echo "All services stopped."
 
 # Build completo

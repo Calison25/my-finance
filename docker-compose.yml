@@ -21,9 +21,11 @@ services:
       POSTGRES_USER: myfinance
       POSTGRES_PASSWORD: myfinance
       POSTGRES_DB: myfinance
+    # Migracoes sao aplicadas via `make migrate` (scripts/run_migrations.py),
+    # nunca pelo initdb do Postgres — assim volume novo e volume antigo seguem
+    # o mesmo caminho e ficam registradas na tabela _migrations.
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./supabase/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U myfinance"]
       interval: 5s
